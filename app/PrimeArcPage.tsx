@@ -6,6 +6,7 @@ import { BUSINESS_CONTACT } from "@/lib/contact";
 import { ArrowRight, Check, ShieldCheck } from "@phosphor-icons/react";
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { type ReactNode, useRef, useState } from "react";
+import { SiteBackground } from "./three/SiteBackground";
 
 function Reveal({
   children,
@@ -51,30 +52,54 @@ function Hero() {
   const ref = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "9%"]);
+  const copyY = useTransform(scrollYProgress, [0, 1], ["0%", "18%"]);
+  const copyOpacity = useTransform(scrollYProgress, [0, 0.75], [1, 0]);
   return (
-    <header className="studio-hero" ref={ref}>
-      <motion.div className="studio-hero-media" style={{ y: reduce ? 0 : y }}>
-        <Image
-          src="/primearc-studio/01-hero.webp"
-          alt="Technical workbench with system maps, prototype materials, and an orange registration marker"
-          fill
-          priority
-          sizes="100vw"
-        />
-      </motion.div>
+    <header className="studio-hero studio-hero-3d" ref={ref}>
       <div className="studio-hero-scrim" aria-hidden="true" />
       <StudioNav />
-      <div className="studio-shell studio-hero-copy">
-        <p className="studio-eyebrow">Founder-led applied AI studio</p>
-        <h1>We build AI systems that complete real work.</h1>
+      <motion.div
+        className="studio-shell studio-hero-copy"
+        style={reduce ? undefined : { y: copyY, opacity: copyOpacity }}
+      >
+        <motion.p
+          className="studio-eyebrow studio-hero-status"
+          initial={reduce ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduce ? 0 : 0.6, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <span className="studio-status-dot" aria-hidden="true" />
+          Founder-led applied AI studio
+        </motion.p>
+        <motion.h1
+          initial={reduce ? false : { opacity: 0, y: 26 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduce ? 0 : 0.8, delay: reduce ? 0 : 0.08, ease: [0.22, 1, 0.36, 1] }}
+        >
+          We build AI systems that complete real work.
+        </motion.h1>
         <div className="studio-hero-bottom">
-          <p>PrimeArcTech turns costly workflows into production systems, then proves the craft through products like FieldRelay.</p>
-          <div className="studio-actions">
+          <motion.p
+            initial={reduce ? false : { opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduce ? 0 : 0.8, delay: reduce ? 0 : 0.16, ease: [0.22, 1, 0.36, 1] }}
+          >
+            PrimeArcTech turns costly workflows into production systems, then proves the craft through products like FieldRelay.
+          </motion.p>
+          <motion.div
+            className="studio-actions"
+            initial={reduce ? false : { opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduce ? 0 : 0.8, delay: reduce ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
+          >
             <a href="/build-brief" className="studio-button">Get free AI audit <ArrowRight aria-hidden="true" /></a>
             <a href="/fieldrelay" target="_blank" rel="noreferrer" className="studio-link">See FieldRelay</a>
-          </div>
+          </motion.div>
         </div>
+      </motion.div>
+      <div className="studio-hero-cue" aria-hidden="true">
+        <span>Live system map</span>
+        <i />
       </div>
     </header>
   );
@@ -299,5 +324,18 @@ function Closing() {
 }
 
 export function PrimeArcPage() {
-  return <main className="studio-page"><Hero /><SituationSelector /><ProductProof /><ProofStandard /><AuditOffer /><DeliveryRail /><Closing /></main>;
+  return (
+    <main className="studio-page studio-immersive">
+      <SiteBackground intensity={1.05} />
+      <div className="studio-immersive-content">
+        <Hero />
+        <SituationSelector />
+        <ProductProof />
+        <ProofStandard />
+        <AuditOffer />
+        <DeliveryRail />
+        <Closing />
+      </div>
+    </main>
+  );
 }

@@ -4620,3 +4620,246 @@ h2 {
   .studio-hero h1 { font-size: clamp(72px, 7vw, 90px); line-height: .88; }
   .studio-hero-bottom { margin-top: 28px; }
 }
+
+/* ============================================================= */
+/* Immersive 3D system-map layer (motion-3D overhaul)            */
+/* ============================================================= */
+
+/* Fixed WebGL stage shared across the primary site. */
+.site-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.system-field {
+  position: absolute;
+  inset: 0;
+}
+
+.system-field canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Readability veil: a soft directional wash so copy stays legible over motion. */
+.site-bg-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(140% 90% at 18% 8%, rgba(216, 100, 62, 0.10), transparent 46%),
+    linear-gradient(180deg, rgba(9, 10, 12, 0.62) 0%, rgba(9, 10, 12, 0.30) 34%, rgba(9, 10, 12, 0.66) 100%);
+}
+
+/* Corner vignette to focus the composition. */
+.site-bg-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 120% at 50% 45%, transparent 52%, rgba(6, 7, 8, 0.72) 100%);
+}
+
+/* Page becomes transparent so the fixed stage reads through the strata. */
+.studio-page.studio-immersive {
+  background: transparent;
+}
+
+.studio-immersive-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 2vw, 26px);
+  padding: 0 clamp(0px, 1.4vw, 26px) clamp(0px, 1.4vw, 26px);
+}
+
+/* Frosted-glass strata: each section floats over the live 3D field, and the
+   gaps between them reveal the raw scene, giving the scroll its depth. */
+.studio-immersive-content > section {
+  border-radius: clamp(18px, 2vw, 28px);
+  background: linear-gradient(180deg, rgba(14, 16, 18, 0.58) 0%, rgba(12, 14, 16, 0.80) 100%);
+  -webkit-backdrop-filter: blur(9px) saturate(1.08);
+  backdrop-filter: blur(9px) saturate(1.08);
+  border: 1px solid rgba(241, 239, 233, 0.07);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.45);
+}
+
+/* Section-level background colours are handled by the strata now. */
+.studio-immersive-content > .studio-router,
+.studio-immersive-content > .studio-proof-product,
+.studio-immersive-content > .studio-proof-standard,
+.studio-immersive-content > .studio-offer,
+.studio-immersive-content > .studio-delivery,
+.studio-immersive-content > .studio-close {
+  background: linear-gradient(180deg, rgba(14, 16, 18, 0.58) 0%, rgba(12, 14, 16, 0.80) 100%);
+}
+
+/* Delivery keeps its photographic backdrop, so drop the blur there and let the
+   image sit inside the rounded stratum. */
+.studio-immersive-content > .studio-delivery {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* A signal-orange hairline reveals on the leading edge of each stratum. */
+.studio-immersive-content > section::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 3;
+  width: clamp(56px, 8vw, 130px);
+  height: 2px;
+  background: linear-gradient(90deg, var(--studio-orange), transparent);
+  opacity: 0.7;
+}
+
+/* ---- Immersive hero (transparent, full 3D behind the promise) ---- */
+.studio-hero-3d {
+  background: transparent;
+}
+
+.studio-hero-3d .studio-hero-scrim {
+  background:
+    radial-gradient(120% 80% at 12% 92%, rgba(8, 9, 11, 0.82) 0%, rgba(8, 9, 11, 0.20) 46%, transparent 68%),
+    linear-gradient(0deg, rgba(8, 9, 11, 0.72) 0%, transparent 40%);
+}
+
+.studio-hero-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.studio-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--studio-orange);
+  box-shadow: 0 0 0 0 rgba(216, 100, 62, 0.55);
+  animation: studio-pulse 2.4s ease-out infinite;
+}
+
+@keyframes studio-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(216, 100, 62, 0.55); }
+  70% { box-shadow: 0 0 0 12px rgba(216, 100, 62, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(216, 100, 62, 0); }
+}
+
+/* Scroll cue / live label, bottom-right of the hero. */
+.studio-hero-cue {
+  position: absolute;
+  right: clamp(20px, 4vw, 64px);
+  bottom: 42px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: #9a9f9d;
+  font: 600 10px/1 var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+}
+
+.studio-hero-cue i {
+  display: block;
+  width: 1px;
+  height: 58px;
+  background: linear-gradient(180deg, var(--studio-orange), transparent);
+  transform-origin: top;
+  animation: studio-cue 2s ease-in-out infinite;
+}
+
+@keyframes studio-cue {
+  0%, 100% { transform: scaleY(0.35); opacity: 0.4; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+@media (max-width: 767px) {
+  .studio-immersive-content {
+    gap: 8px;
+    padding-inline: 8px;
+    padding-bottom: 8px;
+  }
+  .studio-hero-cue { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-status-dot,
+  .studio-hero-cue i { animation: none; }
+}
+
+/* ---- Immersive treatment for About (TrustPage, opt-in) ---- */
+.trust-page.trust-immersive {
+  background: transparent;
+  color: var(--studio-bone);
+}
+
+.trust-immersive .trust-nav,
+.trust-immersive article,
+.trust-immersive footer {
+  position: relative;
+  z-index: 1;
+}
+
+.trust-immersive .trust-nav {
+  border-bottom-color: rgba(241, 239, 233, 0.16);
+}
+
+.trust-immersive .trust-nav nav a { color: var(--studio-bone); }
+.trust-immersive .trust-nav > a:last-child {
+  background: var(--studio-orange);
+  color: var(--studio-ink);
+}
+
+/* Article floats as one frosted stratum over the live field. */
+.trust-immersive article {
+  margin-top: clamp(28px, 5vw, 64px);
+  margin-bottom: clamp(28px, 5vw, 64px);
+  padding-inline: clamp(24px, 4vw, 64px);
+  border-radius: clamp(18px, 2vw, 28px);
+  background: linear-gradient(180deg, rgba(14, 16, 18, 0.60) 0%, rgba(12, 14, 16, 0.82) 100%);
+  -webkit-backdrop-filter: blur(9px) saturate(1.06);
+  backdrop-filter: blur(9px) saturate(1.06);
+  border: 1px solid rgba(241, 239, 233, 0.07);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.45);
+}
+
+.trust-immersive .trust-intro { color: #c3c5c3; }
+.trust-immersive .trust-body section { border-top-color: rgba(241, 239, 233, 0.16); }
+.trust-immersive .trust-body h2 { color: var(--studio-bone); }
+.trust-immersive .trust-body p,
+.trust-immersive .trust-body li { color: var(--studio-steel); }
+.trust-immersive footer { border-top-color: rgba(241, 239, 233, 0.16); }
+.trust-immersive footer span { color: var(--studio-steel); }
+
+/* ---- Immersive treatment for the Build Brief funnel ---- */
+.brief-funnel-page.studio-immersive {
+  background: transparent;
+}
+
+.brief-funnel-page.studio-immersive .brief-funnel-hero > img {
+  opacity: 0.28;
+}
+
+.brief-funnel-page.studio-immersive .brief-funnel-scrim {
+  background:
+    linear-gradient(90deg, rgba(13, 15, 17, 0.86) 0%, rgba(13, 15, 17, 0.62) 45%, rgba(13, 15, 17, 0.30) 100%),
+    linear-gradient(0deg, rgba(13, 15, 17, 0.72), transparent 60%);
+}
+
+.brief-funnel-page.studio-immersive .brief-funnel-explain {
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(14, 16, 18, 0.60), rgba(12, 14, 16, 0.86));
+  -webkit-backdrop-filter: blur(9px) saturate(1.05);
+  backdrop-filter: blur(9px) saturate(1.05);
+  color: var(--studio-bone);
+}
+
+.brief-funnel-page.studio-immersive .brief-funnel-explain h2 { color: var(--studio-bone); }
+.brief-funnel-page.studio-immersive .brief-funnel-explain p { color: var(--studio-steel); }
+.brief-funnel-page.studio-immersive .brief-funnel-explain .studio-label { color: var(--studio-orange); }

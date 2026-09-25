@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { BuildBriefForm } from "../BuildBriefForm";
+import { SiteBackground } from "../three/SiteBackground";
 /* eslint-disable @next/next/no-html-link-for-pages -- full document navigation avoids the production vinext prefetch failure. */
 
 export const metadata: Metadata = {
@@ -18,7 +19,8 @@ const outcomes = [
 
 export default function BuildBriefPage() {
   return (
-    <main className="studio-page brief-funnel-page">
+    <main className="studio-page brief-funnel-page studio-immersive">
+      <SiteBackground intensity={0.9} />
       <header className="brief-funnel-hero">
         <Image src="/primearc-studio/08-brief.webp" alt="Blank technical workflow audit sheet on a dark work surface" fill priority sizes="100vw" />
         <div className="brief-funnel-scrim" aria-hidden="true" />
