@@ -240,9 +240,10 @@
   align-items: center;
   gap: 14px;
   margin: 0 0 32px;
-  color: var(--g1);
-  font-size: 13px;
-  letter-spacing: 0.01em;
+  color: var(--bone);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: normal;
 }
 
 .pa-eyebrow::before {
@@ -250,7 +251,7 @@
   flex: 0 0 auto;
   width: 22px;
   height: 1px;
-  background: var(--g1);
+  background: var(--bone);
 }
 
 .pa-hero h1 {
@@ -800,10 +801,30 @@
   position: relative;
   aspect-ratio: 4 / 5;
   overflow: hidden;
-  background: var(--bone);
+  background: #141618;
 }
 
-.pa-portrait img {
+.pa-portrait-lqip {
+  position: absolute;
+  inset: 0;
+  background-color: #141618;
+  background-size: cover;
+  background-position: center;
+  filter: grayscale(1) contrast(1.05);
+  opacity: 0.9;
+}
+
+.pa-portrait-plate {
+  position: absolute;
+  inset: 0;
+  background: var(--bone);
+  opacity: 0;
+  transition: opacity 480ms ease;
+}
+
+.pa-portrait.is-ready .pa-portrait-plate { opacity: 1; }
+
+.pa-portrait-plate img {
   object-fit: cover;
   object-position: center center;
   filter: grayscale(1) contrast(1.08);
@@ -1099,6 +1120,7 @@
   .pa-hero { position: relative; height: 100vh; }
   .pa-canvas,
   .pa-panel,
+  .pa-portrait-plate,
   .pa-btn,
   .pa-btn span,
   .pa-nav-links a::after,

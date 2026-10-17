@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-html-link-for-pages -- full document navigation avoids the production vinext prefetch failure. */
 
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import Image from "next/image";
 import { ArcCanvas } from "./home/ArcCanvas";
 import { BUSINESS_CONTACT } from "@/lib/contact";
@@ -86,22 +86,81 @@ const team = [
     role: "Senior IoT Platform Engineer",
     image: "/primearc-studio/people/akshay-head.jpg",
     alt: "Portrait of Akshay P M",
+    preview: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABUOEBIQDRUSERIYFhUZHzQiHx0dH0AuMCY0TENQT0tDSUhUXnlmVFlyWkhJaY9qcnyAh4iHUWWUn5ODnXmEh4L/wAALCAAoACABAREA/8QAGQAAAwEBAQAAAAAAAAAAAAAAAwQFAgEA/8QALBAAAgIBAwIDBwUAAAAAAAAAAQIDEQAEEiETMSKB4QUUFTJRYbEjQVJx8P/aAAgBAQAAPwBZxufpKCd1AK3FHMSqRp3Bv5rAxmDWRQOjbTZAsVdn6/QZ6WW9UwhHLEUT3xcOY5U94jkJrwlWqvLGY4JdW8qadCykd/28znJvZ2oE0Ub6eNnVRbKauh+cDKDGzAqUkvm748sI8Jtd9MvI44rLfs9PdoIov5Wx/wB/WaeWRnBKp0786ydrNs8iOebXj70fXOH9Vi7Ua7KB3P3x3Qq7NtdidqCwT2J9Lws5FWO15F0rvvlgvqdP5QTXfDS6yGFQYl6rgjxEcDGoNZDpncOWJeNT4VsCh65n4topt3Tdzs5PgI/OTopY9PrXllUojrfe7z//2Q==",
   },
   {
     name: "Navaneet Deshpande",
     role: "Senior System Engineer | Cloud systems",
     image: "/primearc-studio/people/navaneet-deshpande.jpg",
     alt: "Portrait of Navaneet Deshpande",
+    preview: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABUOEBIQDRUSERIYFhUZHzQiHx0dH0AuMCY0TENQT0tDSUhUXnlmVFlyWkhJaY9qcnyAh4iHUWWUn5ODnXmEh4L/wAALCAAoACABAREA/8QAGgABAAIDAQAAAAAAAAAAAAAABAMFAAIGAf/EACcQAAIBAwMEAgIDAAAAAAAAAAECAwAEEgURISIxQWETURRxMlKR/9oACAEBAAA/ANbTTlEqhlxOXg7mvdT0mLJfhY79iNvdSR6IiRx5M2TDkHxUpsbNIvimulVuRiw/iPfNLxSM5IB3PJol7c/ixrJiC7N0hjsP2T9VtYX0l2s6yqivHtvgdwQai1G2OKzIoyXhvQFIaUICzMiqo5y8VV3eqQXMRUHLHnqGwb0KzRNTs40lhlJSaV9y5XpP1zV9LGHyX+wNcnrE8hREWUuh5324P1Rba1+dHKybyr2jA2JHqjTMULIwIbzXSaXqTzWqrJNsYl2Ix5I8c0a/tTZxpE2PLZHE7jtQbW6jRMJB05ZE5EHtQRlPc8dRJ43q9stPnlvNoiAoOJ/fk/7X/9k=",
   },
   {
     name: "Shreyas Shivakumar",
     role: "Applied AI Engineer",
     image: "/primearc-studio/people/shreyas-shivakumar.jpg",
     alt: "Portrait of Shreyas Shivakumar",
+    preview: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABUOEBIQDRUSERIYFhUZHzQiHx0dH0AuMCY0TENQT0tDSUhUXnlmVFlyWkhJaY9qcnyAh4iHUWWUn5ODnXmEh4L/wAALCAAoACABAREA/8QAFwABAQEBAAAAAAAAAAAAAAAAAwQFAv/EACcQAAIBAwQBAgcAAAAAAAAAAAECAwAEERIhMVFBBiITIzKBkcHR/9oACAEBAAA/ALwu9NGBVsI2pLpFNsXZgBH79+Nh57rPMbLyKG4u4rYgSBycajoQtpHZ6FVwyqyKynKsMgjyK6uH+JbSR8alK/mrXiR6wvUds8VussSg5Ok7ZwOf7SwrogixnQVAUnzikY+3mtKaXTA5zjbFRylrizjVwpUkBs+fH7qI3DT37RhdKJlQOuaVwyirZZFWJiwLAcgHmhubgp8qPSGUD27HH3rKacQ3GwzLJhjk/SAeh3WqQskYZRkEZr//2Q==",
   },
 ] as const;
 
 const scenarios = Object.values(DEMO_SCENARIOS);
+
+function TeamPortrait({ person, active }: { person: (typeof team)[number]; active: boolean }) {
+  const [ready, setReady] = useState(false);
+  return (
+    <figure className="pa-person">
+      <div className={ready ? "pa-portrait is-ready" : "pa-portrait"}>
+        <div className="pa-portrait-lqip" style={{ backgroundImage: `url("${person.preview}")` }} aria-hidden="true" />
+        {active ? (
+          <div className="pa-portrait-plate">
+            <Image
+              src={person.image}
+              alt={person.alt}
+              fill
+              sizes="(max-width: 820px) 42vw, 28vw"
+              onLoad={() => setReady(true)}
+            />
+          </div>
+        ) : null}
+      </div>
+      <figcaption>
+        <h3>{person.name}</h3>
+        <p>{person.role}</p>
+      </figcaption>
+    </figure>
+  );
+}
+
+function TeamRow() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const arm = () => {
+      for (const person of team) {
+        const preload = new window.Image();
+        preload.src = person.image;
+      }
+      setActive(true);
+    };
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      arm();
+      observer.disconnect();
+    }, { rootMargin: "900px 0px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className="pa-people" ref={ref}>
+      {team.map((person) => <TeamPortrait key={person.name} person={person} active={active} />)}
+    </div>
+  );
+}
 
 function FinMotif({ count = 42, hot = 27 }: { count?: number; hot?: number }) {
   return (
@@ -467,19 +526,7 @@ export function PrimeArcPage() {
             <p className="pa-kicker">05 / Team</p>
             <h2 id="team-title">Small studio. Accountable work.</h2>
             <p className="pa-team-lede">Three people in Bangalore. Direct delivery, from the first loop to the system in operation.</p>
-            <div className="pa-people">
-              {team.map((person) => (
-                <figure className="pa-person" key={person.name}>
-                  <div className="pa-portrait">
-                    <Image src={person.image} alt={person.alt} fill sizes="(max-width: 820px) 42vw, 28vw" />
-                  </div>
-                  <figcaption>
-                    <h3>{person.name}</h3>
-                    <p>{person.role}</p>
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
+            <TeamRow />
           </section>
 
           <section className="pa-close pa-grid" id="audit" aria-labelledby="audit-title">
