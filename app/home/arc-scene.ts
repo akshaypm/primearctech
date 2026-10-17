@@ -376,10 +376,12 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     schedule();
   };
   document.addEventListener("visibilitychange", onVisibility);
-  const onPause = () => {
-    paused = true;
+  const onPause = (event: Event) => {
+    const release = event instanceof CustomEvent && event.detail === false;
+    paused = !release;
     window.cancelAnimationFrame(raf);
     raf = 0;
+    if (!paused) schedule();
   };
   window.addEventListener("arc:pause", onPause);
 

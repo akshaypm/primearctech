@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- full document navigation avoids the production vinext prefetch failure. */
 
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import Image from "next/image";
 import { ArcCanvas } from "./home/ArcCanvas";
 import { BUSINESS_CONTACT } from "@/lib/contact";
 import { DEMO_SCENARIOS } from "@/lib/demo/scenarios";
@@ -78,6 +79,27 @@ const auditOutputs = [
   "Key risks and human controls",
   "Build, buy, narrow, or stop recommendation",
 ];
+
+const team = [
+  {
+    name: "Akshay P M",
+    role: "Senior IoT Platform Engineer",
+    image: "/primearc-studio/people/akshay-head.jpg",
+    alt: "Portrait of Akshay P M",
+  },
+  {
+    name: "Navaneet Deshpande",
+    role: "Senior System Engineer | Cloud systems",
+    image: "/primearc-studio/people/navaneet-deshpande.jpg",
+    alt: "Portrait of Navaneet Deshpande",
+  },
+  {
+    name: "Shreyas Shivakumar",
+    role: "Applied AI Engineer",
+    image: "/primearc-studio/people/shreyas-shivakumar.jpg",
+    alt: "Portrait of Shreyas Shivakumar",
+  },
+] as const;
 
 const scenarios = Object.values(DEMO_SCENARIOS);
 
@@ -241,6 +263,7 @@ export function PrimeArcPage() {
   const trackRef = useRef<HTMLDivElement>(null);
   const [situation, setSituation] = useState<(typeof situations)[number]["id"]>("workflow");
   const [scenarioId, setScenarioId] = useState<DemoScenario["id"]>("routine");
+  const activeSituation = situations.find((item) => item.id === situation) ?? situations[0];
 
   return (
     <div className="pa">
@@ -259,7 +282,10 @@ export function PrimeArcPage() {
                   <a href="#method">Method</a>
                   <a href="/about">About</a>
                 </nav>
-                <a className="pa-nav-cta" href="/build-brief">Get a free AI audit</a>
+                <a className="pa-nav-cta" href="/build-brief">
+                  <span className="pa-nav-cta-full">Get a free AI audit</span>
+                  <span className="pa-nav-cta-short">Free audit</span>
+                </a>
               </div>
             </header>
             <div className="pa-hero-copy">
@@ -306,19 +332,24 @@ export function PrimeArcPage() {
               active={situation}
               onChange={(id) => setSituation(id as (typeof situations)[number]["id"])}
             />
-            <div className="pa-stack">
-              {situations.map((item) => (
-                <Panel key={item.id} id={`panel-choose-${item.id}`} labelledBy={`tab-choose-${item.id}`} active={situation === item.id}>
-                  <h3>{item.title}</h3>
-                  <p className="pa-body">{item.body}</p>
-                  <dl className="pa-scope">
-                    <dt className="pa-kicker">First scope</dt>
-                    <dd>{item.scope}</dd>
-                  </dl>
-                </Panel>
-              ))}
+            <div className="pa-choice">
+              <div className="pa-stack">
+                {situations.map((item) => (
+                  <Panel key={item.id} id={`panel-choose-${item.id}`} labelledBy={`tab-choose-${item.id}`} active={situation === item.id}>
+                    <h3>{item.title}</h3>
+                    <p className="pa-body">{item.body}</p>
+                  </Panel>
+                ))}
+              </div>
+              <aside className="pa-choice-side">
+                <FinMotif count={24} hot={14} />
+                <dl className="pa-scope">
+                  <dt className="pa-kicker">First scope</dt>
+                  <dd>{activeSituation.scope}</dd>
+                </dl>
+                <p className="pa-notfit">Not a fit: generic content production, staff augmentation, or automation without an accountable owner.</p>
+              </aside>
             </div>
-            <p className="pa-notfit">Not a fit: generic content production, staff augmentation, or automation without an accountable owner.</p>
           </section>
 
           <section className="pa-relay" id="fieldrelay" aria-labelledby="relay-title">
@@ -435,35 +466,20 @@ export function PrimeArcPage() {
           <section className="pa-team pa-grid" id="team" aria-labelledby="team-title">
             <p className="pa-kicker">05 / Team</p>
             <h2 id="team-title">Small studio. Accountable work.</h2>
-            <p className="pa-team-lede">Names and portraits are not published yet. The seats below are reserved for the people who do the work.</p>
-            <div className="pa-register-wrap">
-              <table className="pa-register">
-                <thead>
-                  <tr>
-                    <th scope="col"> </th>
-                    <th scope="col">Name</th>
-                    <th scope="col">Role</th>
-                    <th scope="col">Owns</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {["01", "02", "03"].map((index) => (
-                    <tr key={index}>
-                      <td className="pa-kicker">{index}</td>
-                      <td><span className="pa-ph">[placeholder]</span></td>
-                      <td><span className="pa-ph">[placeholder]</span></td>
-                      <td><span className="pa-ph">[placeholder]</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <p className="pa-team-lede">Three people in Bangalore. Direct delivery, from the first loop to the system in operation.</p>
+            <div className="pa-people">
+              {team.map((person) => (
+                <figure className="pa-person" key={person.name}>
+                  <div className="pa-portrait">
+                    <Image src={person.image} alt={person.alt} fill sizes="(max-width: 820px) 42vw, 28vw" />
+                  </div>
+                  <figcaption>
+                    <h3>{person.name}</h3>
+                    <p>{person.role}</p>
+                  </figcaption>
+                </figure>
+              ))}
             </div>
-            <figure className="pa-plate">
-              <figcaption>
-                <span className="pa-kicker">Plate</span>
-                <p>Portrait unpublished. One wall, one light, when a reshoot exists.</p>
-              </figcaption>
-            </figure>
           </section>
 
           <section className="pa-close pa-grid" id="audit" aria-labelledby="audit-title">
