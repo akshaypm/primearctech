@@ -1,0 +1,45 @@
+/*
+  Typefaces
+  ---------
+  Production target: Söhne and Söhne Mono (Klim Type Foundry).
+  A commercial Klim licence is required before those files ship.
+  Self-host the WOFF2s. Do not load them from a CDN.
+
+  To swap:
+  1. Add the licensed files beside the faces below, for example
+     public/fonts/soehne-buch.woff2 and public/fonts/soehne-mono.woff2.
+  2. Point the src urls at those files.
+  3. Change the font-family names to "Söhne" and "Söhne Mono".
+  4. Update --font-sans and --font-mono in app/globals.css to the same names.
+  5. Display headlines use --track-display in app/home/home.css.
+     It is -0.035em for General Sans. Retune that one variable for Söhne
+     if the large lines feel tight.
+
+  Current faces:
+  - General Sans 400 and 500 (Fontshare, ITF Free Font License, free for commercial use).
+  - IBM Plex Mono 400 (SIL Open Font License). See public/fonts/IBMPlexMono-OFL.txt.
+*/
+
+@font-face {
+  font-family: "General Sans";
+  src: url("/fonts/general-sans-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "General Sans";
+  src: url("/fonts/general-sans-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/ibm-plex-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

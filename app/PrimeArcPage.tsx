@@ -1,303 +1,510 @@
 "use client";
 /* eslint-disable @next/next/no-html-link-for-pages -- full document navigation avoids the production vinext prefetch failure. */
 
-import Image from "next/image";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { ArcCanvas } from "./home/ArcCanvas";
 import { BUSINESS_CONTACT } from "@/lib/contact";
-import { ArrowRight, Check, ShieldCheck } from "@phosphor-icons/react";
-import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
-import { type ReactNode, useRef, useState } from "react";
+import { DEMO_SCENARIOS } from "@/lib/demo/scenarios";
+import type { DemoScenario } from "@/lib/demo/types";
+import "./home/home.css";
 
-function Reveal({
-  children,
-  className = "",
-  delay = 0,
-}: {
-  children: ReactNode;
-  className?: string;
-  delay?: number;
-}) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div
-      className={className}
-      initial={reduce ? false : { opacity: 0, y: 26 }}
-      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.18 }}
-      transition={{ duration: reduce ? 0 : 0.72, delay: reduce ? 0 : delay, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-function StudioNav() {
-  return (
-    <nav className="studio-nav studio-shell" aria-label="Primary navigation">
-      <a href="/" className="studio-wordmark" aria-label="PrimeArcTech home">
-        <strong>PrimeArc</strong><span>Tech</span>
-      </a>
-      <div className="studio-nav-links">
-        <a href="#studio">Studio</a>
-        <a href="/fieldrelay" target="_blank" rel="noreferrer">Product</a>
-        <a href="#method">Method</a>
-        <a href="/about">About</a>
-      </div>
-      <a href="/build-brief" className="studio-nav-cta">Get free AI audit <ArrowRight aria-hidden="true" /></a>
-    </nav>
-  );
-}
-
-function Hero() {
-  const ref = useRef<HTMLElement>(null);
-  const reduce = useReducedMotion();
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "9%"]);
-  return (
-    <header className="studio-hero" ref={ref}>
-      <motion.div className="studio-hero-media" style={{ y: reduce ? 0 : y }}>
-        <Image
-          src="/primearc-studio/01-hero.webp"
-          alt="Technical workbench with system maps, prototype materials, and an orange registration marker"
-          fill
-          priority
-          sizes="100vw"
-        />
-      </motion.div>
-      <div className="studio-hero-scrim" aria-hidden="true" />
-      <StudioNav />
-      <div className="studio-shell studio-hero-copy">
-        <p className="studio-eyebrow">Founder-led applied AI studio</p>
-        <h1>We build AI systems that complete real work.</h1>
-        <div className="studio-hero-bottom">
-          <p>PrimeArcTech turns costly workflows into production systems, then proves the craft through products like FieldRelay.</p>
-          <div className="studio-actions">
-            <a href="/build-brief" className="studio-button">Get free AI audit <ArrowRight aria-hidden="true" /></a>
-            <a href="/fieldrelay" target="_blank" rel="noreferrer" className="studio-link">See FieldRelay</a>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
+const services = [
+  ["A — Workflow", "Build an AI workflow system"],
+  ["B — Product", "Shape and prove the core product loop"],
+  ["C — Production", "Harden it for real operation"],
+  ["Studio", "Founder-led, Bangalore"],
+] as const;
 
 const situations = [
   {
     id: "workflow",
-    button: "A workflow consumes too much human time",
+    index: "A",
+    label: "A workflow consumes too much human time",
     title: "Build an AI workflow system.",
     body: "Map the decision, tools, exceptions, and human owner before writing production code.",
     scope: "Workflow map, smallest useful loop, operating boundaries",
   },
   {
     id: "product",
-    button: "You have an AI product idea, not a build plan",
+    index: "B",
+    label: "You have an AI product idea, not a build plan",
     title: "Shape and prove the core product loop.",
     body: "Test model behavior and user value before the roadmap becomes expensive.",
     scope: "Product thesis, prototype direction, evaluation plan",
   },
   {
     id: "production",
-    button: "Your prototype works only in the demo",
+    index: "C",
+    label: "Your prototype works only in the demo",
     title: "Harden it for real operation.",
     body: "Add policies, evaluations, failure paths, monitoring, and human handoff.",
     scope: "Production architecture, risk controls, launch decision",
   },
 ] as const;
 
-function SituationSelector() {
-  const [selected, setSelected] = useState<(typeof situations)[number]["id"]>("workflow");
-  const active = situations.find((item) => item.id === selected) ?? situations[0];
-  const reduce = useReducedMotion();
-
-  return (
-    <section className="studio-router" id="studio">
-      <div className="studio-shell studio-router-shell">
-        <Reveal className="studio-router-heading">
-          <h2>Choose the problem you actually have.</h2>
-          <p>One consequential system, scoped tightly enough to prove.</p>
-        </Reveal>
-        <div className="studio-router-grid">
-          <div className="studio-router-options" role="list" aria-label="Reasons to work with PrimeArcTech">
-            {situations.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={selected === item.id ? "is-active" : ""}
-                onClick={() => setSelected(item.id)}
-                aria-pressed={selected === item.id}
-              >
-                <span>{item.button}</span>
-                <ArrowRight aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-          <div className="studio-router-answer">
-            <Image src="/primearc-studio/02-studio-lab.webp" alt="Technical studio materials and a physical system prototype" fill sizes="(max-width: 767px) 100vw, 48vw" />
-            <div className="studio-router-scrim" aria-hidden="true" />
-            <motion.div
-              key={active.id}
-              initial={reduce ? false : { opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduce ? 0 : 0.35 }}
-            >
-              <span>Recommended direction</span>
-              <h3>{active.title}</h3>
-              <p>{active.body}</p>
-              <dl><dt>First scope</dt><dd>{active.scope}</dd></dl>
-              <a href="/build-brief">Get free AI audit <ArrowRight aria-hidden="true" /></a>
-            </motion.div>
-          </div>
-        </div>
-        <p className="studio-router-boundary">Not a fit: generic content production, staff augmentation, or automation without an accountable owner.</p>
-      </div>
-    </section>
-  );
-}
-
-function ProductProof() {
-  return (
-    <section className="studio-proof-product" id="product">
-      <div className="studio-shell">
-        <Reveal className="studio-proof-product-heading">
-          <p className="studio-label">Owned product</p>
-          <h2>Our proof talks back.</h2>
-          <p>FieldRelay is a working voice product, not a portfolio mockup.</p>
-        </Reveal>
-        <div className="studio-proof-product-stage">
-          <div className="studio-proof-product-media">
-            <Image
-              src="/primearc-studio/03-fieldrelay.webp"
-              alt="FieldRelay voice interface with a live transcript and dispatcher receipt"
-              fill
-              sizes="(max-width: 767px) 100vw, 72vw"
-            />
-          </div>
-          <Reveal className="studio-proof-product-console" delay={0.08}>
-            <div><strong>FieldRelay</strong><span>by PrimeArcTech</span></div>
-            <p>Challenge the agent. Interrupt it. Push for a price. Watch the policy decisions and receipt.</p>
-            <ul>
-              <li><Check aria-hidden="true" /> Real browser voice call</li>
-              <li><Check aria-hidden="true" /> Visible transcript</li>
-              <li><Check aria-hidden="true" /> Provisional sandbox receipt</li>
-            </ul>
-            <a href="/fieldrelay/demo" target="_blank" rel="noreferrer" className="studio-button">Try FieldRelay live <ArrowRight aria-hidden="true" /></a>
-            <a href="/fieldrelay" target="_blank" rel="noreferrer" className="studio-link">Explore the product</a>
-          </Reveal>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-const proofArtifacts = [
-  ["Architecture map", "Models, tools, data, people, failure paths"],
-  ["Boundary policy", "Allowed actions, refusals, human handoff"],
-  ["Adversarial test", "Edge cases, prompt attacks, unsafe requests"],
-  ["Operator receipt", "What happened and what a person does next"],
+const architecture = [
+  ["01", "Browser", "Microphone after an explicit click. Public demo recording is off."],
+  ["02", "Voice provider", "Audio goes to the configured assistant. A failure is labelled, not presented as success."],
+  ["03", "Policy", "An immutable policy decides the route. Prompt text does not replace it."],
+  ["04", "Session", "Call id, transcript, decision, and a provisional receipt. Public sessions expire after two hours."],
+  ["05", "Human", "A dispatcher confirms anything real. The demo cannot book, dispatch, transfer, or write a CRM."],
 ] as const;
 
-function ProofStandard() {
-  return (
-    <section className="studio-proof-standard">
-      <div className="studio-shell studio-proof-standard-grid">
-        <div className="studio-proof-standard-media">
-          <Image src="/primearc-studio/05-evidence.webp" alt="Architecture, boundary, testing, and failure documents arranged as system evidence" fill sizes="(max-width: 767px) 100vw, 52vw" />
-        </div>
-        <Reveal className="studio-proof-standard-copy">
-          <h2>What makes the system trustworthy?</h2>
-          <div className="studio-artifact-grid">
-            {proofArtifacts.map(([title, body]) => (
-              <div key={title}><ShieldCheck aria-hidden="true" /><strong>{title}</strong><span>{body}</span></div>
-            ))}
-          </div>
-          <a href="/fieldrelay-architecture-brief.pdf" target="_blank" rel="noreferrer" className="studio-link">View an architecture brief <ArrowRight aria-hidden="true" /></a>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
+const allowed = [
+  "Capture a routine request inside the configured service area",
+  "Hold a provisional arrival window for a dispatcher to confirm",
+  "Stop intake and escalate when the caller describes danger",
+];
+
+const refused = [
+  "Diagnosis or repair instruction",
+  "A firm estimate, a service promise, or a confirmed appointment",
+  "Routine intake after danger language",
+  "A real booking, dispatch, transfer, or CRM write from the demo",
+  "A prompt that tries to replace the system policy",
+];
+
+const method = [
+  ["01", "Frame", "Choose one valuable loop"],
+  ["02", "Prototype", "Prove the core behavior"],
+  ["03", "Test", "Attack failures and boundaries"],
+  ["04", "Ship", "Deploy with clear ownership"],
+  ["05", "Monitor", "Review behavior and improve"],
+] as const;
 
 const auditOutputs = [
   "Best opportunity worth automating",
   "Smallest useful system scope",
   "Key risks and human controls",
   "Build, buy, narrow, or stop recommendation",
-] as const;
+];
 
-function AuditOffer() {
+const scenarios = Object.values(DEMO_SCENARIOS);
+
+function FinMotif({ count = 42, hot = 27 }: { count?: number; hot?: number }) {
   return (
-    <section className="studio-offer" id="engagement">
-      <div className="studio-shell studio-offer-grid">
-        <Reveal className="studio-offer-copy">
-          <p className="studio-label">Free AI Workflow Audit</p>
-          <h2>Find where AI can do useful work.</h2>
-          <p>Show us one repeated, expensive, or error-prone workflow. We return the strongest opportunity and next sensible move.</p>
-          <div className="studio-audit-note"><strong>Free</strong><span>Direct review<br />No sales sequence</span></div>
-          <a href="/build-brief" className="studio-button">Get free AI audit <ArrowRight aria-hidden="true" /></a>
-        </Reveal>
-        <div className="studio-offer-sheet">
-          <Image src="/primearc-studio/08-brief.webp" alt="A mineral-white technical workflow audit sheet on a dark work surface" fill sizes="(max-width: 767px) 100vw, 55vw" />
-          <div className="studio-offer-sheet-copy">
-            <h3>Your audit covers</h3>
-            <ul>{auditOutputs.map((item) => <li key={item}><Check aria-hidden="true" />{item}</li>)}</ul>
-            <p>No complete architecture. No revenue promise. No obligation to build. If an existing tool solves it, we say so.</p>
-          </div>
-        </div>
-      </div>
-    </section>
+    <div className="pa-motif" aria-hidden="true">
+      {Array.from({ length: count }, (_, index) => (
+        <span key={`fin-${count}-${index}`} className={index >= hot && index < hot + 3 ? "is-hot" : undefined} />
+      ))}
+    </div>
   );
 }
 
-const delivery = [
-  ["Frame", "Choose one valuable loop"],
-  ["Prototype", "Prove the core behavior"],
-  ["Test", "Attack failures and boundaries"],
-  ["Ship", "Deploy with clear ownership"],
-  ["Monitor", "Review behavior and improve"],
-] as const;
+function RuleTabs({
+  label,
+  tabs,
+  active,
+  onChange,
+}: {
+  label: string;
+  tabs: readonly { id: string; index: string; label: string }[];
+  active: string;
+  onChange: (id: string) => void;
+}) {
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const current = tabs.findIndex((tab) => tab.id === active);
+    if (current < 0) return;
+    let next = current;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (current + 1) % tabs.length;
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (current - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    const tab = tabs[next];
+    onChange(tab.id);
+    document.getElementById(`tab-${label}-${tab.id}`)?.focus();
+  };
 
-function DeliveryRail() {
   return (
-    <section className="studio-delivery" id="method">
-      <div className="studio-delivery-media"><Image src="/primearc-studio/06-process.webp" alt="A folded technical dossier showing a system moving from question to operating decision" fill sizes="100vw" /></div>
-      <div className="studio-delivery-scrim" aria-hidden="true" />
-      <div className="studio-shell studio-delivery-shell">
-        <Reveal className="studio-delivery-heading">
-          <h2>From workflow to operating system.</h2>
-          <p>Direct delivery, visible artifacts, human controls, and one accountable builder.</p>
-        </Reveal>
-        <div className="studio-delivery-rail">
-          {delivery.map(([title, body], index) => (
-            <Reveal key={title} className="studio-delivery-stop" delay={index * 0.06}>
-              <span>{index + 1}</span><strong>{title}</strong><p>{body}</p>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
+    <div className="pa-tabs" role="tablist" aria-label={label} tabIndex={-1} onKeyDown={onKeyDown}>
+      {tabs.map((tab) => {
+        const selected = tab.id === active;
+        return (
+          <button
+            key={tab.id}
+            id={`tab-${label}-${tab.id}`}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            aria-controls={`panel-${label}-${tab.id}`}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(tab.id)}
+          >
+            <span className="pa-kicker">{tab.index}</span>
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
-function Closing() {
+function Panel({ id, labelledBy, active, children }: { id: string; labelledBy: string; active: boolean; children: ReactNode }) {
   return (
-    <section className="studio-close">
-      <div className="studio-shell studio-close-shell">
-        <Reveal>
-          <h2>Bring one expensive workflow.</h2>
-          <p>Get a direct fit decision, likely first scope, key risks, and the next sensible move.</p>
-          <a href="/build-brief" className="studio-button">Get free AI audit <ArrowRight aria-hidden="true" /></a>
-          <small>Free fit assessment. No automated sales sequence.</small>
-        </Reveal>
-      </div>
-      <footer className="studio-footer studio-shell">
-        <a href="/" className="studio-wordmark"><strong>PrimeArc</strong><span>Tech</span></a>
-        <div><a href="#studio">Studio</a><a href="/fieldrelay" target="_blank" rel="noreferrer">FieldRelay</a><a href={`mailto:${BUSINESS_CONTACT.email}`}>Email</a><a href={BUSINESS_CONTACT.whatsappHref} target="_blank" rel="noreferrer">WhatsApp</a><a href="/security">Security</a><a href="/about">About</a><a href="/privacy">Privacy</a></div>
-        <p><a href={`tel:${BUSINESS_CONTACT.phoneHref}`}>{BUSINESS_CONTACT.phoneDisplay}</a><br />{BUSINESS_CONTACT.location}<br />© {new Date().getFullYear()} PrimeArcTech.</p>
-      </footer>
-    </section>
+    <div
+      id={id}
+      role="tabpanel"
+      aria-labelledby={labelledBy}
+      className={active ? "pa-panel is-on" : "pa-panel"}
+      aria-hidden={active ? undefined : true}
+      inert={active ? undefined : true}
+    >
+      {children}
+    </div>
+  );
+}
+
+function clock(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remain = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remain).padStart(2, "0")}`;
+}
+
+const speakers: Record<DemoScenario["transcript"][number]["speaker"], string> = {
+  fieldrelay: "FieldRelay",
+  caller: "Caller",
+  system: "System",
+};
+
+function Receipt({ scenario }: { scenario: DemoScenario }) {
+  const receipt = scenario.receipt;
+  return (
+    <aside className="pa-receipt" aria-label={`${scenario.title} receipt`}>
+      <header>
+        <span>FieldRelay</span>
+        <span>Sandbox</span>
+      </header>
+      <h3>{receipt.outcome}</h3>
+      <p className="pa-service">{receipt.service}</p>
+      <dl>
+        <dt>Caller</dt>
+        <dd>{receipt.callerName}</dd>
+        <dt>Location</dt>
+        <dd>{receipt.location}</dd>
+        <dt>Urgency</dt>
+        <dd>{receipt.urgency}</dd>
+        {receipt.appointment ? (
+          <>
+            <dt>Window</dt>
+            <dd>{receipt.appointment}</dd>
+          </>
+        ) : null}
+        {receipt.handoff ? (
+          <>
+            <dt>Handoff</dt>
+            <dd>{receipt.handoff}</dd>
+          </>
+        ) : null}
+        <dt>Safeguards</dt>
+        <dd>
+          <ul>
+            {receipt.safeguards.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </dd>
+      </dl>
+    </aside>
+  );
+}
+
+function EmailCopy() {
+  const [copied, setCopied] = useState(false);
+  const email = BUSINESS_CONTACT.email;
+  return (
+    <a
+      className="pa-email"
+      href={`mailto:${email}`}
+      aria-live="polite"
+      onClick={(event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+        event.preventDefault();
+        void navigator.clipboard.writeText(email).then(
+          () => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1600);
+          },
+          () => {
+            window.location.href = `mailto:${email}`;
+          },
+        );
+      }}
+    >
+      {copied ? "COPIED" : email}
+    </a>
   );
 }
 
 export function PrimeArcPage() {
-  return <main className="studio-page"><Hero /><SituationSelector /><ProductProof /><ProofStandard /><AuditOffer /><DeliveryRail /><Closing /></main>;
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [situation, setSituation] = useState<(typeof situations)[number]["id"]>("workflow");
+  const [scenarioId, setScenarioId] = useState<DemoScenario["id"]>("routine");
+
+  return (
+    <div className="pa">
+      <a className="pa-skip" href="#studio">Skip to content</a>
+      <main>
+        <div className="pa-hero-track" ref={trackRef}>
+          <section className="pa-hero" aria-labelledby="hero-title">
+            <ArcCanvas trackRef={trackRef} />
+            <div className="pa-hero-scrim" aria-hidden="true" />
+            <header className="pa-nav">
+              <div className="pa-grid pa-nav-row">
+                <a className="pa-mark" href="/">PrimeArcTech</a>
+                <nav className="pa-nav-links" aria-label="Primary">
+                  <a href="#studio">Studio</a>
+                  <a href="#fieldrelay">FieldRelay</a>
+                  <a href="#method">Method</a>
+                  <a href="/about">About</a>
+                </nav>
+                <a className="pa-nav-cta" href="/build-brief">Get a free AI audit</a>
+              </div>
+            </header>
+            <div className="pa-hero-copy">
+              <p className="pa-eyebrow">Founder-led applied AI studio</p>
+              <h1 id="hero-title">We build AI systems <br />that complete real work.</h1>
+              <p className="pa-lede">PrimeArcTech turns costly workflows into production systems, then proves the craft through products like FieldRelay.</p>
+              <div className="pa-actions">
+                <a className="pa-btn" href="/build-brief">Get a free AI audit <span aria-hidden="true">→</span></a>
+                <a className="pa-textlink" href="/fieldrelay/demo" target="_blank" rel="noreferrer">Try FieldRelay live</a>
+              </div>
+            </div>
+            <p className="pa-cap">The Arc — real-time<br />Bangalore, IN</p>
+            <noscript>
+              {/* The still is the no-JS frame. next/image cannot render inside noscript. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="pa-still" src="/arc/arc-still.webp" alt="" width={1600} height={1000} />
+            </noscript>
+          </section>
+        </div>
+
+        <div className="pa-doc" id="studio">
+          <div className="pa-guides" aria-hidden="true">
+            <div className="pa-grid">
+              {Array.from({ length: 12 }, (_, index) => <span key={`guide-${index}`} />)}
+            </div>
+          </div>
+
+          <ul className="pa-spec pa-grid" aria-label="Services">
+            {services.map(([label, text]) => (
+              <li key={label}>
+                <span className="pa-kicker">{label}</span>
+                <p>{text}</p>
+              </li>
+            ))}
+          </ul>
+
+          <section className="pa-router pa-grid" aria-labelledby="choose-title">
+            <p className="pa-kicker">01 / Choose</p>
+            <h2 id="choose-title">Choose the problem you actually have.</h2>
+            <p className="pa-aside">One consequential system, scoped tightly enough to prove.</p>
+            <RuleTabs
+              label="choose"
+              tabs={situations.map((item) => ({ id: item.id, index: item.index, label: item.label }))}
+              active={situation}
+              onChange={(id) => setSituation(id as (typeof situations)[number]["id"])}
+            />
+            <div className="pa-stack">
+              {situations.map((item) => (
+                <Panel key={item.id} id={`panel-choose-${item.id}`} labelledBy={`tab-choose-${item.id}`} active={situation === item.id}>
+                  <h3>{item.title}</h3>
+                  <p className="pa-body">{item.body}</p>
+                  <dl className="pa-scope">
+                    <dt className="pa-kicker">First scope</dt>
+                    <dd>{item.scope}</dd>
+                  </dl>
+                </Panel>
+              ))}
+            </div>
+            <p className="pa-notfit">Not a fit: generic content production, staff augmentation, or automation without an accountable owner.</p>
+          </section>
+
+          <section className="pa-relay" id="fieldrelay" aria-labelledby="relay-title">
+            <div className="pa-grid">
+              <div className="pa-relay-title">
+                <FinMotif />
+                <p className="pa-kicker">02 / FieldRelay</p>
+                <h2 id="relay-title">Interrupt.<br />Price check.<br />Receipt.</h2>
+              </div>
+              <p className="pa-aside">FieldRelay is a working voice product, not a portfolio mockup. Challenge the agent. Interrupt it. Push for a price. Watch the policy decisions and the receipt.</p>
+              <RuleTabs
+                label="relay"
+                tabs={scenarios.map((item) => ({ id: item.id, index: item.index, label: item.title }))}
+                active={scenarioId}
+                onChange={(id) => setScenarioId(id as DemoScenario["id"])}
+              />
+              <div className="pa-stack">
+                {scenarios.map((item) => (
+                  <Panel key={item.id} id={`panel-relay-${item.id}`} labelledBy={`tab-relay-${item.id}`} active={scenarioId === item.id}>
+                    <p className="pa-case"><strong>{item.label}</strong>{item.prompt}</p>
+                    <div className="pa-proof">
+                      <div>
+                        {item.transcript.map((line) => (
+                          <div className={line.speaker === "system" ? "pa-line is-system" : "pa-line"} key={`${item.id}-${line.atSeconds}`}>
+                            <time dateTime={`PT${line.atSeconds}S`}>{clock(line.atSeconds)}</time>
+                            <b>{speakers[line.speaker]}</b>
+                            <p>{line.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <Receipt scenario={item} />
+                    </div>
+                  </Panel>
+                ))}
+              </div>
+              <div className="pa-relay-actions">
+                <a className="pa-btn" href="/fieldrelay/demo" target="_blank" rel="noreferrer">Try FieldRelay live <span aria-hidden="true">→</span></a>
+                <a className="pa-textlink" href="/fieldrelay" target="_blank" rel="noreferrer">Explore the product</a>
+              </div>
+            </div>
+          </section>
+
+          <section className="pa-trust pa-grid" aria-labelledby="trust-title">
+            <p className="pa-kicker">03 / Trust</p>
+            <h2 id="trust-title">What makes the system trustworthy?</h2>
+            <div className="pa-arch">
+              <p className="pa-fig pa-kicker"><span>FIG. 02 — Architecture</span><span>FieldRelay demo</span></p>
+              {architecture.map(([index, title, body]) => (
+                <article key={index}>
+                  <span className="pa-kicker">{index}</span>
+                  <b>{title}</b>
+                  <p>{body}</p>
+                </article>
+              ))}
+            </div>
+            <div className="pa-policy">
+              <p className="pa-fig pa-kicker"><span>Boundary policy</span><span>Demo</span></p>
+              <h3>Allowed</h3>
+              <ul>
+                {allowed.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+              <div className="is-refused">
+                <h3>Refused</h3>
+                <ul>
+                  {refused.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+              <figure className="pa-filed">
+                <figcaption className="pa-fig pa-kicker"><span>Operator receipt</span><span>Sandbox</span></figcaption>
+                <Receipt scenario={DEMO_SCENARIOS.routine} />
+              </figure>
+            </div>
+            <div className="pa-log-wrap">
+              <p className="pa-fig pa-kicker"><span>FIG. 03 — Adversarial cases</span><span>Prompt to outcome</span></p>
+              <table className="pa-log">
+                <thead>
+                  <tr>
+                    <th scope="col">Prompt</th>
+                    <th scope="col">Outcome</th>
+                    <th scope="col">What it checks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scenarios.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.prompt}</td>
+                      <td>{item.receipt.outcome}</td>
+                      <td>{item.test}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="pa-trust-links">
+              <a className="pa-textlink" href="/fieldrelay-architecture-brief.pdf">View an architecture brief</a>
+              <a className="pa-textlink" href="/security">Security and safeguards</a>
+            </div>
+          </section>
+
+          <section className="pa-method pa-grid" id="method" aria-labelledby="method-title">
+            <p className="pa-kicker">04 / Method</p>
+            <h2 id="method-title">From workflow to operating system.</h2>
+            <div className="pa-steps">
+              {method.map(([index, title, body]) => (
+                <article key={index}>
+                  <span className="pa-kicker">{index}</span>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="pa-team pa-grid" id="team" aria-labelledby="team-title">
+            <p className="pa-kicker">05 / Team</p>
+            <h2 id="team-title">Small studio. Accountable work.</h2>
+            <p className="pa-team-lede">Names and portraits are not published yet. The seats below are reserved for the people who do the work.</p>
+            <div className="pa-register-wrap">
+              <table className="pa-register">
+                <thead>
+                  <tr>
+                    <th scope="col"> </th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Owns</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {["01", "02", "03"].map((index) => (
+                    <tr key={index}>
+                      <td className="pa-kicker">{index}</td>
+                      <td><span className="pa-ph">[placeholder]</span></td>
+                      <td><span className="pa-ph">[placeholder]</span></td>
+                      <td><span className="pa-ph">[placeholder]</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <figure className="pa-plate">
+              <figcaption>
+                <span className="pa-kicker">Plate</span>
+                <p>Portrait unpublished. One wall, one light, when a reshoot exists.</p>
+              </figcaption>
+            </figure>
+          </section>
+
+          <section className="pa-close pa-grid" id="audit" aria-labelledby="audit-title">
+            <FinMotif count={28} hot={16} />
+            <p className="pa-kicker">06 / Free AI Workflow Audit</p>
+            <h2 id="audit-title">See which loop is worth automating first.</h2>
+            <p className="pa-close-copy">Show us one repeated, expensive, or error-prone workflow. We return the strongest opportunity and the next sensible move.</p>
+            <div className="pa-actions">
+              <a className="pa-btn" href="/build-brief">Get a free AI audit <span aria-hidden="true">→</span></a>
+            </div>
+            <p className="pa-close-note">Free. Direct review. No sales sequence. No complete architecture. No revenue promise. No obligation to build. If an existing tool solves it, we say so.</p>
+            <div className="pa-audit">
+              <h3>Your audit covers</h3>
+              <ul>
+                {auditOutputs.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <footer className="pa-foot pa-grid">
+        <a className="pa-mark" href="/">PrimeArcTech</a>
+        <nav aria-label="Footer">
+          <a href="#studio">Studio</a>
+          <a href="/fieldrelay">FieldRelay</a>
+          <a href="#method">Method</a>
+          <a href="/about">About</a>
+          <a href="/security">Security</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+        </nav>
+        <div className="pa-foot-contact">
+          {/* PLACEHOLDER: hello@primearc.tech is not a configured mailbox yet. */}
+          <EmailCopy />
+          <a href={BUSINESS_CONTACT.whatsappHref} target="_blank" rel="noreferrer">WhatsApp</a>
+          <a href={`tel:${BUSINESS_CONTACT.phoneHref}`}>{BUSINESS_CONTACT.phoneDisplay}</a>
+          <span>{BUSINESS_CONTACT.location}</span>
+        </div>
+        <p>© {new Date().getFullYear()} PrimeArcTech.</p>
+      </footer>
+    </div>
+  );
 }

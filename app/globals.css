@@ -9,8 +9,9 @@
   --hairline: #373c41;
   --signal: #d8643e;
   --signal-dark: #2b130b;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Swap these families for licensed Klim Söhne / Söhne Mono. See app/fonts.css. */
+  --font-sans: "General Sans", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 * {
