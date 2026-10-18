@@ -14,7 +14,12 @@ const debugRows = new Map<string, DebugRow>();
 let renderer: THREE.WebGLRenderer | null = null;
 let blitScene: THREE.Scene | null = null;
 let blitCamera: THREE.Camera | null = null;
-let blitUniforms: { map: { value: THREE.Texture | null }; rect: { value: THREE.Vector4 } } | null = null;
+let blitUniforms: {
+  map: { value: THREE.Texture | null };
+  rect: { value: THREE.Vector4 };
+  clip: { value: THREE.Vector4 };
+  fade: { value: THREE.Vector2 };
+} | null = null;
 let raf = 0;
 let last = 0;
 const fpsSamples: number[] = [];
@@ -36,10 +41,19 @@ const blitFragment = `
   precision highp float;
   uniform sampler2D map;
   uniform vec4 rect;
+  uniform vec4 clip;
+  uniform vec2 fade;
   varying vec2 vUv;
   void main() {
-    if (vUv.x < rect.x || vUv.y < rect.y || vUv.x > rect.x + rect.z || vUv.y > rect.y + rect.w) discard;
-    gl_FragColor = texture2D(map, (vUv - rect.xy) / rect.zw);
+    if (vUv.x < clip.x || vUv.y < clip.y || vUv.x > clip.x + clip.z || vUv.y > clip.y + clip.w) discard;
+    vec4 color = texture2D(map, (vUv - rect.xy) / max(rect.zw, vec2(0.0001)));
+    float ay = (vUv.y - clip.y) / max(clip.w, 0.0001);
+    float alpha = 1.0;
+    if (fade.y > 0.0) alpha = min(alpha, smoothstep(0.0, fade.y, ay));
+    if (fade.x > 0.0) alpha = min(alpha, smoothstep(0.0, fade.x, 1.0 - ay));
+    color.rgb *= alpha;
+    color.a *= alpha;
+    gl_FragColor = color;
   }
 `;
 
@@ -80,6 +94,8 @@ export function sharedRenderer() {
   blitUniforms = {
     map: { value: null },
     rect: { value: new THREE.Vector4() },
+    clip: { value: new THREE.Vector4() },
+    fade: { value: new THREE.Vector2() },
   };
   const blitMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(2, 2),
@@ -90,6 +106,9 @@ export function sharedRenderer() {
       depthTest: false,
       depthWrite: false,
       transparent: true,
+      blending: THREE.CustomBlending,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneMinusSrcAlphaFactor,
     }),
   );
   blitMesh.frustumCulled = false;
@@ -121,25 +140,87 @@ export function sectionVisible(element: HTMLElement) {
   return rect;
 }
 
+const fadeDistance = 150;
+
+function boundsOf(element: Element) {
+  const rect = element.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2) return null;
+  if (rect.bottom <= 0 || rect.top >= window.innerHeight || rect.right <= 0 || rect.left >= window.innerWidth) return null;
+  return rect;
+}
+
+function drawWindow(layer: Layer, rect: DOMRect) {
+  const section = layer.element.closest("section, header");
+  let top = Math.max(rect.top, 0);
+  let bottom = Math.min(rect.bottom, window.innerHeight);
+  let left = Math.max(rect.left, 0);
+  let right = Math.min(rect.right, window.innerWidth);
+  if (section) {
+    const box = section.getBoundingClientRect();
+    top = Math.max(top, box.top);
+    bottom = Math.min(bottom, box.bottom);
+    left = Math.max(left, box.left);
+    right = Math.min(right, box.right);
+  }
+  const blockers = document.querySelectorAll(".pa-head, .pa-lede, .pa-side, .pa-foot, .pa-steps, .pa-prog");
+  let fadeTop = 0;
+  let fadeBottom = 0;
+  blockers.forEach((node) => {
+    const own = section?.contains(node) ?? false;
+    const foot = node.classList.contains("pa-foot");
+    if (own && !foot) return;
+    const box = boundsOf(node);
+    if (!box || box.right < left + 8 || box.left > right - 8) return;
+    const pad = foot ? 88 : 24;
+    if (foot && box.top < bottom + pad) {
+      fadeBottom = fadeDistance;
+      bottom = Math.min(bottom, box.top - pad);
+    } else if (box.bottom <= top) fadeTop = Math.max(fadeTop, fadeDistance - (top - box.bottom));
+    else if (box.top >= bottom) fadeBottom = Math.max(fadeBottom, fadeDistance - (box.top - bottom));
+    else if (box.top > (top + bottom) / 2) {
+      fadeBottom = fadeDistance;
+      bottom = Math.min(bottom, box.top - pad);
+    } else {
+      fadeTop = fadeDistance;
+      top = Math.max(top, box.bottom + pad);
+    }
+  });
+  if (bottom - top < 8 || right - left < 8) return null;
+  const span = bottom - top;
+  return {
+    top,
+    bottom,
+    left,
+    right,
+    fadeTop: Math.min(0.45, fadeTop / span),
+    fadeBottom: Math.min(0.45, fadeBottom / span),
+  };
+}
+
 function drawLayer(layer: Layer, rect: DOMRect) {
   if (!renderer || !blitScene || !blitCamera || !blitUniforms) return;
+  const windowRect = drawWindow(layer, rect);
+  if (!windowRect) return;
   const width = window.innerWidth;
   const height = window.innerHeight;
   const texture = layer.texture();
   if (!texture) return;
   texture.colorSpace = THREE.NoColorSpace;
-  const x = rect.left / width;
-  const w = rect.width / width;
-  const y = 1 - rect.bottom / height;
-  const h = rect.height / height;
   blitUniforms.map.value = texture;
-  blitUniforms.rect.value.set(x, y, w, h);
+  blitUniforms.rect.value.set(rect.left / width, 1 - rect.bottom / height, rect.width / width, rect.height / height);
+  blitUniforms.clip.value.set(
+    windowRect.left / width,
+    1 - windowRect.bottom / height,
+    (windowRect.right - windowRect.left) / width,
+    (windowRect.bottom - windowRect.top) / height,
+  );
+  blitUniforms.fade.value.set(windowRect.fadeTop, windowRect.fadeBottom);
   const dpr = renderer.getPixelRatio();
   const buffer = renderer.getDrawingBufferSize(new THREE.Vector2());
-  const sx = Math.max(0, Math.floor(rect.left * dpr));
-  const sy = Math.max(0, Math.floor((height - rect.bottom) * dpr));
-  const sw = Math.max(1, Math.min(buffer.x - sx, Math.floor(rect.width * dpr)));
-  const sh = Math.max(1, Math.min(buffer.y - sy, Math.floor(rect.height * dpr)));
+  const sx = Math.max(0, Math.floor(windowRect.left * dpr));
+  const sy = Math.max(0, Math.floor((height - windowRect.bottom) * dpr));
+  const sw = Math.max(1, Math.min(buffer.x - sx, Math.ceil((windowRect.right - windowRect.left) * dpr)));
+  const sh = Math.max(1, Math.min(buffer.y - sy, Math.ceil((windowRect.bottom - windowRect.top) * dpr)));
   renderer.setRenderTarget(null);
   renderer.setViewport(0, 0, buffer.x, buffer.y);
   renderer.setScissorTest(true);

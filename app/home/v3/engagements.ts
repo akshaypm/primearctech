@@ -218,12 +218,14 @@ export async function mountEngagements(canvas: HTMLCanvasElement, options: Scene
     },
     anchors() {
       if (mobile) return [];
+      const lanes = [36, Math.round((w - 330) * 0.36), Math.max(36, w - 366)];
       return [-4.95, -1.1, 2.9].map((x, index) => {
         const pr = new THREE.Vector3(x, 0, 1.3).project(S.camera);
+        const y = ((1 - pr.y) / 2) * h + 56;
         return {
           id: `s${index}`,
-          x: Math.max(36, Math.min(w - 366, ((pr.x + 1) / 2) * w - 165)),
-          y: ((1 - pr.y) / 2) * h + 56,
+          x: lanes[index] ?? 36,
+          y: Math.max(120, Math.min(y, h - 360)),
         };
       });
     },
