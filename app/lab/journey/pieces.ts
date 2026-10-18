@@ -219,7 +219,11 @@ export function buildToolpath(): Piece {
   const finGeo = new RoundedBoxGeometry(1, 1, 1, 1, 0.02);
   const done = new THREE.InstancedMesh(finGeo, doneMat, count);
   const raw = new THREE.InstancedMesh(finGeo, rawMat, count);
-  const path = new THREE.InstancedMesh(new RoundedBoxGeometry(0.16, 0.035, 0.035, 1, 0.004), hot, count);
+  const path = new THREE.InstancedMesh(
+    new RoundedBoxGeometry(0.16, 0.035, 0.035, 1, 0.004),
+    metal(0xc8c4bc, 0.32, 0.78),
+    count,
+  );
   done.frustumCulled = false;
   raw.frustumCulled = false;
   path.frustumCulled = false;
@@ -322,8 +326,7 @@ export function buildTrace(): Piece {
     const start = x0 + ((x1 - x0) * span[1]) / T;
     const end = x0 + ((x1 - x0) * span[2]) / T;
     const length = Math.max(0.08, end - start);
-    const isHot = span[0] === "llm.generate";
-    const material = isHot ? hot : finMat;
+    const material = finMat;
     const base = new THREE.Mesh(new RoundedBoxGeometry(length, 0.045, 0.26, 1, 0.01), material);
     base.position.set(start + length / 2, 0.25, rowZ(index));
     group.add(base);
@@ -340,6 +343,11 @@ export function buildTrace(): Piece {
     }
     group.add(fins);
   });
+  const hotSpan = SPANS.findIndex((span) => span[0] === "llm.generate");
+  const hotStart = x0 + ((x1 - x0) * (SPANS[hotSpan]?.[1] ?? 610)) / T;
+  const marker = new THREE.Mesh(new RoundedBoxGeometry(0.18, 0.26, 0.3, 1, 0.01), hot);
+  marker.position.set(hotStart + 0.22, 0.46, rowZ(Math.max(0, hotSpan)));
+  group.add(marker);
   group.rotation.y = -0.32;
   return { object: group, accents: [hot] };
 }

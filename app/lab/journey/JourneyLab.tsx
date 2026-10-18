@@ -4,13 +4,15 @@ import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
-import { STATIONS, copyInk } from "./copy";
+import { STATIONS, copyInk, textOpacity } from "./copy";
 import { mountJourney, type JourneyWorld } from "./world";
 import "./journey.css";
 
 type JourneyApi = {
   setFrame: (progress: number, timeMs: number) => void;
   stations: { id: string }[];
+  seconds: number;
+  marks: { id: string; kind: string; progress: number }[];
 };
 
 declare global {
@@ -22,15 +24,6 @@ declare global {
 function smoothstep(value: number) {
   const x = Math.min(1, Math.max(0, value));
   return x * x * (3 - 2 * x);
-}
-
-function lineY(progress: number, index: number, count: number, line: number) {
-  const span = 1 / count;
-  const local = (progress - index * span) / span - line * 0.04;
-  if (index === count - 1) return (1 - smoothstep((local + 0.02) / 0.2)) * 110;
-  const enter = index === 0 && progress < span * 0.22 ? 1 : smoothstep(local / 0.18);
-  const exit = smoothstep((local - 0.76) / 0.16);
-  return (1 - enter * (1 - exit)) * 110;
 }
 
 export function JourneyLab() {
@@ -54,11 +47,16 @@ export function JourneyLab() {
     const cards = () => [...copy.querySelectorAll<HTMLElement>(".lj-card")];
 
     const paint = (progress: number) => {
-      const count = cards().length || 1;
+      const text = textOpacity(progress);
       copy.classList.toggle("is-ink", copyInk(progress));
       cards().forEach((card, index) => {
+        const opacity = index === text.index ? text.opacity : 0;
+        const rise = smoothstep(Math.min(1, opacity / 0.45));
+        card.style.setProperty("--fade", opacity.toFixed(3));
         card.querySelectorAll<HTMLElement>(".line > span").forEach((line, lineIndex) => {
-          line.style.setProperty("--y", `${lineY(progress, index, count, lineIndex)}%`);
+          const delay = Math.min(1, Math.max(0, (opacity - lineIndex * 0.08) / 0.4));
+          const shown = index === text.index ? smoothstep(delay) * rise : 0;
+          line.style.setProperty("--y", `${(1 - shown) * 110}%`);
         });
       });
     };
@@ -72,6 +70,8 @@ export function JourneyLab() {
       worldRef.current = world;
       const api: JourneyApi = {
         stations: world.stations,
+        seconds: world.seconds,
+        marks: world.marks,
         setFrame(progress, timeMs) {
           world.setProgress(progress);
           world.setTime(timeMs);
@@ -144,7 +144,7 @@ export function JourneyLab() {
       <canvas ref={canvasRef} className="lj-gl" />
       <div ref={copyRef} className="lj-copy">
         {STATIONS.map((station) => (
-          <article key={station.id} className="lj-card" data-station={station.id}>
+          <article key={station.id} className={`lj-card is-${station.side}`} data-station={station.id}>
             <p className="line eyebrow">
               <span>{station.eyebrow}</span>
             </p>
