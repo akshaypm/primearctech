@@ -19,8 +19,8 @@ export const arcModelConfig: { url: string | null } = {
 export type ArcModel = {
   object: THREE.Object3D;
   finCount: number;
-  /** Move the three anodised fins. No-op when the model has no addressable fins. */
-  setBand: (startIndex: number) => void;
+  /** Move the anodised fins. Defaults to the hero's band of three. */
+  setBand: (startIndex: number, hotCount?: number) => void;
   dispose: () => void;
 };
 
@@ -156,12 +156,14 @@ function createProceduralArc(options: BuildOptions): ArcModel {
   }
 
   let current = -1;
+  let currentCount = 0;
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
   const scale = new THREE.Vector3();
 
   function placeHot(slot: number, finIndex: number) {
     matrices[finIndex].decompose(position, quaternion, scale);
+    hots[slot].visible = true;
     hots[slot].position.copy(position);
     hots[slot].quaternion.copy(quaternion);
     hots[slot].scale.copy(scale);
@@ -172,19 +174,23 @@ function createProceduralArc(options: BuildOptions): ArcModel {
     fins.setMatrixAt(finIndex, matrices[finIndex]);
   }
 
-  function setBand(startIndex: number) {
-    const start = Math.max(0, Math.min(count - 3, Math.round(startIndex)));
-    if (start === current) return;
+  function setBand(startIndex: number, hotCount = 3) {
+    const slots = Math.max(1, Math.min(hots.length, Math.round(hotCount)));
+    const start = Math.max(0, Math.min(count - slots, Math.round(startIndex)));
+    if (start === current && slots === currentCount) return;
     if (current >= 0) {
-      restore(current);
-      restore(current + 1);
-      restore(current + 2);
+      for (let index = 0; index < currentCount; index += 1) restore(current + index);
     }
-    placeHot(0, start);
-    placeHot(1, start + 1);
-    placeHot(2, start + 2);
+    for (let slot = 0; slot < hots.length; slot += 1) {
+      if (slot < slots) placeHot(slot, start + slot);
+      else {
+        hots[slot].visible = false;
+        hots[slot].scale.set(0, 0, 0);
+      }
+    }
     fins.instanceMatrix.needsUpdate = true;
     current = start;
+    currentCount = slots;
   }
 
   setBand(Math.round(count * 0.66));
@@ -238,16 +244,19 @@ async function loadGlbArc(url: string): Promise<ArcModel> {
   const hotMaterial = anodisedMaterial();
   const staticBand = root.userData.staticBand === true || entries.length < 3;
   let current = -1;
+  let currentCount = 0;
 
-  function setBand(startIndex: number) {
+  function setBand(startIndex: number, hotCount = 3) {
     if (staticBand) return;
-    const start = Math.max(0, Math.min(entries.length - 3, Math.round(startIndex)));
-    if (start === current) return;
+    const slots = Math.max(1, Math.min(3, Math.round(hotCount)));
+    const start = Math.max(0, Math.min(entries.length - slots, Math.round(startIndex)));
+    if (start === current && slots === currentCount) return;
     entries.forEach((entry, index) => {
-      const hot = index >= start && index < start + 3;
+      const hot = index >= start && index < start + slots;
       entry.mesh.material = hot ? hotMaterial : entry.original;
     });
     current = start;
+    currentCount = slots;
   }
 
   if (!staticBand) setBand(Math.round(entries.length * 0.66));
