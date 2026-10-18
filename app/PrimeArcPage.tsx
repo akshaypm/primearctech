@@ -323,7 +323,7 @@ function Team() {
       {team.map((person, index) => (
         <figure className={`pa-person is-${person.width}`} key={person.name}>
           <div className="pa-ph">
-            <img src={person.image} alt={person.name} />
+            <img src={person.image} alt={person.name} width={900} height={1200} loading="eager" decoding="sync" />
           </div>
           <figcaption>
             <div>

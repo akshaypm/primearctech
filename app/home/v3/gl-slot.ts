@@ -10,13 +10,9 @@ const visibleRatio = 0.08;
 
 function elect() {
   for (const claim of claims.values()) {
-    const should = claim.ratio > visibleRatio;
-    if (should && !claim.active) {
+    if (claim.ratio > visibleRatio && !claim.active) {
       claim.active = true;
       claim.acquire();
-    } else if (!should && claim.active) {
-      claim.active = false;
-      claim.release();
     }
   }
 }

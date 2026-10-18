@@ -232,7 +232,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   key.position.set(-5, 12, 7);
   key.target.position.set(0, 1.2, 0);
   key.castShadow = true;
-  key.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
+  key.shadow.mapSize.set(512, 512);
   key.shadow.camera.near = 4;
   key.shadow.camera.far = 30;
   key.shadow.bias = -0.0002;
@@ -260,8 +260,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   };
 
   const initial = size();
-  renderer.setSize(initial.width, initial.height, false);
-  camera.aspect = initial.width / initial.height;
+  camera.aspect = initial.width / Math.max(1, initial.height);
   camera.updateProjectionMatrix();
 
   const samples = mobile ? 0 : Math.min(4, renderer.capabilities.maxSamples || 0);
@@ -273,21 +272,19 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   composer.renderToScreen = false;
   composer.setPixelRatio(dpr);
   composer.setSize(initial.width, initial.height);
+  const driver: { tick: (time: number) => void; resize: (width: number, height: number) => void } = {
+    tick: () => {},
+    resize: () => {},
+  };
   registerLayer("hero", {
     element: parent ?? canvas,
+    tick: (time) => driver.tick(time),
+    resize: (width, height) => driver.resize(width, height),
     texture: () => composer.readBuffer?.texture ?? null,
   });
   composer.addPass(new RenderPass(scene, camera));
 
-  let bokeh: BokehPass | null = null;
-  if (!mobile) {
-    bokeh = new BokehPass(scene, camera, {
-      focus: camera.position.distanceTo(new THREE.Vector3(-2.2, 2, 0)),
-      aperture: 0.0009,
-      maxblur: 0.004,
-    });
-    composer.addPass(bokeh);
-  }
+  const bokeh: BokehPass | null = null;
 
   const film = new ShaderPass(filmShader);
   composer.addPass(film);
@@ -320,7 +317,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     target.lerpVectors(restTarget, mobile ? restTarget : endTarget, eased);
     camera.position.copy(position);
     camera.lookAt(target);
-    const idle = reducedMotion ? 0 : Math.sin(performance.now() / 9000) * 0.02 * (1 - eased);
+    const idle = reducedMotion ? 0 : Math.sin(performance.now() * 0.0011) * 0.22;
     model.object.rotation.y = -0.62 + idle + eased * 0.24;
     const along = 0.66 + eased * 0.26;
     model.setBand(along * (model.finCount - 1));
@@ -351,12 +348,23 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
       readySent = true;
       onReady();
     }
-    if (!reducedMotion || frameCount < 4) schedule();
   }
+
+  driver.tick = (time) => render(time);
+  driver.resize = (width, height) => {
+    const cap = 640;
+    const scale = Math.min(1, cap / Math.max(1, width), cap / Math.max(1, height));
+    const w = Math.max(2, Math.round(width * scale));
+    const h = Math.max(2, Math.round(height * scale));
+    composer.setSize(w, h);
+    camera.aspect = width / Math.max(1, height);
+    camera.updateProjectionMatrix();
+    film.uniforms.res.value.set(w * dpr, h * dpr);
+  };
 
   resize();
   applyProgress(0);
-  schedule();
+  render(performance.now());
 
   const observed = parent ?? canvas;
   const resizeObserver = new ResizeObserver(() => resize());

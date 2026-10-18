@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ArcHandle } from "./arc-scene";
 import { decideRender, type RenderMode } from "./v3/gates";
 import { clearGl, reportGl } from "./v3/gl-slot";
-import { degrade, onDegrade, setDebug } from "./v3/gl-host";
+import { setDebug } from "./v3/gl-host";
 
 export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,8 +37,6 @@ export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null
     let token = 0;
     let handle: ArcHandle | null = null;
     let boot = 0;
-    let dead = false;
-
     const readProgress = () => {
       const track = trackRef.current;
       if (!track || !handle) return;
@@ -55,16 +53,8 @@ export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null
       if (alive) setShown(false);
     };
 
-    const stop = onDegrade((why) => {
-      dead = true;
-      setMode("still");
-      setReason(why);
-      setShown(false);
-      release();
-    });
-
     const acquire = () => {
-      if (handle || dead) return;
+      if (handle) return;
       const mine = ++token;
       boot = window.setTimeout(() => {
         const canvas = canvasRef.current;
@@ -98,7 +88,7 @@ export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null
               setMode("still");
               setReason("webgl-context-failed");
               setShown(false);
-              degrade("webgl-context-failed");
+              setDebug("hero", "still", "webgl-context-failed");
             }
           });
       }, 48);
@@ -120,7 +110,6 @@ export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null
       window.removeEventListener("resize", readProgress);
       clearGl("hero");
       release();
-      stop();
       window.cancelAnimationFrame(publish);
     };
   }, [trackRef]);

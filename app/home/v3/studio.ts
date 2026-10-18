@@ -166,7 +166,8 @@ export type Studio = {
   rim: THREE.DirectionalLight;
   bokeh: BokehPass | null;
   look: (position: number[], target: number[], focus?: number[]) => void;
-  render: () => void;
+  render: (time?: number) => void;
+  setFrame: (fn: (time: number) => void) => void;
   settle: (frames?: number) => Promise<void>;
   resize: (w: number, h: number) => void;
   setVignette: (value: number) => void;
@@ -229,7 +230,7 @@ export function studio(options: StudioOptions): Studio {
   const spot = new THREE.SpotLight(0xfaf6f0, key.int, 50, key.angle, 1, 2);
   spot.position.set(...key.pos);
   spot.castShadow = true;
-  const shadowSize = mobile ? 1024 : 2048;
+  const shadowSize = 512;
   spot.shadow.mapSize.set(shadowSize, shadowSize);
   spot.shadow.camera.near = 3;
   spot.shadow.camera.far = 40;
@@ -250,11 +251,7 @@ export function studio(options: StudioOptions): Studio {
   composer.setPixelRatio(dpr);
   composer.setSize(w, h);
   composer.addPass(new RenderPass(scene, camera));
-  let bokeh: BokehPass | null = null;
-  if (!mobile) {
-    bokeh = new BokehPass(scene, camera, { focus: 10, aperture: 0.0009, maxblur: 0.004 });
-    composer.addPass(bokeh);
-  }
+  const bokeh: BokehPass | null = null;
   composer.addPass(new OutputPass());
   const film = new ShaderPass(filmShader);
   composer.addPass(film);
@@ -266,13 +263,21 @@ export function studio(options: StudioOptions): Studio {
 
   const layerId = canvas.closest("section, header")?.id || `scene-${++sceneSerial}`;
   const layerElement = canvas.parentElement ?? canvas;
-  registerLayer(layerId, {
-    element: layerElement,
-    texture: () => composer.readBuffer?.texture ?? null,
-  });
+  const spotHome = spot.position.clone();
+  let sizedW = 0;
+  let sizedH = 0;
 
-  function render() {
+  let onFrame: ((time: number) => void) | null = null;
+
+  function render(time = performance.now()) {
     frame += 1;
+    onFrame?.(time);
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduced) {
+      scene.rotation.y = Math.sin(time * 0.00115) * 0.2;
+      spot.position.x = spotHome.x + Math.sin(time * 0.0008) * 1.6;
+      spot.position.z = spotHome.z + Math.cos(time * 0.0008) * 1.1;
+    }
     film.uniforms.t.value = frame * 0.37;
     renderer.toneMapping = grade.mapping;
     renderer.toneMappingExposure = grade.exposure;
@@ -281,8 +286,13 @@ export function studio(options: StudioOptions): Studio {
   }
 
   function resize(nextW: number, nextH: number) {
-    w = Math.max(1, nextW);
-    h = Math.max(1, nextH);
+    const cap = 640;
+    const scale = Math.min(1, cap / Math.max(1, nextW), cap / Math.max(1, nextH));
+    w = Math.max(2, Math.round(nextW * scale));
+    h = Math.max(2, Math.round(nextH * scale));
+    if (Math.abs(w - sizedW) < 2 && Math.abs(h - sizedH) < 2) return;
+    sizedW = w;
+    sizedH = h;
     composer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -290,6 +300,13 @@ export function studio(options: StudioOptions): Studio {
     const uniforms = bokeh?.uniforms as { aspect?: { value: number } } | undefined;
     if (uniforms?.aspect) uniforms.aspect.value = camera.aspect;
   }
+
+  registerLayer(layerId, {
+    element: layerElement,
+    resize,
+    tick: (time) => render(time),
+    texture: () => composer.readBuffer?.texture ?? null,
+  });
 
   return {
     renderer,
@@ -338,6 +355,9 @@ export function studio(options: StudioOptions): Studio {
     setGrade(mapping, exposure) {
       grade.mapping = mapping;
       if (exposure !== undefined) grade.exposure = exposure;
+    },
+    setFrame(fn) {
+      onFrame = fn;
     },
     dispose() {
       stopped = true;

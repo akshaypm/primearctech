@@ -19,9 +19,11 @@ export function DebugHud() {
   }, [on]);
 
   if (!on) return null;
+  const rank = (row: DebugRow) => (row.mode === "live" ? 0 : row.id === "fps" ? 1 : row.id === "renderer" ? 2 : 3);
+  const ordered = [...rows].sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
   return (
     <aside className="pa-debug" aria-hidden="true">
-      {rows.map((row) => (
+      {ordered.map((row) => (
         <div key={row.id}>
           <b>{row.id}</b> {row.mode} <span>{row.reason}</span>
         </div>

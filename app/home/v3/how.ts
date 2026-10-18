@@ -5,17 +5,15 @@ import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { SceneHandle, SceneOptions } from "./types";
 import { viewSize } from "./studio";
+import { registerLayer, sharedRenderer, unregisterLayer } from "./gl-host";
 
 export async function mountHow(canvas: HTMLCanvasElement, options: SceneOptions): Promise<SceneHandle> {
   const mobile = options.mobile;
   const size = viewSize(canvas);
   let w = size.w;
   let h = size.h;
-  const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.5);
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(dpr);
-  renderer.setSize(w, h, false);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  const renderer = sharedRenderer();
+  const target = new THREE.WebGLRenderTarget(2, 2);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf1efe9);
   const camera = new THREE.PerspectiveCamera(18, w / Math.max(1, h), 0.1, 100);
@@ -122,7 +120,7 @@ export async function mountHow(canvas: HTMLCanvasElement, options: SceneOptions)
     tool.rotation.z = fin.a - Math.PI / 2;
   }
 
-  function frame() {
+  function frame(time = performance.now()) {
     if (mobile) {
       camera.position.set(1.2, 2.6, 26);
       camera.lookAt(0, 1.9, 0);
@@ -130,20 +128,34 @@ export async function mountHow(canvas: HTMLCanvasElement, options: SceneOptions)
       camera.position.set(1.6, 3.2, 21.5);
       camera.lookAt(0.2, 1.8, 0);
     }
+    if (!options.reducedMotion) arc.rotation.z = Math.sin(time * 0.0011) * 0.12;
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
-    lineMat.resolution.set(w, h);
+    lineMat.resolution.set(target.width, target.height);
+    renderer.setRenderTarget(target);
+    renderer.setClearColor(0xf1efe9, 1);
+    renderer.clear(true, true, true);
     renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
   }
+
+  registerLayer("how", {
+    element: canvas.parentElement ?? canvas,
+    resize(width, height) {
+      const cap = 640;
+      const scale = Math.min(1, cap / Math.max(1, width), cap / Math.max(1, height));
+      const rw = Math.max(2, Math.round(width * scale));
+      const rh = Math.max(2, Math.round(height * scale));
+      target.setSize(rw, rh);
+      w = width;
+      h = height;
+    },
+    tick: (time) => frame(time),
+    texture: () => target.texture,
+  });
 
   apply(progress);
   frame();
-  await new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      frame();
-      resolve();
-    });
-  });
 
   return {
     setProgress(value) {
@@ -155,15 +167,14 @@ export async function mountHow(canvas: HTMLCanvasElement, options: SceneOptions)
       const next = viewSize(canvas);
       w = next.w;
       h = next.h;
-      renderer.setSize(w, h, false);
       built = -1;
       apply(progress);
       frame();
     },
     anchors: () => [],
     dispose() {
-      renderer.forceContextLoss();
-      renderer.dispose();
+      unregisterLayer("how");
+      target.dispose();
       scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
         mesh.geometry?.dispose();

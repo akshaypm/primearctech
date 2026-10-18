@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Anchor, SceneHandle, SceneOptions } from "./types";
 import { decideRender, type RenderMode } from "./gates";
 import { clearGl, reportGl } from "./gl-slot";
-import { degrade, onDegrade, setDebug } from "./gl-host";
+import { setDebug } from "./gl-host";
 
 export type SceneName = "demo" | "engagements" | "how" | "proof" | "products" | "partners" | "fit" | "book";
 
@@ -65,13 +65,10 @@ export function Stage({
   });
 
   useEffect(() => {
-    setDebug(id, shown ? mode : "still", shown ? reason : mode === "still" ? reason : "offscreen");
-  }, [id, mode, reason, shown]);
-
-  useEffect(() => {
     const node = frameRef.current;
     const canvas = canvasRef.current;
     const decision = decideRender();
+    setDebug(id, decision.mode === "still" ? "still" : "loading", decision.reason);
     const publish = window.requestAnimationFrame(() => {
       setMode(decision.mode);
       setReason(decision.reason);
@@ -105,17 +102,8 @@ export function Stage({
       if (alive) setShown(false);
     };
 
-    let dead = false;
-    const stop = onDegrade((why) => {
-      dead = true;
-      setMode("still");
-      setReason(why);
-      setShown(false);
-      release();
-    });
-
     const acquire = () => {
-      if (handle || dead) return;
+      if (handle) return;
       const mine = ++token;
       void loaders[scene]()
         .then((mount) => {
@@ -144,7 +132,7 @@ export function Stage({
           if (alive && mine === token) {
             setMode("still");
             setReason("webgl-context-failed");
-            degrade("webgl-context-failed");
+            setDebug(id, "still", "webgl-context-failed");
           }
         });
     };
@@ -172,7 +160,6 @@ export function Stage({
       window.removeEventListener("resize", onScroll);
       clearGl(id);
       release();
-      stop();
       window.cancelAnimationFrame(publish);
     };
   }, [id, scene, scrubCenter]);

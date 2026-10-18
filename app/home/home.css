@@ -89,7 +89,7 @@
 .pa-gl-host { position: fixed; inset: 0; z-index: 1; width: 100%; height: 100%; pointer-events: none; display: block; }
 .pa-canvas, .pa-still { position: absolute; inset: 0; width: 100%; height: 100%; }
 .pa-canvas { display: none; }
-.pa-still { display: block; object-fit: cover; }
+.pa-still { display: block; object-fit: cover; pointer-events: none; }
 .pa-still.is-covered { opacity: 0; }
 .pa-top {
   position: absolute; z-index: 3; top: 0; left: 0; right: 0;
@@ -114,18 +114,19 @@
 .pa-stage-view { position: absolute; inset: 0; }
 .pa-stage-view canvas, .pa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; }
 .pa-stage-view canvas { display: none; }
-.pa-fallback { display: block; object-fit: cover; }
+.pa-fallback { display: block; object-fit: cover; pointer-events: none; }
 .pa-fallback.is-covered { opacity: 0; }
 .pa-anchors { inset: 0; pointer-events: none; }
 .pa-debug {
-  position: fixed; z-index: 40; top: 56px; right: 8px; left: auto; bottom: auto;
-  max-width: min(360px, 70vw); max-height: 46vh; overflow: hidden;
+  position: fixed; z-index: 40; top: auto; bottom: 8px; left: 8px; right: auto;
+  max-width: min(280px, 32vw); max-height: 30vh; overflow: hidden;
   padding: 8px 10px; background: rgba(17, 19, 21, 0.88); color: #f1efe9;
   font: 11px/1.45 ui-monospace, monospace; pointer-events: none;
 }
 .pa-debug b { display: inline-block; width: 92px; }
 .pa-debug span { color: #a7adb2; }
-.pa-anchor { position: absolute; z-index: 2; pointer-events: auto; }
+.pa-anchor { position: absolute; z-index: 5; pointer-events: auto; }
+.pa :where(h1, h2, h3, h4, p, a, ul, ol, li, button, figcaption) { position: relative; z-index: 5; }
 
 .pa-demo { height: 1000px; background: #e7e4dd; }
 .pa-demo .pa-head { left: var(--pad); top: 96px; width: min(700px, 54vw); }
@@ -324,8 +325,10 @@
   .pa { --pad: 20px; }
   .pa-sec { height: auto !important; display: flex; flex-direction: column; padding: 56px 0 48px; overflow: visible; }
   .pa-sec > .pa-ov { position: relative !important; left: auto !important; right: auto !important; top: auto !important; bottom: auto !important; width: auto !important; margin: 0 var(--pad); transform: none !important; }
-  .pa-stage { position: relative; inset: auto; display: flex; flex-direction: column; height: auto; margin: 28px 0; overflow: hidden; }
-  .pa-stage-view { position: relative; height: var(--mh, 520px); flex: none; }
+  .pa-stage { position: relative; inset: auto; display: flex; flex-direction: column; height: auto; margin: 12px 0 20px; overflow: hidden; }
+  .pa-stage-view { position: relative; height: min(52vh, 460px); flex: none; }
+  .pa-debug { top: auto; bottom: 8px; left: 8px; max-width: min(168px, 46vw); max-height: 28vh; font-size: 9px; line-height: 1.3; padding: 4px 6px; }
+  .pa-debug b { width: 68px; }
   .pa-anchors { position: relative; inset: auto; display: flex; flex-direction: column; }
   .pa-anchor.is-flow { position: relative !important; left: auto !important; top: auto !important; width: auto !important; margin: 26px var(--pad) 0; transform: none !important; }
   .pa h2 { font-size: 40px !important; }
@@ -357,10 +360,11 @@
   .pa-partners .pa-cta { order: 5; margin-top: 24px !important; }
   .pa-partners .pa-cap { order: 6; margin-top: 24px !important; white-space: normal; color: #f7f6f4; background: transparent; }
   .pa-book::after { display: none; }
-  .pa-person { position: relative; left: auto !important; top: auto !important; margin: 34px var(--pad) 0; }
-  .pa-person.is-a { width: auto; }
-  .pa-person.is-b { width: 72%; margin-left: auto; }
-  .pa-person.is-c { width: 84%; }
+  .pa-person, .pa-person.is-a, .pa-person.is-b, .pa-person.is-c {
+    position: relative !important; left: auto !important; top: auto !important;
+    width: auto !important; margin: 28px var(--pad) 0 !important;
+  }
+  .pa-ph { width: 100%; min-height: 220px; }
   .pa-team .pa-foot { margin-top: 34px !important; width: auto !important; }
   .pa-book .pa-stage { order: 2; }
   .pa-book .pa-head { order: 1; }

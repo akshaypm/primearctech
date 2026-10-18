@@ -101,25 +101,18 @@ export async function mountBook(canvas: HTMLCanvasElement, options: SceneOptions
 
   S.spot.target.position.set(0.2, 1.5, 0);
   const restYaw = model.object.rotation.y;
-  let raf = 0;
-  let alive = true;
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   function frame() {
     if (mobile) S.look([-8.6, 2.5, 15.4], [-0.2, 1.7, 0], [0, 1.6, 0]);
     else S.look([-8.8, 2.35, 15.8], [-3.2, 2.15, 0], [0, 1.8, 0]);
     S.setAperture(0.00018);
   }
-  function tick(time: number) {
-    raf = 0;
-    if (!alive) return;
-    model.object.rotation.y = restYaw + Math.sin(time * 0.00011) * 0.018;
-    S.render();
-    raf = window.requestAnimationFrame(tick);
-  }
   frame();
   await S.settle(4);
-  if (!reduced) raf = window.requestAnimationFrame(tick);
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  S.setFrame((time) => {
+    if (!reduced) model.object.rotation.y = restYaw + Math.sin(time * 0.00105) * 0.16;
+  });
 
   return {
     setProgress() {},
@@ -133,8 +126,6 @@ export async function mountBook(canvas: HTMLCanvasElement, options: SceneOptions
     },
     anchors: () => [],
     dispose() {
-      alive = false;
-      window.cancelAnimationFrame(raf);
       model.dispose();
       S.dispose();
     },
