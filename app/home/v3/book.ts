@@ -19,35 +19,79 @@ export async function mountBook(canvas: HTMLCanvasElement, options: SceneOptions
     tone: 1,
     light: true,
   });
-  S.setVignette(0.82);
+  S.setVignette(0.94);
+  S.setGrain(0.012);
   S.spot.color.set(0xffe9cf);
   S.spot.penumbra = 0.6;
   S.spot.shadow.radius = 3;
-  S.rim.intensity = 0.3;
+  S.rim.intensity = 0.55;
+  S.rim.color.set(0xffe2c4);
   const { scene, renderer } = S;
+  const hemi = scene.children.find((child): child is THREE.HemisphereLight => child instanceof THREE.HemisphereLight);
+  if (hemi) {
+    hemi.color.set(0xf6f1e8);
+    hemi.groundColor.set(0xe7e1d6);
+    hemi.intensity = 0.95;
+  }
+  const fill = new THREE.DirectionalLight(0xf7f2ea, 2.6);
+  fill.position.set(-12, 9, 14);
+  scene.add(fill);
+  const bounce = new THREE.DirectionalLight(0xffe7cc, 0.7);
+  bounce.position.set(6, 3, -8);
+  scene.add(bounce);
+  const ground = scene.children.find((child): child is THREE.Mesh => child instanceof THREE.Mesh);
+  if (ground && !Array.isArray(ground.material)) {
+    const mat = ground.material as THREE.MeshStandardMaterial;
+    mat.color.set(0xe6e1d8);
+    mat.roughness = 0.88;
+    mat.metalness = 0;
+    mat.envMapIntensity = 0.2;
+  }
   const env = new THREE.Scene();
-  env.add(new THREE.Mesh(new THREE.BoxGeometry(40, 24, 40), new THREE.MeshBasicMaterial({ color: 0x5e5850, side: THREE.BackSide })));
+  env.add(new THREE.Mesh(new THREE.BoxGeometry(40, 24, 40), new THREE.MeshBasicMaterial({ color: 0xd9d3c8, side: THREE.BackSide })));
   const pnl = (pw: number, ph: number, x: number, y: number, z: number, color: number, intensity: number) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide }));
     m.position.set(x, y, z);
     m.lookAt(0, 1.5, 0);
     env.add(m);
   };
-  pnl(16, 6, 14, 4, -14, 0xffd9b0, 5);
-  pnl(6, 14, 18, 6, -4, 0xffe4c6, 2.2);
-  pnl(30, 30, 0, -11, 0, 0xe9e2d4, 0.9);
-  pnl(14, 10, -16, 6, 12, 0xe6e8ea, 1.6);
-  pnl(30, 4, 0, 14, 0, 0xf2ede4, 1);
+  pnl(16, 6, 14, 4, -14, 0xffd9b0, 2.2);
+  pnl(6, 14, 18, 6, -4, 0xffe4c6, 1.15);
+  pnl(30, 30, 0, -11, 0, 0xe9e2d4, 0.7);
+  pnl(14, 10, -16, 6, 12, 0xe6e8ea, 0.85);
+  pnl(30, 4, 0, 14, 0, 0xf2ede4, 0.7);
   const pm = new THREE.PMREMGenerator(renderer);
   const envTex = pm.fromScene(env, 0.03).texture;
   pm.dispose();
   scene.environment?.dispose();
   scene.environment = envTex;
+  scene.environmentIntensity = 0.42;
   const R = 3.1;
   const N = mobile ? 180 : 260;
   const geo = new RoundedBoxGeometry(1, 1, 1, 2, 0.06);
-  const metal = new THREE.MeshPhysicalMaterial({ color: 0xd6d3cd, metalness: 1, roughness: 0.22, roughnessMap: brushedTex(), anisotropy: 0.5, envMapIntensity: 1, envMap: envTex });
-  const hot = new THREE.MeshPhysicalMaterial({ color: 0xd8643e, metalness: 0.3, roughness: 0.42, clearcoat: 0.5, clearcoatRoughness: 0.3, emissive: 0xd8643e, emissiveIntensity: 0.12, envMap: envTex });
+  const metal = new THREE.MeshPhysicalMaterial({
+    color: 0xc9c5bd,
+    metalness: 0.78,
+    roughness: 0.35,
+    roughnessMap: brushedTex(8, 22),
+    anisotropy: 0.72,
+    anisotropyRotation: 0.35,
+    envMapIntensity: 0.48,
+    clearcoat: 0.04,
+    clearcoatRoughness: 0.7,
+    envMap: envTex,
+  });
+  const hot = new THREE.MeshPhysicalMaterial({
+    color: 0xd8643e,
+    metalness: 0.22,
+    roughness: 0.42,
+    clearcoat: 0.12,
+    clearcoatRoughness: 0.55,
+    emissive: 0xd8643e,
+    emissiveIntensity: 0.05,
+    envMapIntensity: 0.35,
+    envMap: envTex,
+  });
   const fins = new THREE.InstancedMesh(geo, metal, N);
   fins.castShadow = fins.receiveShadow = true;
   const M = new THREE.Matrix4();
@@ -103,7 +147,7 @@ export async function mountBook(canvas: HTMLCanvasElement, options: SceneOptions
   function tick(time: number) {
     raf = 0;
     if (!alive) return;
-    const a = Math.sin(time * 0.00035) * 0.22;
+    const a = Math.sin(time * 0.00022) * 0.05;
     S.spot.position.set(K0.x * Math.cos(a) - K0.z * Math.sin(a), K0.y, K0.x * Math.sin(a) + K0.z * Math.cos(a));
     S.render();
     raf = window.requestAnimationFrame(tick);

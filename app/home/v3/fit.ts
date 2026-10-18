@@ -17,14 +17,14 @@ function variedSteel() {
   for (let k = 0; k < 28; k += 1) {
     const y = n() * 512;
     const tone = 90 + n() * 90;
-    x.fillStyle = `rgba(${tone},${tone + 2},${tone + 4},${0.08 + n() * 0.12})`;
+    x.fillStyle = `rgba(${tone},${tone + 2},${tone + 4},${0.035 + n() * 0.05})`;
     x.fillRect(0, y, 512, 6 + n() * 28);
   }
   for (let k = 0; k < 80; k += 1) {
     const r = 18 + n() * 70;
     const g = x.createRadialGradient(0, 0, 0, 0, 0, r);
     const v = n() < 0.5 ? 70 : 190;
-    g.addColorStop(0, `rgba(${v},${v},${v + 6},${0.08 + n() * 0.1})`);
+    g.addColorStop(0, `rgba(${v},${v},${v + 6},${0.035 + n() * 0.04})`);
     g.addColorStop(1, "rgba(0,0,0,0)");
     x.save();
     x.translate(n() * 512, n() * 512);
@@ -39,7 +39,7 @@ function variedSteel() {
   for (let i = 0; i < image.data.length; i += 4) {
     const j = (i / 4) | 0;
     const row = (j / 512) | 0;
-    const grain = Math.sin(row * 0.85) * 10 + (n() * 16 - 8);
+    const grain = Math.sin(row * 0.85) * 6 + (n() * 8 - 4);
     image.data[i] = Math.max(0, Math.min(255, image.data[i] + grain));
     image.data[i + 1] = Math.max(0, Math.min(255, image.data[i + 1] + grain));
     image.data[i + 2] = Math.max(0, Math.min(255, image.data[i + 2] + grain - 2));
@@ -72,19 +72,23 @@ export async function mountFit(canvas: HTMLCanvasElement, options: SceneOptions)
   S.rim.intensity = 2.2;
   S.rim.position.set(5, 4, -7);
   const { scene } = S;
-  const brush = brushedTex();
+  const brush = brushedTex(5, 28);
   const steelMap = variedSteel();
   const steel = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     map: steelMap,
-    metalness: 1,
-    roughness: 0.38,
-    roughnessMap: steelMap,
-    bumpMap: steelMap,
-    bumpScale: 0.07,
-    anisotropy: 0.75,
-    envMapIntensity: 0.95,
+    metalness: 0.92,
+    roughness: 0.36,
+    roughnessMap: brush,
+    bumpMap: brush,
+    bumpScale: 0.018,
+    anisotropy: 0.86,
+    envMapIntensity: 0.62,
   });
+  const steelL = steel.clone();
+  steelL.anisotropyRotation = 0.18;
+  const steelR = steel.clone();
+  steelR.anisotropyRotation = -0.22;
   const ground2 = tex(512, (i) => 150 + Math.sin(i * 2.3) * 8 + (rnd() * 40 - 20));
   const steelG = new THREE.MeshPhysicalMaterial({ color: 0x8e9194, metalness: 1, roughness: 0.42, roughnessMap: ground2, envMapIntensity: 1 });
   const alu = new THREE.MeshPhysicalMaterial({ color: 0xd9d8d4, metalness: 1, roughness: 0.28, roughnessMap: brush, envMapIntensity: 1.1 });
@@ -145,14 +149,24 @@ export async function mountFit(canvas: HTMLCanvasElement, options: SceneOptions)
   const GD = 0.95;
   const slot = 0.075;
   const half = (GW - slot) / 2;
-  for (const sx of [-1, 1]) sh(new THREE.Mesh(new RoundedBoxGeometry(half, GH, GD, 6, 0.045), steel)).position.set(sx * (slot / 2 + half / 2), GH / 2 + 0.18, 0);
-  sh(new THREE.Mesh(new RoundedBoxGeometry(GW + 0.3, 0.18, GD + 0.25, 5, 0.035), steelG)).position.set(0, 0.09, 0);
+  const bevel = 0.12;
+  for (const sx of [-1, 1]) {
+    const block = sh(new THREE.Mesh(new RoundedBoxGeometry(half, GH, GD, 4, bevel), sx < 0 ? steelL : steelR));
+    block.position.set(sx * (slot / 2 + half / 2), GH / 2 + 0.18, 0);
+    const lip = sh(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, GD - bevel * 2), alu));
+    lip.position.set(sx * (slot / 2 + half - bevel * 0.45), GH + 0.18 - 0.028, 0);
+    lip.rotation.z = sx * -Math.PI / 4;
+    const nose = sh(new THREE.Mesh(new THREE.BoxGeometry(half - bevel * 2, 0.045, 0.045), alu));
+    nose.position.set(sx * (slot / 2 + half / 2), GH + 0.18 - 0.03, GD / 2 - bevel * 0.55);
+    nose.rotation.x = Math.PI / 4;
+  }
+  sh(new THREE.Mesh(new RoundedBoxGeometry(GW + 0.3, 0.18, GD + 0.25, 4, 0.055), steelG)).position.set(0, 0.09, 0);
   for (const sx of [-1, 1]) {
     const lip = sh(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, GD - 0.06), alu));
     lip.position.set(sx * (slot / 2 + 0.01), GH + 0.18 - 0.006, 0);
     lip.rotation.z = sx * Math.PI / 4;
   }
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), engrave((x) => {
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(GW - bevel * 1.7, GH - bevel * 1.7), engrave((x) => {
     letters(x, "GO", 560, 250, 190);
     letters(x, "NO-GO", 1500, 250, 190);
     x.font = '400 46px "IBM Plex Mono"';

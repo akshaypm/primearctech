@@ -123,11 +123,12 @@ const filmShader = {
     tDiffuse: { value: null as THREE.Texture | null },
     t: { value: 0 },
     vig: { value: 0.62 },
+    grain: { value: 0.04 },
     res: { value: new THREE.Vector2(1, 1) },
   },
   vertexShader: "varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float t, vig; uniform vec2 res; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float t, vig, grain; uniform vec2 res; varying vec2 vUv;
     float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
     void main(){
       vec4 c=texture2D(tDiffuse,vUv);
@@ -135,7 +136,7 @@ const filmShader = {
       float v=smoothstep(1.15,0.25,length(d));
       c.rgb*=mix(vig,1.0,v);
       float g=h(floor(vUv*res/1.5)+t)-0.5;
-      c.rgb+=g*0.04;
+      c.rgb+=g*grain;
       gl_FragColor=c;
     }
   `,
@@ -168,6 +169,7 @@ export type Studio = {
   settle: (frames?: number) => Promise<void>;
   resize: (w: number, h: number) => void;
   setVignette: (value: number) => void;
+  setGrain: (value: number) => void;
   setAperture: (value: number) => void;
   dispose: () => void;
 };
@@ -250,7 +252,7 @@ export function studio(options: StudioOptions): Studio {
   scene.add(new THREE.HemisphereLight(0x2a2f34, 0x0b0c0d, 0.25));
 
   const camera = new THREE.PerspectiveCamera(24, w / Math.max(1, h), 0.1, 100);
-  const samples = mobile ? 0 : Math.min(2, renderer.capabilities.maxSamples || 0);
+  const samples = mobile ? 0 : Math.min(4, renderer.capabilities.maxSamples || 0);
   const renderTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples });
   const composer = new EffectComposer(renderer, renderTarget);
   composer.setPixelRatio(dpr);
@@ -324,6 +326,9 @@ export function studio(options: StudioOptions): Studio {
     resize,
     setVignette(value) {
       film.uniforms.vig.value = value;
+    },
+    setGrain(value) {
+      film.uniforms.grain.value = value;
     },
     setAperture(value) {
       const uniforms = bokeh?.uniforms as { aperture?: { value: number } } | undefined;
