@@ -8,6 +8,7 @@ export type Anchor = {
 
 export type SceneOptions = {
   mobile: boolean;
+  reducedMotion?: boolean;
 };
 
 export type SceneHandle = {

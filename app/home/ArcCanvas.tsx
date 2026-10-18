@@ -1,46 +1,43 @@
 "use client";
 
-import Image from "next/image";
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ArcHandle } from "./arc-scene";
+import { decideRender, type RenderMode } from "./v3/gates";
 import { clearGl, reportGl } from "./v3/gl-slot";
-
-function webglAvailable() {
-  try {
-    const test = document.createElement("canvas");
-    return Boolean(test.getContext("webgl2") || test.getContext("webgl"));
-  } catch {
-    return false;
-  }
-}
-
-function holdStill() {
-  const nav = navigator as Navigator & { connection?: { saveData?: boolean }; deviceMemory?: number };
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
-  if (nav.connection?.saveData) return true;
-  if (nav.deviceMemory !== undefined && nav.deviceMemory <= 2) return true;
-  return !webglAvailable();
-}
+import { degrade, onDegrade, setDebug } from "./v3/gl-host";
 
 export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [mode, setMode] = useState<"booting" | "live" | "still">("booting");
+  const [mode, setMode] = useState<RenderMode>("still");
+  const [reason, setReason] = useState("ssr");
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    setDebug("hero", shown ? mode : "still", shown ? reason : mode === "still" ? reason : "offscreen");
+  }, [mode, reason, shown]);
 
   useEffect(() => {
     let alive = true;
-    if (holdStill()) {
-      const frame = window.requestAnimationFrame(() => {
-        if (alive) setMode("still");
-      });
+    const decision = decideRender();
+    const publish = window.requestAnimationFrame(() => {
+      setMode(decision.mode);
+      setReason(decision.reason);
+    });
+    if (decision.mode === "still") {
       return () => {
         alive = false;
-        window.cancelAnimationFrame(frame);
+        window.cancelAnimationFrame(publish);
       };
     }
+
+    const reducedMotion = decision.mode === "static-3d";
     const mobileQuery = window.matchMedia("(max-width: 820px)");
     let token = 0;
     let handle: ArcHandle | null = null;
     let boot = 0;
+    let dead = false;
 
     const readProgress = () => {
       const track = trackRef.current;
@@ -55,13 +52,20 @@ export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null
       window.clearTimeout(boot);
       handle?.dispose();
       handle = null;
-      if (alive) setMode("still");
+      if (alive) setShown(false);
     };
 
+    const stop = onDegrade((why) => {
+      dead = true;
+      setMode("still");
+      setReason(why);
+      setShown(false);
+      release();
+    });
+
     const acquire = () => {
-      if (handle) return;
+      if (handle || dead) return;
       const mine = ++token;
-      if (alive) setMode("booting");
       boot = window.setTimeout(() => {
         const canvas = canvasRef.current;
         if (!alive || mine !== token || !canvas) return;
@@ -69,10 +73,14 @@ export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null
           .then((mod) => {
             if (!alive || mine !== token || !canvasRef.current) return null;
             return mod.mountArcScene(canvasRef.current, {
-              reducedMotion: false,
+              reducedMotion,
               mobile: mobileQuery.matches,
               onReady: () => {
-                if (alive && mine === token) setMode("live");
+                if (alive && mine === token) {
+                  setMode(reducedMotion ? "static-3d" : "live");
+                  setReason(reducedMotion ? "prefers-reduced-motion" : "webgl");
+                  setShown(true);
+                }
               },
             });
           })
@@ -86,7 +94,12 @@ export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null
             readProgress();
           })
           .catch(() => {
-            if (alive && mine === token) setMode("still");
+            if (alive && mine === token) {
+              setMode("still");
+              setReason("webgl-context-failed");
+              setShown(false);
+              degrade("webgl-context-failed");
+            }
           });
       }, 48);
     };
@@ -107,13 +120,15 @@ export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null
       window.removeEventListener("resize", readProgress);
       clearGl("hero");
       release();
+      stop();
+      window.cancelAnimationFrame(publish);
     };
   }, [trackRef]);
 
   return (
     <>
-      <Image className={mode === "live" ? "pa-still is-covered" : "pa-still"} src="/arc/arc-still.webp" alt="" fill sizes="100vw" />
-      <canvas ref={canvasRef} className={mode === "live" ? "pa-canvas is-ready" : "pa-canvas"} aria-hidden="true" />
+      <img className={shown ? "pa-still is-covered" : "pa-still"} src="/arc/arc-still.webp" alt="" />
+      <canvas ref={canvasRef} className="pa-canvas" data-mode={mode} data-reason={reason} aria-hidden="true" />
     </>
   );
 }

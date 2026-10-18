@@ -56,9 +56,7 @@ export async function mountBook(canvas: HTMLCanvasElement, options: SceneOptions
   S.rim.color.set(0xfff0e0);
   S.rim.position.set(6, 4.5, -6);
   const { scene, renderer } = S;
-  renderer.toneMapping = THREE.NoToneMapping;
-  renderer.toneMappingExposure = 1;
-  renderer.setClearColor(BONE, 1);
+  S.setGrade(THREE.NoToneMapping, 1);
   scene.background = new THREE.Color(BONE);
   scene.fog = null;
   const hemi = scene.children.find((child): child is THREE.HemisphereLight => child instanceof THREE.HemisphereLight);

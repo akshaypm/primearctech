@@ -5,6 +5,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { createArcModel, type ArcModel } from "./arc-model";
+import { registerLayer, sharedRenderer, unregisterLayer } from "./v3/gl-host";
 
 export type ArcHandle = {
   setProgress: (value: number) => void;
@@ -192,22 +193,8 @@ function smoothstep(value: number) {
 export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMountOptions): Promise<ArcHandle> {
   const { reducedMotion, mobile, onReady } = options;
   const parent = canvas.parentElement;
-  const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2);
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: !mobile,
-    powerPreference: "high-performance",
-    alpha: false,
-    preserveDrawingBuffer: true,
-    failIfMajorPerformanceCaveat: false,
-  });
-  renderer.setPixelRatio(dpr);
-  renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
-  renderer.setClearColor(INK, 1);
+  const renderer = sharedRenderer();
+  const dpr = renderer.getPixelRatio();
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(INK);
@@ -283,8 +270,13 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     samples,
   });
   const composer = new EffectComposer(renderer, renderTarget);
+  composer.renderToScreen = false;
   composer.setPixelRatio(dpr);
   composer.setSize(initial.width, initial.height);
+  registerLayer("hero", {
+    element: parent ?? canvas,
+    texture: () => composer.readBuffer?.texture ?? null,
+  });
   composer.addPass(new RenderPass(scene, camera));
 
   let bokeh: BokehPass | null = null;
@@ -312,7 +304,6 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
 
   function resize() {
     const next = size();
-    renderer.setSize(next.width, next.height, false);
     composer.setSize(next.width, next.height);
     camera.aspect = next.width / next.height;
     camera.updateProjectionMatrix();
@@ -351,6 +342,9 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     progress += (targetProgress - progress) * (reducedMotion ? 1 : 0.14);
     applyProgress(progress);
     film.uniforms.t.value = reducedMotion ? 2.4 : time * 0.00037;
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = 1;
+    composer.renderToScreen = false;
     composer.render();
     frameCount += 1;
     if (!readySent && frameCount >= 2) {
@@ -417,8 +411,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
       groundTexture.dispose();
       scene.environment?.dispose();
       key.dispose();
-      renderer.forceContextLoss();
-      renderer.dispose();
+      unregisterLayer("hero");
     },
   };
 }

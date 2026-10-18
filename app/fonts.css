@@ -25,7 +25,7 @@
   src: url("/fonts/general-sans-400.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }
 
 @font-face {
@@ -33,7 +33,7 @@
   src: url("/fonts/general-sans-500.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }
 
 @font-face {
@@ -41,5 +41,5 @@
   src: url("/fonts/ibm-plex-mono-400.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }

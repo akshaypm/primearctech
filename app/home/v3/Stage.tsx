@@ -1,9 +1,12 @@
 "use client";
 
-import Image from "next/image";
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Anchor, SceneHandle, SceneOptions } from "./types";
+import { decideRender, type RenderMode } from "./gates";
 import { clearGl, reportGl } from "./gl-slot";
+import { degrade, onDegrade, setDebug } from "./gl-host";
 
 export type SceneName = "demo" | "engagements" | "how" | "proof" | "products" | "partners" | "fit" | "book";
 
@@ -19,23 +22,6 @@ const loaders: Record<SceneName, () => Promise<Mount>> = {
   fit: () => import("./fit").then((mod) => mod.mountFit),
   book: () => import("./book").then((mod) => mod.mountBook),
 };
-
-function webglAvailable() {
-  try {
-    const test = document.createElement("canvas");
-    return Boolean(test.getContext("webgl2") || test.getContext("webgl"));
-  } catch {
-    return false;
-  }
-}
-
-function holdStill() {
-  const nav = navigator as Navigator & { connection?: { saveData?: boolean }; deviceMemory?: number };
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
-  if (nav.connection?.saveData) return true;
-  if (nav.deviceMemory !== undefined && nav.deviceMemory <= 2) return true;
-  return !webglAvailable();
-}
 
 function scrubProgress(section: HTMLElement, center: number) {
   const rect = section.getBoundingClientRect();
@@ -65,7 +51,9 @@ export function Stage({
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [live, setLive] = useState(false);
+  const [mode, setMode] = useState<RenderMode>("still");
+  const [reason, setReason] = useState("ssr");
+  const [shown, setShown] = useState(false);
   const [broken, setBroken] = useState(false);
   const [anchors, setAnchors] = useState<Anchor[]>([]);
   const progressRef = useRef(onProgress);
@@ -77,10 +65,22 @@ export function Stage({
   });
 
   useEffect(() => {
+    setDebug(id, shown ? mode : "still", shown ? reason : mode === "still" ? reason : "offscreen");
+  }, [id, mode, reason, shown]);
+
+  useEffect(() => {
     const node = frameRef.current;
     const canvas = canvasRef.current;
-    if (!node || !canvas || holdStill()) return;
+    const decision = decideRender();
+    const publish = window.requestAnimationFrame(() => {
+      setMode(decision.mode);
+      setReason(decision.reason);
+    });
+    if (!node || !canvas || decision.mode === "still") {
+      return () => window.cancelAnimationFrame(publish);
+    }
 
+    const reducedMotion = decision.mode === "static-3d";
     let alive = true;
     let token = 0;
     let handle: SceneHandle | null = null;
@@ -102,17 +102,26 @@ export function Stage({
       handle?.dispose();
       handle = null;
       handleCb.current?.(null);
-      if (alive) setLive(false);
+      if (alive) setShown(false);
     };
 
+    let dead = false;
+    const stop = onDegrade((why) => {
+      dead = true;
+      setMode("still");
+      setReason(why);
+      setShown(false);
+      release();
+    });
+
     const acquire = () => {
-      if (handle) return;
+      if (handle || dead) return;
       const mine = ++token;
       void loaders[scene]()
         .then((mount) => {
           if (!alive || mine !== token || !canvasRef.current) return null;
           const mobile = window.matchMedia("(max-width: 700px)").matches;
-          return mount(canvasRef.current, { mobile });
+          return mount(canvasRef.current, { mobile, reducedMotion });
         })
         .then((next) => {
           if (!next) return;
@@ -126,11 +135,17 @@ export function Stage({
           };
           read();
           setAnchors(next.anchors());
-          setLive(true);
+          setMode(reducedMotion ? "static-3d" : "live");
+          setReason(reducedMotion ? "prefers-reduced-motion" : "webgl");
+          setShown(true);
           handleCb.current?.(next);
         })
         .catch(() => {
-          if (alive && mine === token) setLive(false);
+          if (alive && mine === token) {
+            setMode("still");
+            setReason("webgl-context-failed");
+            degrade("webgl-context-failed");
+          }
         });
     };
 
@@ -157,16 +172,18 @@ export function Stage({
       window.removeEventListener("resize", onScroll);
       clearGl(id);
       release();
+      stop();
+      window.cancelAnimationFrame(publish);
     };
   }, [id, scene, scrubCenter]);
 
   return (
-    <div ref={frameRef} className="pa-stage" data-ready={live ? "true" : "false"} style={{ ["--mh" as string]: `${mobileHeight}px` }}>
+    <div ref={frameRef} className="pa-stage" data-ready={mode === "still" ? "false" : "true"} data-mode={mode} data-reason={reason} style={{ ["--mh" as string]: `${mobileHeight}px` }}>
       <div className="pa-stage-view">
         {broken ? null : (
-          <Image className={live ? "pa-fallback is-covered" : "pa-fallback"} src={fallback} alt="" fill sizes="100vw" onError={() => setBroken(true)} />
+          <img className={shown ? "pa-fallback is-covered" : "pa-fallback"} src={fallback} alt="" onError={() => setBroken(true)} />
         )}
-        <canvas ref={canvasRef} className={live ? "is-ready" : ""} aria-hidden="true" />
+        <canvas ref={canvasRef} aria-hidden="true" />
       </div>
       <div className="pa-anchors">{children?.(anchors)}</div>
     </div>

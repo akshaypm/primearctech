@@ -15,6 +15,9 @@
   font-synthesis: none;
   letter-spacing: normal;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .pa * { box-sizing: border-box; }
@@ -49,7 +52,7 @@
 
 .pa-sec { position: relative; overflow: hidden; }
 .pa-light { color: var(--ink); }
-.pa-ov { position: absolute; z-index: 2; }
+.pa-ov, .pa-top, .pa-person, .pa-anchors { position: absolute; z-index: 3; }
 .pa p.pa-eyebrow {
   display: flex;
   gap: 10px;
@@ -83,9 +86,10 @@
 .pa a.pa-textlink:hover { border-color: var(--sig); }
 
 .pa-hero { position: relative; height: 100vh; min-height: 620px; overflow: hidden; background: var(--ink); }
-.pa-canvas, .pa-still { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.pa-canvas { opacity: 0; }
-.pa-canvas.is-ready { opacity: 1; }
+.pa-gl-host { position: fixed; inset: 0; z-index: 1; width: 100%; height: 100%; pointer-events: none; display: block; }
+.pa-canvas, .pa-still { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pa-canvas { display: none; }
+.pa-still { display: block; object-fit: cover; }
 .pa-still.is-covered { opacity: 0; }
 .pa-top {
   position: absolute; z-index: 3; top: 0; left: 0; right: 0;
@@ -108,11 +112,19 @@
 
 .pa-stage { position: absolute; inset: 0; }
 .pa-stage-view { position: absolute; inset: 0; }
-.pa-stage-view canvas, .pa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.pa-stage-view canvas { opacity: 0; }
-.pa-stage-view canvas.is-ready { opacity: 1; }
+.pa-stage-view canvas, .pa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pa-stage-view canvas { display: none; }
+.pa-fallback { display: block; object-fit: cover; }
 .pa-fallback.is-covered { opacity: 0; }
-.pa-anchors { position: absolute; inset: 0; pointer-events: none; }
+.pa-anchors { inset: 0; pointer-events: none; }
+.pa-debug {
+  position: fixed; z-index: 40; top: 56px; right: 8px; left: auto; bottom: auto;
+  max-width: min(360px, 70vw); max-height: 46vh; overflow: hidden;
+  padding: 8px 10px; background: rgba(17, 19, 21, 0.88); color: #f1efe9;
+  font: 11px/1.45 ui-monospace, monospace; pointer-events: none;
+}
+.pa-debug b { display: inline-block; width: 92px; }
+.pa-debug span { color: #a7adb2; }
 .pa-anchor { position: absolute; z-index: 2; pointer-events: auto; }
 
 .pa-demo { height: 1000px; background: #e7e4dd; }
@@ -167,7 +179,7 @@
 .pa-steps .pa-k i.on { background: var(--sig); border-color: var(--sig); }
 .pa-steps h3 { font-size: 24px; margin-bottom: 8px; }
 .pa-steps p { font-size: 15px; line-height: 1.5; color: #4a4f53; }
-.pa-how .pa-note { left: 50%; bottom: 44px; transform: translateX(-50%); color: #4a4f53; font-size: 11px; white-space: nowrap; }
+.pa-how .pa-note { left: 0; right: 0; bottom: 44px; transform: none; text-align: center; color: #4a4f53; font-size: 11px; white-space: nowrap; }
 
 .pa-proof { height: 1160px; background: #111315; }
 .pa-proof .pa-head { left: var(--pad); top: 96px; width: min(640px, 48vw); }
@@ -241,7 +253,7 @@
 .pa-person.is-b { left: 584px; top: 560px; width: 360px; }
 .pa-person.is-c { left: 994px; top: 360px; width: 410px; }
 .pa-ph { position: relative; aspect-ratio: 900 / 1140; overflow: hidden; background: #3b3d3f; }
-.pa-ph img { object-fit: cover; object-position: 50% 0; filter: contrast(1.02); }
+.pa-ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; }
 .pa-person figcaption { display: flex; justify-content: space-between; align-items: baseline; margin-top: 16px; gap: 16px; }
 .pa-person h3 { font-size: 26px; }
 .pa-person figcaption p { margin-top: 6px; font-size: 11px; line-height: 1.5; letter-spacing: 0.05em; color: var(--g1); }

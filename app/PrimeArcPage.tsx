@@ -1,8 +1,11 @@
 "use client";
 
-import { useRef, useState, type CSSProperties, type ReactNode } from "react";
-import Image from "next/image";
+/* eslint-disable @next/next/no-img-element */
+
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ArcCanvas } from "./home/ArcCanvas";
+import { DebugHud } from "./home/v3/DebugHud";
+import { setDebug } from "./home/v3/gl-host";
 import { Stage, type SceneName } from "./home/v3/Stage";
 import type { Anchor, SceneHandle } from "./home/v3/types";
 import { BUSINESS_CONTACT } from "@/lib/contact";
@@ -48,12 +51,16 @@ function EmailLine() {
 
 export function PrimeArcPage() {
   const heroRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    setDebug("team", "image", "portraits /v3/people");
+  }, []);
   const [locked, setLocked] = useState(50);
   const [fitHandle, setFitHandle] = useState<SceneHandle | null>(null);
   const [productHandle, setProductHandle] = useState<SceneHandle | null>(null);
 
   return (
     <div className="pa">
+      <DebugHud />
       <a className="pa-skip" href="#main">Skip to content</a>
       <header className="pa-hero" id="hero" ref={heroRef}>
         <ArcCanvas trackRef={heroRef} />
@@ -316,7 +323,7 @@ function Team() {
       {team.map((person, index) => (
         <figure className={`pa-person is-${person.width}`} key={person.name}>
           <div className="pa-ph">
-            <Image src={person.image} alt={person.name} fill sizes="(max-width: 700px) 84vw, 500px" />
+            <img src={person.image} alt={person.name} />
           </div>
           <figcaption>
             <div>

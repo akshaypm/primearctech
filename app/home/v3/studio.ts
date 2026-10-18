@@ -6,6 +6,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { registerLayer, sharedRenderer, unregisterLayer } from "./gl-host";
 
 export { THREE, RoundedBoxGeometry };
 
@@ -171,8 +172,11 @@ export type Studio = {
   setVignette: (value: number) => void;
   setGrain: (value: number) => void;
   setAperture: (value: number) => void;
+  setGrade: (mapping: THREE.ToneMapping, exposure?: number) => void;
   dispose: () => void;
 };
+
+let sceneSerial = 0;
 
 export function studio(options: StudioOptions): Studio {
   reseed(11);
@@ -180,22 +184,9 @@ export function studio(options: StudioOptions): Studio {
   const key = options.key ?? { pos: [-5, 12, 7] as [number, number, number], int: 420, angle: 0.46 };
   let w = options.w;
   let h = options.h;
-  const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.5);
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: !mobile,
-    alpha: false,
-    powerPreference: "high-performance",
-    preserveDrawingBuffer: true,
-    failIfMajorPerformanceCaveat: false,
-  });
-  renderer.setPixelRatio(dpr);
-  renderer.setSize(w, h, false);
-  renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = tone;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  const dpr = sharedRenderer().getPixelRatio();
+  const renderer = sharedRenderer();
+  const grade = { mapping: THREE.NeutralToneMapping as THREE.ToneMapping, exposure: tone };
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(bg);
@@ -255,6 +246,7 @@ export function studio(options: StudioOptions): Studio {
   const samples = mobile ? 0 : Math.min(4, renderer.capabilities.maxSamples || 0);
   const renderTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples });
   const composer = new EffectComposer(renderer, renderTarget);
+  composer.renderToScreen = false;
   composer.setPixelRatio(dpr);
   composer.setSize(w, h);
   composer.addPass(new RenderPass(scene, camera));
@@ -272,16 +264,25 @@ export function studio(options: StudioOptions): Studio {
   let raf = 0;
   let stopped = false;
 
+  const layerId = canvas.closest("section, header")?.id || `scene-${++sceneSerial}`;
+  const layerElement = canvas.parentElement ?? canvas;
+  registerLayer(layerId, {
+    element: layerElement,
+    texture: () => composer.readBuffer?.texture ?? null,
+  });
+
   function render() {
     frame += 1;
     film.uniforms.t.value = frame * 0.37;
+    renderer.toneMapping = grade.mapping;
+    renderer.toneMappingExposure = grade.exposure;
+    composer.renderToScreen = false;
     composer.render();
   }
 
   function resize(nextW: number, nextH: number) {
     w = Math.max(1, nextW);
     h = Math.max(1, nextH);
-    renderer.setSize(w, h, false);
     composer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -334,9 +335,14 @@ export function studio(options: StudioOptions): Studio {
       const uniforms = bokeh?.uniforms as { aperture?: { value: number } } | undefined;
       if (uniforms?.aperture) uniforms.aperture.value = value;
     },
+    setGrade(mapping, exposure) {
+      grade.mapping = mapping;
+      if (exposure !== undefined) grade.exposure = exposure;
+    },
     dispose() {
       stopped = true;
       window.cancelAnimationFrame(raf);
+      unregisterLayer(layerId);
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();
       const textures = new Set<THREE.Texture>();
@@ -357,8 +363,6 @@ export function studio(options: StudioOptions): Studio {
       textures.forEach((texture) => texture.dispose());
       composer.dispose();
       renderTarget.dispose();
-      renderer.forceContextLoss();
-      renderer.dispose();
     },
   };
 }

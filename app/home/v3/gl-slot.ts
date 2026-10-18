@@ -3,31 +3,21 @@ type Hooks = {
   release: () => void;
 };
 
-type Claim = Hooks & { ratio: number };
+type Claim = Hooks & { ratio: number; active: boolean };
 
 const claims = new Map<string, Claim>();
-let owner: string | null = null;
-let electing = false;
+const visibleRatio = 0.08;
 
 function elect() {
-  if (electing) return;
-  electing = true;
-  try {
-    let bestId: string | null = null;
-    let best = 0.18;
-    for (const [id, claim] of claims) {
-      if (claim.ratio > best) {
-        best = claim.ratio;
-        bestId = id;
-      }
+  for (const claim of claims.values()) {
+    const should = claim.ratio > visibleRatio;
+    if (should && !claim.active) {
+      claim.active = true;
+      claim.acquire();
+    } else if (!should && claim.active) {
+      claim.active = false;
+      claim.release();
     }
-    if (bestId === owner) return;
-    const previous = owner;
-    owner = bestId;
-    if (previous) claims.get(previous)?.release();
-    if (owner) claims.get(owner)?.acquire();
-  } finally {
-    electing = false;
   }
 }
 
@@ -38,7 +28,7 @@ export function reportGl(id: string, ratio: number, hooks: Hooks) {
     current.acquire = hooks.acquire;
     current.release = hooks.release;
   } else {
-    claims.set(id, { ratio, ...hooks });
+    claims.set(id, { ratio, active: false, ...hooks });
   }
   elect();
 }
@@ -46,9 +36,8 @@ export function reportGl(id: string, ratio: number, hooks: Hooks) {
 export function clearGl(id: string) {
   const claim = claims.get(id);
   claims.delete(id);
-  if (owner === id) {
-    owner = null;
-    claim?.release();
+  if (claim?.active) {
+    claim.active = false;
+    claim.release();
   }
-  elect();
 }
