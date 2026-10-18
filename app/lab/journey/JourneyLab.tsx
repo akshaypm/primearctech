@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
+import { STATIONS, copyInk } from "./copy";
 import { mountJourney, type JourneyWorld } from "./world";
 import "./journey.css";
 
@@ -18,15 +19,18 @@ declare global {
   }
 }
 
-function revealFor(progress: number, index: number, count: number) {
-  if (progress <= 0.001 && index === 0) return 0;
-  if (progress >= 0.999 && index === count - 1) return 0;
+function smoothstep(value: number) {
+  const x = Math.min(1, Math.max(0, value));
+  return x * x * (3 - 2 * x);
+}
+
+function lineY(progress: number, index: number, count: number, line: number) {
   const span = 1 / count;
-  const local = (progress - index * span) / span;
-  if (local <= 0 || local >= 1) return 110;
-  const enter = Math.min(1, local / 0.18);
-  const exit = Math.min(1, (1 - local) / 0.18);
-  return (1 - Math.min(enter, exit)) * 110;
+  const local = (progress - index * span) / span - line * 0.04;
+  if (index === count - 1) return (1 - smoothstep((local + 0.02) / 0.2)) * 110;
+  const enter = index === 0 && progress < span * 0.22 ? 1 : smoothstep(local / 0.18);
+  const exit = smoothstep((local - 0.76) / 0.16);
+  return (1 - enter * (1 - exit)) * 110;
 }
 
 export function JourneyLab() {
@@ -41,27 +45,22 @@ export function JourneyLab() {
     const track = trackRef.current;
     if (!canvas || !copy || !track) return;
     const capture = new URLSearchParams(window.location.search).get("capture") === "1";
+    if (capture) {
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+    }
     let alive = true;
     let frame = 0;
-    const cards = () => [...copy.querySelectorAll<HTMLElement>(".journey-card")];
+    const cards = () => [...copy.querySelectorAll<HTMLElement>(".lj-card")];
 
     const paint = (progress: number) => {
       const count = cards().length || 1;
-      let active = 0;
-      let best = Infinity;
+      copy.classList.toggle("is-ink", copyInk(progress));
       cards().forEach((card, index) => {
-        const center = (index + 0.5) / count;
-        const distance = Math.abs(progress - center);
-        if (distance < best) {
-          best = distance;
-          active = index;
-        }
-        const y = revealFor(progress, index, count);
-        card.querySelectorAll<HTMLElement>(".line > span").forEach((line) => {
-          line.style.setProperty("--y", `${y}%`);
+        card.querySelectorAll<HTMLElement>(".line > span").forEach((line, lineIndex) => {
+          line.style.setProperty("--y", `${lineY(progress, index, count, lineIndex)}%`);
         });
       });
-      cards().forEach((card, index) => card.classList.toggle("is-on", index === active));
     };
 
     let stop = () => {};
@@ -106,7 +105,10 @@ export function JourneyLab() {
         world.setPointer((event.clientX / window.innerWidth) * 2 - 1, (event.clientY / window.innerHeight) * 2 - 1);
       };
       window.addEventListener("pointermove", onPointer);
-      const onResize = () => world.resize();
+      const onResize = () => {
+        world.resize();
+        ScrollTrigger.refresh();
+      };
       window.addEventListener("resize", onResize);
       const loop = (now: number) => {
         frame = requestAnimationFrame(loop);
@@ -132,28 +134,20 @@ export function JourneyLab() {
       worldRef.current?.dispose();
       worldRef.current = null;
       if (window.__journey) delete window.__journey;
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
     };
   }, []);
 
-  const stations = [
-    { id: "hero", kicker: "01 — Hero", lines: ["AI features,", "from demo to production."] },
-    { id: "demo", kicker: "02 — Demo to production", lines: ["The demo worked.", "Production is a different machine."] },
-    { id: "engagements", kicker: "03 — Engagements", lines: ["Three ways in.", "One standard of finish."] },
-    { id: "how", kicker: "04 — How we work", lines: ["Engineers on the call.", "Engineers on the code."] },
-    { id: "proof", kicker: "05 — Engineering depth", lines: ["Engineering you", "can inspect."] },
-    { id: "products", kicker: "06 — Products", lines: ["When the same problem", "shows up three times."] },
-    { id: "partners", kicker: "07 — Partners", lines: ["Built under", "your name."] },
-    { id: "fit", kicker: "09 — Fit", lines: ["We work to a tolerance.", "So should a client list."] },
-    { id: "book", kicker: "10 — Book a call", lines: ["Talk to an engineer,", "not a salesperson."] },
-  ];
-
   return (
-    <main className="journey">
-      <canvas ref={canvasRef} className="journey-gl" />
-      <div ref={copyRef} className="journey-copy">
-        {stations.map((station) => (
-          <article key={station.id} className="journey-card" data-station={station.id}>
-            <p>{station.kicker}</p>
+    <main className="lj">
+      <canvas ref={canvasRef} className="lj-gl" />
+      <div ref={copyRef} className="lj-copy">
+        {STATIONS.map((station) => (
+          <article key={station.id} className="lj-card" data-station={station.id}>
+            <p className="line eyebrow">
+              <span>{station.eyebrow}</span>
+            </p>
             <h1>
               {station.lines.map((line) => (
                 <span className="line" key={line}>
@@ -164,7 +158,7 @@ export function JourneyLab() {
           </article>
         ))}
       </div>
-      <div ref={trackRef} className="journey-track" style={{ height: `${stations.length * 100}vh` }} />
+      <div ref={trackRef} className="lj-track" style={{ height: `${STATIONS.length * 100}vh` }} />
     </main>
   );
 }
