@@ -3,8 +3,8 @@ import "./fonts.css";
 import "./globals.css";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://primearc.tech";
-const title = "PrimeArcTech | AI systems that complete real work";
-const description = "PrimeArcTech turns costly workflows into production AI systems and proves the craft through owned products like FieldRelay.";
+const title = "PrimeArcTech | AI features, from demo to production";
+const description = "A senior-engineer AI studio that takes AI features from demo to production for B2B software companies in the US and UK.";
 
 export const metadata: Metadata = {
   title: { default: title, template: "%s | PrimeArcTech" },
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     url: "/",
     title,
     description,
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "PrimeArcTech founder-led applied AI studio" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "PrimeArcTech senior-engineer AI studio" }],
   },
   twitter: {
     card: "summary_large_image",

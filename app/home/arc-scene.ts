@@ -198,6 +198,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     antialias: !mobile,
     powerPreference: "high-performance",
     alpha: false,
+    preserveDrawingBuffer: true,
     failIfMajorPerformanceCaveat: false,
   });
   renderer.setPixelRatio(dpr);
@@ -416,6 +417,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
       groundTexture.dispose();
       scene.environment?.dispose();
       key.dispose();
+      renderer.forceContextLoss();
       renderer.dispose();
     },
   };
