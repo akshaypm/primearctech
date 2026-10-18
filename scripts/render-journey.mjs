@@ -86,7 +86,7 @@ await shoot(390, 844, mobileFrames, mobileDir, false);
 
 const desktop = spawnSync("ffmpeg", [
   "-y", "-framerate", String(fps), "-i", `${desktopDir}/frame-%04d.jpg`,
-  "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", "-preset", "veryfast",
+  "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "25", "-preset", "veryfast",
   "-movflags", "+faststart", "-an", `${root}/journey-desktop.mp4`,
 ], { stdio: "inherit" });
 const mobile = spawnSync("ffmpeg", [
