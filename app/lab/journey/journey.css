@@ -1,0 +1,71 @@
+.journey {
+  background: #111315;
+  color: #f1efe9;
+  font-family: "General Sans", ui-sans-serif, sans-serif;
+}
+
+.journey-gl {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+}
+
+.journey-copy {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  padding: 7vh 6vw 9vh;
+}
+
+.journey-card {
+  display: none;
+  max-width: min(920px, 86vw);
+}
+
+.journey-card.is-on {
+  display: block;
+}
+
+.journey-card p {
+  margin: 0 0 14px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a7adb2;
+}
+
+.journey-card h1 {
+  margin: 0;
+  font-weight: 500;
+  font-size: clamp(32px, 3.8vw, 58px);
+  letter-spacing: -0.045em;
+  line-height: 0.96;
+}
+
+.journey-card .line {
+  display: block;
+  overflow: hidden;
+}
+
+.journey-card .line > span {
+  display: block;
+  white-space: nowrap;
+  transform: translateY(var(--y, 110%));
+}
+
+.journey-track {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 700px) {
+  .journey-copy { align-items: flex-start; padding: 12vh 20px 0; }
+  .journey-card h1 { font-size: 40px; }
+}
