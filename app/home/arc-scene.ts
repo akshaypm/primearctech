@@ -225,7 +225,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     scene.environment?.dispose();
     throw error;
   }
-  model.object.position.y = 0.18;
+  model.object.position.y = mobile ? 0.52 : 0.18;
   scene.add(model.object);
 
   const key = new THREE.SpotLight(0xfaf6f0, mobile ? 360 : 420, 50, 0.46, 1, 2);

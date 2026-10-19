@@ -94,19 +94,47 @@
 .pa-top {
   position: absolute; z-index: 3; top: 0; left: 0; right: 0;
   display: flex; justify-content: space-between; align-items: center;
-  padding: var(--pad); font-size: 14px;
+  padding: 32px var(--pad) 0; font-size: 14px;
 }
-.pa-wm { font-weight: 500; letter-spacing: -0.01em; font-size: 15px; }
-.pa-top nav { display: flex; gap: 28px; color: var(--g1); }
-.pa-top nav a:hover { color: var(--bone); }
-.pa-hero-copy { position: absolute; z-index: 3; left: var(--pad); bottom: calc(var(--pad) + 8px); max-width: 760px; }
-.pa-hero h1 { font-size: clamp(2.4rem, 3.9vw, 3.75rem); }
+.pa a.pa-wm { font-weight: 500; letter-spacing: -0.02em; font-size: 15px; }
+.pa-top nav {
+  position: absolute;
+  left: 50%;
+  top: 32px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+}
+.pa-top > .pa-textlink { margin-left: auto; }
+.pa-menu {
+  display: none;
+  margin: 0;
+  padding: 0 0 2px;
+  border: 0;
+  border-bottom: 1px solid rgba(241, 239, 233, 0.35);
+  background: none;
+  color: var(--bone);
+  cursor: pointer;
+}
+.pa-menu:hover { border-bottom-color: var(--sig); }
+.pa-links { display: flex; gap: 32px; color: var(--g1); }
+.pa-links a:hover, .pa-links a:focus-visible { color: var(--bone); }
+.pa-hero-copy { position: absolute; z-index: 3; left: var(--pad); bottom: 28px; max-width: 680px; }
+.pa-hero h1 { font-size: clamp(52px, 3.9vw, 60px); letter-spacing: -0.045em; line-height: 0.96; }
+.pa-hero h1 .pa-br-m { display: none; }
 .pa p.pa-lede { margin-top: 20px; color: var(--g1); font-size: 16px; line-height: 1.5; max-width: 46ch; }
+.pa-hero p.pa-lede { margin-top: 16px; max-width: 410px; font-size: 15.5px; line-height: 1.5; color: #b7bdc2; }
 .pa-actions { margin-top: 28px; display: flex; gap: 28px; align-items: center; font-size: 15px; }
+.pa-hero .pa-actions { margin-top: 26px; }
+.pa-hero .pa-btn { gap: 18px; padding: 0 22px; }
 .pa-hero .pa-cap {
-  position: absolute; z-index: 3; right: var(--pad); bottom: calc(var(--pad) + 8px);
+  position: absolute; z-index: 3; right: var(--pad); bottom: 32px;
   width: auto; transform: none;
-  color: var(--g1); text-align: right; line-height: 1.6; font-size: 12px;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #9aa1a6; text-align: right; line-height: 1.45; font-size: 12px;
 }
 .pa-hero-scrim { display: none; }
 
@@ -310,12 +338,34 @@
 }
 
 @media (max-width: 820px) {
-  .pa-top nav { display: none; }
-  .pa-hero-copy { right: var(--pad); bottom: 28px; }
-  .pa-hero h1 { font-size: 40px; }
-  .pa-hero h1 br { display: none; }
+  .pa-top { padding-top: 14px; }
+  .pa-top nav { position: relative; left: auto; top: auto; transform: none; margin-left: auto; }
+  .pa-top > .pa-textlink { margin-left: 18px; }
+  .pa-menu { display: inline-block; min-height: 44px; }
+  .pa-links {
+    display: none;
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 6;
+    flex-direction: column;
+    gap: 0;
+    min-width: 196px;
+    padding: 6px 0;
+    background: rgba(17, 19, 21, 0.96);
+    border: 1px solid rgba(241, 239, 233, 0.16);
+  }
+  .pa-top nav[data-open="true"] .pa-links { display: flex; }
+  .pa-links a { min-height: 48px; display: flex; align-items: center; padding: 0 16px; color: var(--bone); }
+  .pa-hero-copy { right: var(--pad); bottom: 24px; max-width: none; }
+  .pa-hero h1 { font-size: 42px; letter-spacing: -0.046em; line-height: 0.98; }
+  .pa-hero h1 .pa-br-m { display: inline; }
+  .pa-hero p.pa-eyebrow::before { display: none; }
+  .pa-hero p.pa-lede { max-width: none; font-size: 15px; }
   .pa p.pa-lede { font-size: 15px; }
-  .pa-actions { flex-direction: column; align-items: flex-start; gap: 18px; }
+  .pa-hero .pa-actions { flex-direction: column; align-items: stretch; gap: 16px; width: 100%; }
+  .pa-hero .pa-btn { width: 100%; min-width: 0; min-height: 48px; height: 48px; justify-content: center; gap: 16px; }
+  .pa-hero .pa-actions .pa-textlink { align-self: flex-start; }
   .pa-hero .pa-cap { display: none; }
   .pa-hero::after {
     content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 58%; z-index: 1; pointer-events: none;

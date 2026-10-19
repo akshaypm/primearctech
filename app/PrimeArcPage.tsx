@@ -82,21 +82,52 @@ export function PrimeArcPage() {
 }
 
 function HeroChrome() {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const first = document.querySelector<HTMLElement>("#primary-menu a");
+    first?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        menuRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const close = () => setOpen(false);
+
   return (
     <>
       <div className="pa-top">
         <a className="pa-wm" href="#hero">PrimeArcTech</a>
-        <nav aria-label="Primary">
-          <a href="#engagements">Engagements</a>
-          <a href="#products">Products</a>
-          <a href="#partners">Partners</a>
-          <a href="#team">Team</a>
+        <nav aria-label="Primary" data-open={open ? "true" : "false"}>
+          <button
+            ref={menuRef}
+            className="pa-menu"
+            type="button"
+            aria-expanded={open}
+            aria-controls="primary-menu"
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? "Close" : "Menu"}
+          </button>
+          <div id="primary-menu" className="pa-links">
+            <a href="#engagements" onClick={close}>Engagements</a>
+            <a href="#products" onClick={close}>Products</a>
+            <a href="#partners" onClick={close}>Partners</a>
+            <a href="#team" onClick={close}>Team</a>
+          </div>
         </nav>
         <a className="pa-textlink" href="#book">Book a call</a>
       </div>
       <div className="pa-hero-copy">
         <p className="pa-eyebrow">Senior-engineer AI studio · US &amp; UK</p>
-        <h1>AI features, <br />from demo to production.</h1>
+        <h1>AI features, <br />from demo <br className="pa-br-m" />to production.</h1>
         <p className="pa-lede">We take the AI feature your team demoed and make it hold up under real users, real data and real cost. For B2B software companies, Seed to Series B.</p>
         <div className="pa-actions">
           <a className="pa-btn" href="#book">Book a call with an engineer <span>→</span></a>
