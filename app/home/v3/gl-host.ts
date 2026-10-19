@@ -155,11 +155,13 @@ function resizeHost() {
 function adaptPixelRatio() {
   if (!renderer || framesSeen <= WARMUP_FRAMES || fpsSamples.length < FPS_WINDOW) return;
   const ratio = renderer.getPixelRatio();
-  if (ratio <= 1) return;
+  // On 2x-3x phones a 1x canvas brings the fin stair-stepping back; 1.5x is the floor there.
+  const floor = devicePixelRatioCap() >= 2 ? 1.5 : 1;
+  if (ratio <= floor) return;
   const sorted = [...fpsSamples].sort((a, b) => a - b);
   if (sorted[sorted.length >> 1] <= SLOW_FRAME_MS) return;
   dprLowered = true;
-  renderer.setPixelRatio(Math.max(1, ratio - 0.5));
+  renderer.setPixelRatio(Math.max(floor, ratio - 0.5));
   fpsSamples.length = 0;
 }
 
