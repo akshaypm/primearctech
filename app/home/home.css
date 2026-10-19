@@ -128,7 +128,9 @@
 
 .pa-stage { position: absolute; inset: 0; }
 .pa-stage-view { position: absolute; inset: 0; }
-.pa-stage-view canvas, .pa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pa-stage-view picture,
+.pa-stage-view canvas,
+.pa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; }
 .pa-stage-view canvas { display: none; }
 .pa-fallback { display: block; object-fit: cover; pointer-events: none; }
 .pa-fallback.is-covered { opacity: 0; }
