@@ -121,7 +121,7 @@
 .pa-hero .pa-cap {
   position: absolute; z-index: 3; right: var(--pad); bottom: calc(var(--pad) + 8px);
   width: auto; transform: none;
-  color: var(--g2); text-align: right; line-height: 1.5; font-size: 12px;
+  color: #787e83; text-align: right; line-height: 1.5; font-size: 12px;
   letter-spacing: -0.015em; text-transform: none;
 }
 .pa-hero-scrim { display: none; }
