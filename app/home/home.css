@@ -281,6 +281,7 @@
 .pa-team .pa-foot .ph { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; }
 
 .pa-fit { height: 1080px; background: #a29f98; }
+.pa .pa-fit p.pa-eyebrow { color: #181b1e; }
 .pa-fit .pa-head { left: var(--pad); top: 96px; width: min(640px, 46vw); }
 .pa-fit h2 { font-size: 72px; }
 .pa-fit .pa-lists { right: var(--pad); top: 120px; width: 470px; }
