@@ -1,25 +1,33 @@
 import * as THREE from "three";
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
-import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
-import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { FullScreenQuad } from "three/addons/postprocessing/Pass.js";
 import { createArcModel, type ArcModel } from "./arc-model";
-import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
-import { registerLayer, renderPixelRatio, setDebug, sharedRenderer, unregisterLayer } from "./v3/gl-host";
+import { registerLayer, setDebug, sharedRenderer, unregisterLayer } from "./v3/gl-host";
 
 export type ArcHandle = {
   setProgress: (value: number) => void;
   dispose: () => void;
 };
 
+export type ClearBox = { left: number; top: number; right: number; bottom: number };
+
 export type ArcMountOptions = {
   reducedMotion: boolean;
   mobile: boolean;
   onReady: () => void;
+  /** The headline's box in hero-local CSS px. On mobile the mesh is framed to stay above it. */
+  keepClear?: () => ClearBox | null;
 };
 
 const INK = 0x111315;
+// 1440x900 at 1x and 390x844 at 2x both fit; larger or denser screens scale down to this.
+const MAX_BUFFER_PIXELS = 2_100_000;
+// The approved hero pose; the idle sway leaves it and returns, always away from the copy.
+const REST_YAW = -0.62;
+const SWAY_YAW = 0.14;
+const SWAY_RATE = 0.0011;
+const CLEAR_MARGIN = 6;
+// The mobile top bar is about 60px tall; keep the top of the Arc below it when reframing.
+const MOBILE_APEX_MIN = 76;
 
 function hash(seed: number) {
   let value = seed || 7;
@@ -81,7 +89,7 @@ function groundNoise() {
     }
   }
   const randomGrain = hash(19);
-  return noiseTexture(size, size, (x, y) => Math.min(255, field[y * size + x] * 120 + randomGrain() * 40));
+  return noiseTexture(size, size, (x, y) => Math.min(255, field[y * size + x] * 120 + 14 + randomGrain() * 12));
 }
 
 function cycloramaGeometry() {
@@ -160,33 +168,99 @@ function studioEnvironment(renderer: THREE.WebGLRenderer) {
   return texture;
 }
 
-const filmShader = {
-  uniforms: {
-    tDiffuse: { value: null as THREE.Texture | null },
-    t: { value: 0 },
-    res: { value: new THREE.Vector2(1, 1) },
-    grain: { value: 0.015 },
-  },
-  vertexShader: "varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform float t;
-    uniform float grain;
-    uniform vec2 res;
-    varying vec2 vUv;
-    float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
-    void main(){
-      vec4 c=texture2D(tDiffuse,vUv);
-      vec2 d=vUv-0.5;
-      d.x*=res.x/res.y;
-      float v=smoothstep(1.15,0.25,length(d));
-      c.rgb*=mix(0.62,1.0,v);
-      float g=h(floor(vUv*res/1.5)+t)-0.5;
-      c.rgb+=g*grain;
-      gl_FragColor=c;
+// Vignette in linear light, then tone map and encode, then grain in display space.
+// Grain is about one 8-bit step, per device pixel, and fades out on bright metal.
+function finishMaterial() {
+  return new THREE.RawShaderMaterial({
+    uniforms: {
+      tDiffuse: { value: null as THREE.Texture | null },
+      toneMappingExposure: { value: 1 },
+      seed: { value: 0 },
+      aspect: { value: 1 },
+      grain: { value: 0.011 },
+    },
+    vertexShader: `
+      precision highp float;
+      uniform mat4 modelViewMatrix;
+      uniform mat4 projectionMatrix;
+      attribute vec3 position;
+      attribute vec2 uv;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+      uniform sampler2D tDiffuse;
+      uniform float seed;
+      uniform float aspect;
+      uniform float grain;
+      #include <tonemapping_pars_fragment>
+      #include <colorspace_pars_fragment>
+      varying vec2 vUv;
+      float hash12(vec2 p) {
+        vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+        p3 += dot(p3, p3.yzx + 33.33);
+        return fract((p3.x + p3.y) * p3.z);
+      }
+      void main() {
+        vec4 c = texture2D(tDiffuse, vUv);
+        vec2 d = vUv - 0.5;
+        d.x *= aspect;
+        c.rgb *= mix(0.62, 1.0, smoothstep(1.15, 0.25, length(d)));
+        c.rgb = NeutralToneMapping(c.rgb);
+        c = sRGBTransferOETF(c);
+        vec2 p = gl_FragCoord.xy + seed * vec2(113.0, 71.0);
+        float n = hash12(p) + hash12(p + 19.19) - 1.0;
+        float luma = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+        c.rgb += n * grain * (1.0 - smoothstep(0.22, 0.7, luma));
+        gl_FragColor = vec4(c.rgb, 1.0);
+      }
+    `,
+    depthTest: false,
+    depthWrite: false,
+  });
+}
+
+/** Bounding-box corners of every mesh and instance, in the root's local space. Slightly conservative. */
+function meshSamples(root: THREE.Object3D) {
+  const points: THREE.Vector3[] = [];
+  const box = new THREE.Box3();
+  const instance = new THREE.Matrix4();
+  const toRoot = new THREE.Matrix4();
+  root.updateMatrixWorld(true);
+  const rootInverse = root.matrixWorld.clone().invert();
+  const push = (matrix: THREE.Matrix4) => {
+    for (let corner = 0; corner < 8; corner += 1) {
+      points.push(new THREE.Vector3(
+        corner & 1 ? box.max.x : box.min.x,
+        corner & 2 ? box.max.y : box.min.y,
+        corner & 4 ? box.max.z : box.min.z,
+      ).applyMatrix4(matrix));
     }
-  `,
-};
+  };
+  root.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry || !mesh.visible) return;
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    box.copy(mesh.geometry.boundingBox!);
+    toRoot.multiplyMatrices(rootInverse, mesh.matrixWorld);
+    const instanced = child as THREE.InstancedMesh;
+    if (!instanced.isInstancedMesh) {
+      if (Math.abs(toRoot.determinant()) > 1e-12) push(toRoot);
+      return;
+    }
+    for (let index = 0; index < instanced.count; index += 1) {
+      instanced.getMatrixAt(index, instance);
+      // Hidden instances are zero-scaled onto the origin; they would read as a point on the floor.
+      if (Math.abs(instance.determinant()) < 1e-12) continue;
+      push(instance.premultiply(toRoot));
+    }
+  });
+  return points;
+}
 
 function smoothstep(value: number) {
   const t = Math.min(1, Math.max(0, value));
@@ -227,7 +301,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     scene.environment?.dispose();
     throw error;
   }
-  model.object.position.y = mobile ? 0.52 : 0.18;
+  model.object.position.y = 0.18;
   scene.add(model.object);
 
   const key = new THREE.SpotLight(0xfaf6f0, mobile ? 360 : 420, 50, 0.46, 1, 2);
@@ -261,178 +335,178 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     return { width: Math.max(1, width), height: Math.max(1, height) };
   };
 
-  const initial = size();
-  camera.aspect = initial.width / Math.max(1, initial.height);
-  camera.updateProjectionMatrix();
-
+  // MSAA on the HDR scene buffer at every width; thin fins alias badly without it.
   const samples = Math.min(4, renderer.capabilities.maxSamples || 0);
-  const renderTarget = new THREE.WebGLRenderTarget(1, 1, {
-    type: THREE.HalfFloatType,
-    samples,
-  });
-  const composer = new EffectComposer(renderer, renderTarget);
-  composer.renderToScreen = false;
-  composer.setPixelRatio(1);
-  composer.setSize(initial.width, initial.height);
-  const driver: { tick: (time: number) => void; resize: (width: number, height: number) => void } = {
-    tick: () => {},
-    resize: () => {},
-  };
+  const sceneTarget = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples });
+  const outTarget = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false });
+  const finish = finishMaterial();
+  finish.uniforms.tDiffuse.value = sceneTarget.texture;
+  const finishQuad = new FullScreenQuad(finish);
+  let bufferWidth = 0;
+  let bufferHeight = 0;
+  let cssWidth = 0;
+  let cssHeight = 0;
+  let dirty = true;
+
+  const meshPoints = mobile && options.keepClear ? meshSamples(model.object) : [];
+  let clearKey = "";
+
+  /**
+   * Phones are shorter than the approved 390x844 frame once browser chrome is counted, and the copy is
+   * pinned to the bottom in fixed px while the Arc scales with height. Lift the view (and zoom out, anchored
+   * left, only if lifting would push the Arc under the top bar) so the mesh clears the headline at every
+   * yaw the sway reaches.
+   */
+  function frameAboveHeadline(width: number, height: number) {
+    const clear = options.keepClear?.();
+    const key = clear ? `${width}|${height}|${Math.round(clear.left)}|${Math.round(clear.top)}|${Math.round(clear.right)}` : "";
+    if (key === clearKey) return;
+    clearKey = key;
+    camera.clearViewOffset();
+    camera.position.copy(restPosition);
+    camera.lookAt(restTarget);
+    camera.updateMatrixWorld();
+    camera.updateProjectionMatrix();
+    if (!clear || meshPoints.length === 0) {
+      setDebug("hero-frame", "natural", "no keep-clear box");
+      return;
+    }
+    const projected: number[] = [];
+    const pose = new THREE.Matrix4();
+    const turn = new THREE.Quaternion();
+    const point = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
+    for (let step = 0; step <= 6; step += 1) {
+      turn.setFromAxisAngle(up, REST_YAW + (reducedMotion ? 0 : (SWAY_YAW * step) / 6));
+      pose.compose(model.object.position, turn, model.object.scale);
+      for (const sample of meshPoints) {
+        point.copy(sample).applyMatrix4(pose).project(camera);
+        projected.push(((point.x + 1) / 2) * width, ((1 - point.y) / 2) * height);
+      }
+    }
+    const footLimit = clear.top - CLEAR_MARGIN;
+    let zoom = 1;
+    let lift = 0;
+    for (let pass = 0; pass < 6; pass += 1) {
+      let top = Infinity;
+      let bottom = -Infinity;
+      for (let index = 0; index < projected.length; index += 2) {
+        const x = projected[index] * zoom;
+        if (x < 0 || x > width) continue;
+        const y = projected[index + 1];
+        top = Math.min(top, y);
+        if (x >= clear.left - CLEAR_MARGIN && x <= clear.right + CLEAR_MARGIN) bottom = Math.max(bottom, y);
+      }
+      if (!Number.isFinite(bottom) || (bottom - lift) * zoom <= footLimit + 0.25) break;
+      lift = bottom - footLimit / zoom;
+      if ((top - lift) * zoom < MOBILE_APEX_MIN && bottom > top) {
+        zoom = Math.min(zoom, (footLimit - MOBILE_APEX_MIN) / (bottom - top));
+        lift = top - MOBILE_APEX_MIN / zoom;
+      }
+    }
+    if (lift > 0.25 || zoom < 1) camera.setViewOffset(width, height, 0, lift, width / zoom, height / zoom);
+    camera.updateProjectionMatrix();
+    setDebug("hero-frame", lift > 0.25 || zoom < 1 ? "reframed" : "natural", `lift ${lift.toFixed(1)}px zoom ${zoom.toFixed(3)}`);
+  }
+
   registerLayer("hero", {
     element: parent ?? canvas,
-    tick: (time) => driver.tick(time),
-    resize: (width, height) => driver.resize(width, height),
-    texture: () => composer.readBuffer?.texture ?? null,
+    tick: (time) => tick(time),
+    resize: (width, height) => resize(width, height),
+    texture: () => outTarget.texture,
   });
-  composer.addPass(new RenderPass(scene, camera));
-
-  const bokeh: BokehPass | null = null;
-
-  const fxaa = new ShaderPass(FXAAShader);
-  const film = new ShaderPass(filmShader);
-  composer.addPass(fxaa);
-  composer.addPass(film);
-  composer.addPass(new OutputPass());
 
   let targetProgress = 0;
   let progress = 0;
   let frameCount = 0;
   let stopped = false;
   let paused = false;
-  let raf = 0;
   let readySent = false;
-  const focusPoint = new THREE.Vector3(-2.2, 2, 0);
+  const mountedAt = performance.now();
 
-  function bufferSize(width: number, height: number) {
-    const scale = renderPixelRatio();
-    return {
-      scale,
-      width: Math.max(2, Math.round(width * scale)),
-      height: Math.max(2, Math.round(height * scale)),
-    };
-  }
-
-  let sizedW = 0;
-  let sizedH = 0;
-  function applyBuffer(width: number, height: number) {
-    const next = bufferSize(width, height);
-    camera.aspect = width / Math.max(1, height);
-    camera.updateProjectionMatrix();
-    if (next.width === sizedW && next.height === sizedH) return;
-    sizedW = next.width;
-    sizedH = next.height;
-    composer.setPixelRatio(1);
-    composer.setSize(next.width, next.height);
-    film.uniforms.res.value.set(next.width, next.height);
-    const resolution = fxaa.uniforms?.resolution as { value: THREE.Vector2 } | undefined;
-    resolution?.value.set(1 / next.width, 1 / next.height);
-    setDebug("aa", "live", `${next.width}x${next.height} x${next.scale} msaa ${samples}`);
-    if (bokeh) {
-      const uniforms = bokeh.uniforms as { aspect?: { value: number } };
-      if (uniforms.aspect) uniforms.aspect.value = camera.aspect;
+  function resize(width: number, height: number) {
+    const ratio = renderer.getPixelRatio();
+    const budget = Math.min(1, Math.sqrt(MAX_BUFFER_PIXELS / Math.max(1, width * height * ratio * ratio)));
+    const w = Math.max(2, Math.round(width * ratio * budget));
+    const h = Math.max(2, Math.round(height * ratio * budget));
+    if (width !== cssWidth || height !== cssHeight) {
+      cssWidth = width;
+      cssHeight = height;
+      camera.aspect = width / Math.max(1, height);
+      camera.updateProjectionMatrix();
+      finish.uniforms.aspect.value = camera.aspect;
+      dirty = true;
     }
+    if (mobile) frameAboveHeadline(width, height);
+    if (w === bufferWidth && h === bufferHeight) return;
+    bufferWidth = w;
+    bufferHeight = h;
+    sceneTarget.setSize(w, h);
+    outTarget.setSize(w, h);
+    dirty = true;
+    setDebug("hero-buffer", `${w}x${h}`, `dpr ${ratio} msaa ${samples}x ${mobile ? 150 : 260} fins`);
   }
 
-  function resize() {
-    const next = size();
-    applyBuffer(next.width, next.height);
-  }
-
-  function applyProgress(amount: number) {
+  function applyProgress(amount: number, time: number) {
     const eased = mobile || reducedMotion ? 0 : smoothstep(amount);
     position.lerpVectors(restPosition, mobile ? restPosition : endPosition, eased);
     target.lerpVectors(restTarget, mobile ? restTarget : endTarget, eased);
     camera.position.copy(position);
     camera.lookAt(target);
-    const idle = reducedMotion ? 0 : Math.sin(performance.now() * 0.0011) * 0.22;
-    model.object.rotation.y = -0.62 + idle + eased * 0.24;
+    // Desktop: more negative yaw walks the leg right, off the headline. Mobile: less negative slides it off the left edge.
+    const sway = reducedMotion ? 0 : (mobile ? 1 : -1) * SWAY_YAW * 0.5 * (1 - Math.cos((time - mountedAt) * SWAY_RATE));
+    model.object.rotation.y = REST_YAW + sway + eased * 0.24;
+    setDebug("hero-pose", `yaw ${model.object.rotation.y.toFixed(3)}`, `rest ${REST_YAW}`);
     const along = 0.66 + eased * 0.26;
     model.setBand(along * (model.finCount - 1));
-    if (bokeh) {
-      const uniforms = bokeh.uniforms as { focus?: { value: number } };
-      if (uniforms.focus) uniforms.focus.value = camera.position.distanceTo(focusPoint);
-    }
-  }
-
-  function schedule() {
-    if (stopped || paused || raf) return;
-    if (reducedMotion && frameCount >= 4) return;
-    raf = window.requestAnimationFrame(render);
   }
 
   function render(time: number) {
-    raf = 0;
-    if (stopped) return;
     progress += (targetProgress - progress) * (reducedMotion ? 1 : 0.14);
-    applyProgress(progress);
-    film.uniforms.t.value = reducedMotion ? 2.4 : time * 0.00037;
-    renderer.toneMapping = THREE.NeutralToneMapping;
-    renderer.toneMappingExposure = 1;
-    composer.renderToScreen = false;
-    composer.render();
+    applyProgress(progress, time);
+    finish.uniforms.seed.value = reducedMotion ? 3 : frameCount % 61;
+    renderer.setRenderTarget(sceneTarget);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(outTarget);
+    finishQuad.render(renderer);
+    renderer.setRenderTarget(null);
     frameCount += 1;
+    dirty = false;
     if (!readySent && frameCount >= 2) {
       readySent = true;
       onReady();
     }
   }
 
-  driver.tick = (time) => render(time);
-  driver.resize = (width, height) => {
-    applyBuffer(width, height);
-  };
+  function tick(time: number) {
+    if (stopped || document.hidden) return;
+    if ((paused || reducedMotion) && frameCount >= 4 && !dirty) return;
+    render(time);
+  }
 
-  resize();
-  applyProgress(0);
+  const initial = size();
+  resize(initial.width, initial.height);
+  applyProgress(0, mountedAt);
+  render(mountedAt);
   render(performance.now());
 
-  const observed = parent ?? canvas;
-  const resizeObserver = new ResizeObserver(() => resize());
-  resizeObserver.observe(observed);
-
-  const onVisibility = () => {
-    if (document.hidden) {
-      window.cancelAnimationFrame(raf);
-      raf = 0;
-      return;
-    }
-    schedule();
-  };
-  document.addEventListener("visibilitychange", onVisibility);
   const onPause = (event: Event) => {
-    const release = event instanceof CustomEvent && event.detail === false;
-    paused = !release;
-    window.cancelAnimationFrame(raf);
-    raf = 0;
-    if (!paused) schedule();
+    paused = !(event instanceof CustomEvent && event.detail === false);
   };
   window.addEventListener("arc:pause", onPause);
-
-  const intersection = new IntersectionObserver((entries) => {
-    const visible = entries.some((entry) => entry.isIntersecting);
-    if (!visible) {
-      window.cancelAnimationFrame(raf);
-      raf = 0;
-      return;
-    }
-    schedule();
-  }, { threshold: 0.02 });
-  intersection.observe(observed);
 
   return {
     setProgress(value: number) {
       if (reducedMotion || mobile) return;
       targetProgress = Math.min(1, Math.max(0, value));
-      schedule();
     },
     dispose() {
       stopped = true;
-      window.cancelAnimationFrame(raf);
-      resizeObserver.disconnect();
-      intersection.disconnect();
-      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("arc:pause", onPause);
-      composer.dispose();
+      sceneTarget.dispose();
+      outTarget.dispose();
+      finish.dispose();
+      finishQuad.dispose();
       model.dispose();
       ground.geometry.dispose();
       (ground.material as THREE.Material).dispose();

@@ -24,15 +24,22 @@ let raf = 0;
 let last = 0;
 const fpsSamples: number[] = [];
 let fpsValue = 0;
+let dprLowered = false;
 let rendererName = "pending";
+let hostWidth = 0;
+let hostHeight = 0;
+let framesSeen = 0;
+const FPS_WINDOW = 45;
+const WARMUP_FRAMES = 30;
+const SLOW_FRAME_MS = 42;
 
-// Buffer scale for the hero. The shared canvas stays at pixel ratio 1: WebGLRenderer
-// multiplies the viewport by its pixel ratio even while an EffectComposer target is bound,
-// which clips the scene whenever that ratio is above 1.
-export function renderPixelRatio() {
-  const mobile = window.matchMedia("(max-width: 820px)").matches;
-  if (mobile) return 2;
-  return Math.min(1.5, Math.max(1, window.devicePixelRatio || 1));
+function devicePixelRatioCap() {
+  return Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+}
+
+/** Section scenes keep their 1x, 640-capped buffers whatever the host canvas density. */
+export function sectionPixelRatio() {
+  return 1;
 }
 
 const blitVertex = `
@@ -86,8 +93,8 @@ export function sharedRenderer() {
     preserveDrawingBuffer: false,
     failIfMajorPerformanceCaveat: false,
   });
-  renderer.setPixelRatio(1);
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  renderer.setPixelRatio(devicePixelRatioCap());
+  resizeHost();
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.shadowMap.enabled = false;
@@ -135,8 +142,27 @@ export function rendererLabel() {
 
 function resizeHost() {
   if (!renderer) return;
-  if (renderer.getPixelRatio() !== 1) renderer.setPixelRatio(1);
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  const buffer = renderer.getDrawingBufferSize(new THREE.Vector2());
+  const ratio = renderer.getPixelRatio();
+  const wantW = Math.floor(window.innerWidth * ratio);
+  const wantH = Math.floor(window.innerHeight * ratio);
+  if (window.innerWidth === hostWidth && window.innerHeight === hostHeight && buffer.x === wantW && buffer.y === wantH) return;
+  hostWidth = window.innerWidth;
+  hostHeight = window.innerHeight;
+  renderer.setSize(hostWidth, hostHeight, false);
+}
+
+function adaptPixelRatio() {
+  if (!renderer || framesSeen <= WARMUP_FRAMES || fpsSamples.length < FPS_WINDOW) return;
+  const ratio = renderer.getPixelRatio();
+  // On 2x-3x phones a 1x canvas brings the fin stair-stepping back; 1.5x is the floor there.
+  const floor = devicePixelRatioCap() >= 2 ? 1.5 : 1;
+  if (ratio <= floor) return;
+  const sorted = [...fpsSamples].sort((a, b) => a - b);
+  if (sorted[sorted.length >> 1] <= SLOW_FRAME_MS) return;
+  dprLowered = true;
+  renderer.setPixelRatio(Math.max(floor, ratio - 0.5));
+  fpsSamples.length = 0;
 }
 
 export function sectionVisible(element: HTMLElement) {
@@ -223,14 +249,13 @@ function drawLayer(layer: Layer, rect: DOMRect) {
     (windowRect.bottom - windowRect.top) / height,
   );
   blitUniforms.fade.value.set(windowRect.fadeTop, windowRect.fadeBottom);
-  const dpr = renderer.getPixelRatio();
-  const buffer = renderer.getDrawingBufferSize(new THREE.Vector2());
-  const sx = Math.max(0, Math.floor(windowRect.left * dpr));
-  const sy = Math.max(0, Math.floor((height - windowRect.bottom) * dpr));
-  const sw = Math.max(1, Math.min(buffer.x - sx, Math.ceil((windowRect.right - windowRect.left) * dpr)));
-  const sh = Math.max(1, Math.min(buffer.y - sy, Math.ceil((windowRect.bottom - windowRect.top) * dpr)));
+  // setViewport and setScissor take CSS pixels; three multiplies them by the pixel ratio.
+  const sx = Math.max(0, Math.floor(windowRect.left));
+  const sy = Math.max(0, Math.floor(height - windowRect.bottom));
+  const sw = Math.max(1, Math.min(width - sx, Math.ceil(windowRect.right - windowRect.left)));
+  const sh = Math.max(1, Math.min(height - sy, Math.ceil(windowRect.bottom - windowRect.top)));
   renderer.setRenderTarget(null);
-  renderer.setViewport(0, 0, buffer.x, buffer.y);
+  renderer.setViewport(0, 0, width, height);
   renderer.setScissorTest(true);
   renderer.setScissor(sx, sy, sw, sh);
   renderer.render(blitScene, blitCamera);
@@ -243,10 +268,12 @@ function frame(now: number) {
   const dt = now - last;
   last = now;
   if (dt > 0 && dt < 5000) {
+    framesSeen += 1;
     fpsSamples.push(dt);
-    if (fpsSamples.length > 30) fpsSamples.shift();
+    if (fpsSamples.length > FPS_WINDOW) fpsSamples.shift();
     const average = fpsSamples.reduce((sum, value) => sum + value, 0) / fpsSamples.length;
     fpsValue = 1000 / average;
+    adaptPixelRatio();
   }
   if (renderer) {
     resizeHost();
@@ -267,7 +294,7 @@ function frame(now: number) {
       drawLayer(layer, rect);
       setDebug(id, "live", `on screen ${Math.round(fpsValue || 0)}fps`);
     }
-    setDebug("fps", "live", `${(fpsValue || 0).toFixed(1)} fps dpr ${renderer.getPixelRatio().toFixed(2)} ${rendererName}`);
+    setDebug("fps", "live", `${(fpsValue || 0).toFixed(1)} fps dpr ${renderer.getPixelRatio()}${dprLowered ? " (lowered)" : ""} ${rendererName}`);
   }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -65,6 +65,14 @@ export function ArcCanvas({ trackRef }: { trackRef: RefObject<HTMLElement | null
             return mod.mountArcScene(canvasRef.current, {
               reducedMotion,
               mobile: mobileQuery.matches,
+              keepClear: () => {
+                const track = trackRef.current;
+                const headline = track?.querySelector("h1");
+                if (!track || !headline) return null;
+                const hero = track.getBoundingClientRect();
+                const box = headline.getBoundingClientRect();
+                return { left: box.left - hero.left, top: box.top - hero.top, right: box.right - hero.left, bottom: box.bottom - hero.top };
+              },
               onReady: () => {
                 if (alive && mine === token) {
                   setMode(reducedMotion ? "static-3d" : "live");
