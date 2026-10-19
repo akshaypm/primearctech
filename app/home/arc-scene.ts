@@ -5,7 +5,8 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { createArcModel, type ArcModel } from "./arc-model";
-import { registerLayer, sharedRenderer, unregisterLayer } from "./v3/gl-host";
+import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
+import { registerLayer, renderPixelRatio, setDebug, sharedRenderer, unregisterLayer } from "./v3/gl-host";
 
 export type ArcHandle = {
   setProgress: (value: number) => void;
@@ -164,11 +165,13 @@ const filmShader = {
     tDiffuse: { value: null as THREE.Texture | null },
     t: { value: 0 },
     res: { value: new THREE.Vector2(1, 1) },
+    grain: { value: 0.015 },
   },
   vertexShader: "varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
   fragmentShader: `
     uniform sampler2D tDiffuse;
     uniform float t;
+    uniform float grain;
     uniform vec2 res;
     varying vec2 vUv;
     float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
@@ -179,7 +182,7 @@ const filmShader = {
       float v=smoothstep(1.15,0.25,length(d));
       c.rgb*=mix(0.62,1.0,v);
       float g=h(floor(vUv*res/1.5)+t)-0.5;
-      c.rgb+=g*0.045;
+      c.rgb+=g*grain;
       gl_FragColor=c;
     }
   `,
@@ -194,7 +197,6 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   const { reducedMotion, mobile, onReady } = options;
   const parent = canvas.parentElement;
   const renderer = sharedRenderer();
-  const dpr = renderer.getPixelRatio();
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(INK);
@@ -263,14 +265,14 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   camera.aspect = initial.width / Math.max(1, initial.height);
   camera.updateProjectionMatrix();
 
-  const samples = mobile ? 0 : Math.min(4, renderer.capabilities.maxSamples || 0);
+  const samples = Math.min(4, renderer.capabilities.maxSamples || 0);
   const renderTarget = new THREE.WebGLRenderTarget(1, 1, {
     type: THREE.HalfFloatType,
     samples,
   });
   const composer = new EffectComposer(renderer, renderTarget);
   composer.renderToScreen = false;
-  composer.setPixelRatio(dpr);
+  composer.setPixelRatio(1);
   composer.setSize(initial.width, initial.height);
   const driver: { tick: (time: number) => void; resize: (width: number, height: number) => void } = {
     tick: () => {},
@@ -286,7 +288,9 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
 
   const bokeh: BokehPass | null = null;
 
+  const fxaa = new ShaderPass(FXAAShader);
   const film = new ShaderPass(filmShader);
+  composer.addPass(fxaa);
   composer.addPass(film);
   composer.addPass(new OutputPass());
 
@@ -299,16 +303,39 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   let readySent = false;
   const focusPoint = new THREE.Vector3(-2.2, 2, 0);
 
-  function resize() {
-    const next = size();
-    composer.setSize(next.width, next.height);
-    camera.aspect = next.width / next.height;
+  function bufferSize(width: number, height: number) {
+    const scale = renderPixelRatio();
+    return {
+      scale,
+      width: Math.max(2, Math.round(width * scale)),
+      height: Math.max(2, Math.round(height * scale)),
+    };
+  }
+
+  let sizedW = 0;
+  let sizedH = 0;
+  function applyBuffer(width: number, height: number) {
+    const next = bufferSize(width, height);
+    camera.aspect = width / Math.max(1, height);
     camera.updateProjectionMatrix();
-    film.uniforms.res.value.set(next.width * dpr, next.height * dpr);
+    if (next.width === sizedW && next.height === sizedH) return;
+    sizedW = next.width;
+    sizedH = next.height;
+    composer.setPixelRatio(1);
+    composer.setSize(next.width, next.height);
+    film.uniforms.res.value.set(next.width, next.height);
+    const resolution = fxaa.uniforms?.resolution as { value: THREE.Vector2 } | undefined;
+    resolution?.value.set(1 / next.width, 1 / next.height);
+    setDebug("aa", "live", `${next.width}x${next.height} x${next.scale} msaa ${samples}`);
     if (bokeh) {
       const uniforms = bokeh.uniforms as { aspect?: { value: number } };
       if (uniforms.aspect) uniforms.aspect.value = camera.aspect;
     }
+  }
+
+  function resize() {
+    const next = size();
+    applyBuffer(next.width, next.height);
   }
 
   function applyProgress(amount: number) {
@@ -352,14 +379,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
 
   driver.tick = (time) => render(time);
   driver.resize = (width, height) => {
-    const cap = 640;
-    const scale = Math.min(1, cap / Math.max(1, width), cap / Math.max(1, height));
-    const w = Math.max(2, Math.round(width * scale));
-    const h = Math.max(2, Math.round(height * scale));
-    composer.setSize(w, h);
-    camera.aspect = width / Math.max(1, height);
-    camera.updateProjectionMatrix();
-    film.uniforms.res.value.set(w * dpr, h * dpr);
+    applyBuffer(width, height);
   };
 
   resize();

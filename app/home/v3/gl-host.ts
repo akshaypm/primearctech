@@ -24,8 +24,16 @@ let raf = 0;
 let last = 0;
 const fpsSamples: number[] = [];
 let fpsValue = 0;
-let dprLowered = false;
 let rendererName = "pending";
+
+// Buffer scale for the hero. The shared canvas stays at pixel ratio 1: WebGLRenderer
+// multiplies the viewport by its pixel ratio even while an EffectComposer target is bound,
+// which clips the scene whenever that ratio is above 1.
+export function renderPixelRatio() {
+  const mobile = window.matchMedia("(max-width: 820px)").matches;
+  if (mobile) return 2;
+  return Math.min(1.5, Math.max(1, window.devicePixelRatio || 1));
+}
 
 const blitVertex = `
   attribute vec3 position;
@@ -78,8 +86,7 @@ export function sharedRenderer() {
     preserveDrawingBuffer: false,
     failIfMajorPerformanceCaveat: false,
   });
-  const dpr = 1;
-  renderer.setPixelRatio(dpr);
+  renderer.setPixelRatio(1);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NeutralToneMapping;
@@ -128,6 +135,7 @@ export function rendererLabel() {
 
 function resizeHost() {
   if (!renderer) return;
+  if (renderer.getPixelRatio() !== 1) renderer.setPixelRatio(1);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
 }
 
@@ -239,10 +247,6 @@ function frame(now: number) {
     if (fpsSamples.length > 30) fpsSamples.shift();
     const average = fpsSamples.reduce((sum, value) => sum + value, 0) / fpsSamples.length;
     fpsValue = 1000 / average;
-    if (!dprLowered && renderer && average > 42 && renderer.getPixelRatio() > 1) {
-      dprLowered = true;
-      renderer.setPixelRatio(1);
-    }
   }
   if (renderer) {
     resizeHost();
@@ -263,7 +267,7 @@ function frame(now: number) {
       drawLayer(layer, rect);
       setDebug(id, "live", `on screen ${Math.round(fpsValue || 0)}fps`);
     }
-    setDebug("fps", "live", `${(fpsValue || 0).toFixed(1)} fps${dprLowered ? " dpr1" : ""} ${rendererName}`);
+    setDebug("fps", "live", `${(fpsValue || 0).toFixed(1)} fps dpr ${renderer.getPixelRatio().toFixed(2)} ${rendererName}`);
   }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
