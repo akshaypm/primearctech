@@ -411,6 +411,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   }
 
   registerLayer("hero", {
+    dense: true,
     element: parent ?? canvas,
     tick: (time) => tick(time),
     resize: (width, height) => resize(width, height),

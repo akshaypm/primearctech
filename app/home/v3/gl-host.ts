@@ -7,6 +7,8 @@ type Layer = {
   tick: (time: number) => void;
   resize: (width: number, height: number) => void;
   texture: () => THREE.Texture | null;
+  /** Needs the shared canvas at device density while on screen. Other frames stay at 1x. */
+  dense?: boolean;
 };
 
 const layers = new Map<string, Layer>();
@@ -29,6 +31,7 @@ let rendererName = "pending";
 let hostWidth = 0;
 let hostHeight = 0;
 let framesSeen = 0;
+let denseRatio = 1;
 const FPS_WINDOW = 45;
 const WARMUP_FRAMES = 30;
 const SLOW_FRAME_MS = 42;
@@ -93,7 +96,8 @@ export function sharedRenderer() {
     preserveDrawingBuffer: false,
     failIfMajorPerformanceCaveat: false,
   });
-  renderer.setPixelRatio(devicePixelRatioCap());
+  denseRatio = devicePixelRatioCap();
+  renderer.setPixelRatio(1);
   resizeHost();
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NeutralToneMapping;
@@ -154,15 +158,22 @@ function resizeHost() {
 
 function adaptPixelRatio() {
   if (!renderer || framesSeen <= WARMUP_FRAMES || fpsSamples.length < FPS_WINDOW) return;
-  const ratio = renderer.getPixelRatio();
+  if (renderer.getPixelRatio() <= 1) return;
   // On 2x-3x phones a 1x canvas brings the fin stair-stepping back; 1.5x is the floor there.
   const floor = devicePixelRatioCap() >= 2 ? 1.5 : 1;
-  if (ratio <= floor) return;
+  if (denseRatio <= floor) return;
   const sorted = [...fpsSamples].sort((a, b) => a - b);
   if (sorted[sorted.length >> 1] <= SLOW_FRAME_MS) return;
   dprLowered = true;
-  renderer.setPixelRatio(Math.max(floor, ratio - 0.5));
+  denseRatio = Math.max(floor, denseRatio - 0.5);
   fpsSamples.length = 0;
+}
+
+function onScreen(layer: Layer) {
+  const rect = sectionVisible(layer.element);
+  if (!rect) return null;
+  const visibleHeight = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
+  return visibleHeight < 64 ? null : rect;
 }
 
 export function sectionVisible(element: HTMLElement) {
@@ -276,6 +287,10 @@ function frame(now: number) {
     adaptPixelRatio();
   }
   if (renderer) {
+    const visible = new Map([...layers.entries()].map(([id, layer]) => [id, onScreen(layer)]));
+    const dense = [...layers.entries()].some(([id, layer]) => layer.dense && visible.get(id));
+    const ratio = dense ? denseRatio : 1;
+    if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio);
     resizeHost();
     renderer.setRenderTarget(null);
     renderer.setScissorTest(false);
@@ -283,10 +298,9 @@ function frame(now: number) {
     renderer.clear(true, true, true);
     const ordered = [...layers.entries()].sort((a, b) => a[1].element.getBoundingClientRect().top - b[1].element.getBoundingClientRect().top);
     for (const [id, layer] of ordered) {
-      const rect = sectionVisible(layer.element);
-      const visibleHeight = rect ? Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0) : 0;
-      if (!rect || visibleHeight < 64) {
-        setDebug(id, "offscreen", rect ? "edge" : "offscreen");
+      const rect = visible.get(id);
+      if (!rect) {
+        setDebug(id, "offscreen", sectionVisible(layer.element) ? "edge" : "offscreen");
         continue;
       }
       layer.resize(Math.max(2, rect.width), Math.max(2, rect.height));
