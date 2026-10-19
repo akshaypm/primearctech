@@ -184,7 +184,7 @@
 .pa-how { height: 1300px; background: #f1efe9; }
 .pa-how .pa-head { left: var(--pad); top: 96px; width: min(680px, 48vw); }
 .pa-how h2 { font-size: 92px; letter-spacing: -0.045em; }
-.pa-how .pa-lede { right: var(--pad); top: 150px; width: 330px; font-size: 16px; line-height: 1.5; color: #4a4f53; }
+.pa .pa-how p.pa-lede { right: var(--pad); top: 150px; width: 330px; font-size: 16px; line-height: 1.5; color: #4a4f53; }
 .pa-how .pa-lede b { font-weight: 500; color: var(--ink); }
 .pa-how .pa-stage { top: 460px; bottom: 200px; }
 .pa-steps {
