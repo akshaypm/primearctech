@@ -77,9 +77,13 @@ const blitFragment = `
 
 function mountCanvas() {
   const existing = document.querySelector<HTMLCanvasElement>("canvas.pa-gl-host");
-  if (existing) return existing;
+  if (existing) {
+    existing.setAttribute("aria-hidden", "true");
+    return existing;
+  }
   const canvas = document.createElement("canvas");
   canvas.className = "pa-gl-host";
+  canvas.setAttribute("aria-hidden", "true");
   const root = document.querySelector(".pa") ?? document.body;
   root.prepend(canvas);
   return canvas;

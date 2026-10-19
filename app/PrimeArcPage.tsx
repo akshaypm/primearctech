@@ -440,7 +440,7 @@ function Fit({ handle, onHandle }: { handle: SceneHandle | null; onHandle: (hand
       </div>
       <Scene id="fit" scene="fit" fallback="/v3/stills/fit.jpg" mobileHeight={420} onHandle={onHandle} />
       <div className="pa-ov pa-lists">
-        <h4><span>Built for</span><span>Go</span></h4>
+        <h3><span>Built for</span><span>Go</span></h3>
         <ul>
           {fitRows.map(([kind, label, mark], index) => (
             <li key={label}>
@@ -450,7 +450,7 @@ function Fit({ handle, onHandle }: { handle: SceneHandle | null; onHandle: (hand
             </li>
           ))}
         </ul>
-        <h4><span>Not for</span><span>No-go</span></h4>
+        <h3><span>Not for</span><span>No-go</span></h3>
         <ul className="is-no">
           {noRows.map(([kind, label, mark], index) => (
             <li key={label}>
