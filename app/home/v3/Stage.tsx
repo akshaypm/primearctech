@@ -168,7 +168,7 @@ export function Stage({
     <div ref={frameRef} className="pa-stage" data-ready={mode === "still" ? "false" : "true"} data-mode={mode} data-reason={reason} style={{ ["--mh" as string]: `${mobileHeight}px` }}>
       <div className="pa-stage-view">
         {broken ? null : (
-          <img className={shown ? "pa-fallback is-covered" : "pa-fallback"} src={fallback} alt="" onError={() => setBroken(true)} />
+          <img className={shown ? "pa-fallback is-covered" : "pa-fallback"} src={fallback} alt="" width={1600} height={1000} loading="lazy" decoding="async" fetchPriority="low" onError={() => setBroken(true)} />
         )}
         <canvas ref={canvasRef} aria-hidden="true" />
       </div>

@@ -397,7 +397,11 @@ function Team() {
       {team.map((person, index) => (
         <figure className={`pa-person is-${person.width}`} key={person.name}>
           <div className="pa-ph">
-            <img src={person.image} alt={person.name} width={900} height={1200} loading="eager" decoding="sync" />
+            <picture>
+              <source type="image/avif" srcSet={person.image.replace(/\.jpg$/, ".avif")} />
+              <source type="image/webp" srcSet={person.image.replace(/\.jpg$/, ".webp")} />
+              <img src={person.image} alt={person.name} width={900} height={1200} loading="lazy" decoding="async" fetchPriority="low" />
+            </picture>
           </div>
           <figcaption>
             <div>
