@@ -9,8 +9,9 @@
   --hairline: #373c41;
   --signal: #d8643e;
   --signal-dark: #2b130b;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Swap these families for licensed Klim Söhne / Söhne Mono. See app/fonts.css. */
+  --font-sans: "General Sans", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 * {
@@ -21,6 +22,10 @@ html {
   background: var(--ink);
   color: var(--mineral);
   scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }
 
 body {
@@ -221,6 +226,9 @@ h2 {
   display: flex;
   gap: clamp(20px, 2.4vw, 38px);
   align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .nav-links a {
@@ -231,6 +239,37 @@ h2 {
 
 .nav-links a:hover {
   color: var(--mineral);
+}
+
+.nav-links a:focus-visible,
+.nav-menu-btn:focus-visible,
+.nav-cta:focus-visible,
+.wordmark:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 4px;
+}
+
+.nav-menu-btn {
+  display: none;
+}
+
+.fr-skip {
+  position: absolute;
+  left: 12px;
+  top: -40px;
+  z-index: 20;
+  background: #f1efe9;
+  color: #111315;
+  padding: 8px 12px;
+}
+
+.fr-skip:focus {
+  top: 12px;
+}
+
+.fr-skip:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 4px;
 }
 
 .nav-cta {
@@ -739,6 +778,9 @@ h2 {
   display: flex;
   height: 630px;
   gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .capability-slice {
@@ -1312,11 +1354,105 @@ h2 {
 
 @media (max-width: 1100px) {
   .nav {
-    grid-template-columns: 1fr auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .nav .wordmark {
+    min-width: 0;
+  }
+
+  .nav-menu-btn,
+  .nav-cta {
+    flex-shrink: 0;
+  }
+
+  .nav-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: -14px 0;
+    padding: 14px 10px;
+    min-height: 44px;
+    background: none;
+    border: 0;
+    color: var(--mineral);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .nav-menu-btn i {
+    position: relative;
+    width: 12px;
+    height: 7px;
+  }
+
+  .nav-menu-btn i::before,
+  .nav-menu-btn i::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: currentColor;
+    transition: transform 180ms ease, top 180ms ease, background-color 160ms ease;
+  }
+
+  .nav-menu-btn i::before { top: 0; }
+  .nav-menu-btn i::after { top: 6px; }
+  .nav[data-open="true"] .nav-menu-btn i::before { top: 3px; transform: rotate(45deg); }
+  .nav[data-open="true"] .nav-menu-btn i::after { top: 3px; transform: rotate(-45deg); }
+  .nav-menu-btn:hover i::before,
+  .nav-menu-btn:hover i::after,
+  .nav[data-open="true"] .nav-menu-btn i::before,
+  .nav[data-open="true"] .nav-menu-btn i::after {
+    background: var(--signal);
+  }
+
+  .nav .wordmark,
+  .nav-menu-btn,
+  .nav-cta {
+    position: relative;
+    z-index: 5;
   }
 
   .nav-links {
+    position: absolute;
+    z-index: 4;
+    top: 0;
+    left: 50%;
+    width: 100vw;
+    transform: translateX(-50%);
     display: none;
+    flex-direction: column;
+    gap: 0;
+    padding: 88px 24px 18px;
+    background: rgba(17, 19, 21, 0.97);
+    border-bottom: 1px solid rgba(241, 239, 233, 0.14);
+  }
+
+  .nav[data-open="true"] .nav-links {
+    display: flex;
+  }
+
+  .nav-links li {
+    border-top: 1px solid rgba(241, 239, 233, 0.14);
+    width: 100%;
+  }
+
+  .nav-links a {
+    display: flex;
+    align-items: center;
+    min-height: 52px;
+    padding: 14px 0;
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--mineral);
   }
 
   .hero-readout {
@@ -1471,6 +1607,17 @@ h2 {
     border: 1px solid rgba(241, 239, 233, 0.25);
     border-radius: 10px;
     padding: 0 12px;
+  }
+
+  @media (max-width: 400px) {
+    .nav {
+      gap: 12px;
+    }
+
+    .nav-cta {
+      padding: 0 10px;
+      gap: 6px;
+    }
   }
 
   .hero-media img {
@@ -4074,7 +4221,7 @@ h2 {
   grid-template-columns: repeat(4, 1fr);
   border-top: 1px solid var(--hairline);
   padding-top: 17px;
-  color: #747b7f;
+  color: #7c8387;
   font: 10px/1 var(--font-mono), monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;

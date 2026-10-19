@@ -1,0 +1,24 @@
+export type RenderMode = "live" | "static-3d" | "still";
+
+let webglCached: boolean | null = null;
+
+export function webglAvailable() {
+  if (webglCached !== null) return webglCached;
+  try {
+    const test = document.createElement("canvas");
+    const gl = test.getContext("webgl2") || test.getContext("webgl");
+    webglCached = Boolean(gl);
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  } catch {
+    webglCached = false;
+  }
+  return webglCached;
+}
+
+export function decideRender(): { mode: RenderMode; reason: string } {
+  if (!webglAvailable()) return { mode: "still", reason: "webgl-unavailable" };
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return { mode: "static-3d", reason: "prefers-reduced-motion" };
+  }
+  return { mode: "live", reason: "webgl" };
+}

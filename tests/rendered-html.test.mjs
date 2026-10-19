@@ -23,7 +23,7 @@ test("production bundle contains the PrimeArcTech and FieldRelay conversion page
   assert.match(built, /Get my audit/);
   assert.match(built, /52%/);
   assert.doesNotMatch(built, /SkeletonPreview|codex-preview/);
-  assert.match(built, /We build AI systems that complete real work/);
+  assert.match(built, /AI features, from demo to production/);
   assert.match(built, /Free AI Workflow Audit/);
   assert.doesNotMatch(built, /AI System Blueprint Sprint|\$1,500/);
   assert.match(built, /FieldRelay by PrimeArcTech/);
