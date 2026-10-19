@@ -34,8 +34,10 @@ node scripts/visual-audit.mjs
 
 ## Token budget and skill packs
 
-The contract above and the visual-qa skill take precedence over both packs. Neither pack lowers the verification bar.
+The contract above and the visual-qa skill take precedence over every pack. No pack lowers the verification bar or replaces this file.
 
 - **pstack** (`.cursor/skills/`, models in `.cursor/rules/pstack-models.mdc`): smallest budget, every role `inherit-parent`, single-entry panels, so it adds no model spend beyond the parent chat. Use `/poteto-mode` only for nontrivial multi-step changes. Answer questions and make small edits directly.
 - **Ponytail** (`.cursor/skills/ponytail/`): plumbing only (build config, tests, scripts, data/content wiring, utilities). Never use it to simplify or minimise visual craft code: Three.js scenes, shaders, GSAP/ScrollTrigger motion, post-processing, micro-interactions, responsive art direction. Here that is `app/home/**` and the nav, hero and section markup in `app/PrimeArcPage.tsx`. On this site, visual fidelity outranks code size.
+- **vercel-react-best-practices** (`.cursor/skills/react-best-practices/`): React/Next.js performance review only — waterfalls, bundles, hydration, re-renders, data fetching. Use it on performance audits and when changing those paths. Its compiled `AGENTS.md` is a rules dump, not this contract. Skip Fluid Compute and other Vercel-hosting advice.
+- **web-design-guidelines** (`.cursor/skills/web-design-guidelines/`): interface-guidelines audit only (a11y, focus, forms, motion, images). Use it when asked to audit UX or accessibility. Do not restyle an approved mock to match generic guidelines.
 - Sources, versions and local changes: `.cursor/vendor/README.md`.
