@@ -29,6 +29,7 @@ import {
   type FormEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -103,6 +104,91 @@ function MagneticLink({
   );
 }
 
+const fieldRelayLinks = [
+  { href: "/", label: "PrimeArcTech" },
+  { href: "/fieldrelay/demo", label: "Live demo" },
+  { href: "#calculator", label: "Calculator" },
+  { href: "#how-it-works", label: "How it works" },
+  { href: "#offer", label: "Offer" },
+] as const;
+
+function FieldRelayNav() {
+  const [open, setOpen] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
+      buttonRef.current?.focus();
+    };
+    const onPointer = (event: PointerEvent) => {
+      if (!navRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    const narrow = window.matchMedia("(max-width: 1100px)");
+    const onChange = () => {
+      if (!narrow.matches) setOpen(false);
+    };
+    narrow.addEventListener("change", onChange);
+    return () => narrow.removeEventListener("change", onChange);
+  }, []);
+
+  const pick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (!open) return;
+    setOpen(false);
+    const href = event.currentTarget.getAttribute("href");
+    const section = href?.startsWith("#") ? document.querySelector(href) : null;
+    if (!href || !section || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    window.history.pushState(null, "", href);
+    section.scrollIntoView({ block: "start" });
+    buttonRef.current?.focus({ preventScroll: true });
+  };
+
+  return (
+    <nav ref={navRef} className="nav shell" aria-label="Primary navigation" data-open={open ? "true" : "false"}>
+      <a href="/fieldrelay" className="wordmark" aria-label="FieldRelay product home">
+        <span>FieldRelay</span>
+        <small>by PrimeArcTech</small>
+      </a>
+      <button
+        ref={buttonRef}
+        type="button"
+        className="nav-menu-btn"
+        aria-expanded={open}
+        aria-controls="fr-nav-links"
+        onClick={() => setOpen((value) => !value)}
+      >
+        Menu<i aria-hidden="true" />
+      </button>
+      <ul id="fr-nav-links" className="nav-links">
+        {fieldRelayLinks.map((link) => (
+          <li key={link.href}>
+            <a href={link.href} onClick={pick}>
+              {link.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+      <a className="nav-cta" href="#audit">
+        Get my audit <ArrowUpRight aria-hidden="true" weight="bold" />
+      </a>
+    </nav>
+  );
+}
+
 function Hero() {
   const heroRef = useRef<HTMLElement>(null);
   const reduceMotion = useReducedMotion();
@@ -124,22 +210,7 @@ function Hero() {
         />
       </motion.div>
       <div className="hero-scrim" aria-hidden="true" />
-      <nav className="nav shell" aria-label="Primary navigation">
-        <a href="/fieldrelay" className="wordmark" aria-label="FieldRelay product home">
-          <span>FieldRelay</span>
-          <small>by PrimeArcTech</small>
-        </a>
-        <div className="nav-links">
-          <a href="/">PrimeArcTech</a>
-          <a href="/fieldrelay/demo">Live demo</a>
-          <a href="#calculator">Calculator</a>
-          <a href="#how-it-works">How it works</a>
-          <a href="#offer">Offer</a>
-        </div>
-        <a className="nav-cta" href="#audit">
-          Get my audit <ArrowUpRight aria-hidden="true" weight="bold" />
-        </a>
-      </nav>
+      <FieldRelayNav />
 
       <div className="hero-content shell" id="top">
         <div className="hero-copy">
@@ -759,16 +830,19 @@ function MobileAuditBar() {
 
 export function FieldRelayPage() {
   return (
-    <main>
+    <>
+      <a className="fr-skip" href="#main">Skip to content</a>
       <Hero />
-      <Evidence />
-      <RevenueCalculator />
-      <CallJourney />
-      <Capabilities />
-      <HumanHandoff />
-      <FoundingOffer />
-      <ClosingAudit />
-      <MobileAuditBar />
-    </main>
+      <main id="main">
+        <Evidence />
+        <RevenueCalculator />
+        <CallJourney />
+        <Capabilities />
+        <HumanHandoff />
+        <FoundingOffer />
+        <ClosingAudit />
+        <MobileAuditBar />
+      </main>
+    </>
   );
 }
