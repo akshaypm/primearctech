@@ -22,3 +22,12 @@ export function decideRender(): { mode: RenderMode; reason: string } {
   }
   return { mode: "live", reason: "webgl" };
 }
+
+/** The hall camera is live WebGL only. Reduced motion and very small devices keep the section stills. */
+export function journeyAllowed() {
+  if (decideRender().mode !== "live") return false;
+  const nav = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
+  if (nav.deviceMemory !== undefined && nav.deviceMemory <= 2) return false;
+  if (nav.connection?.saveData) return false;
+  return true;
+}

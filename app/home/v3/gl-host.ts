@@ -9,6 +9,8 @@ type Layer = {
   texture: () => THREE.Texture | null;
   /** Needs the shared canvas at device density while on screen. Other frames stay at 1x. */
   dense?: boolean;
+  /** Drawn after every section so a full-viewport pass can cover the hero while it is still on screen. */
+  overlay?: boolean;
 };
 
 const layers = new Map<string, Layer>();
@@ -248,7 +250,9 @@ function drawWindow(layer: Layer, rect: DOMRect) {
 
 function drawLayer(layer: Layer, rect: DOMRect) {
   if (!renderer || !blitScene || !blitCamera || !blitUniforms) return;
-  const windowRect = drawWindow(layer, rect);
+  const windowRect = layer.overlay
+    ? { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, fadeTop: 0, fadeBottom: 0 }
+    : drawWindow(layer, rect);
   if (!windowRect) return;
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -300,7 +304,10 @@ function frame(now: number) {
     renderer.setScissorTest(false);
     renderer.setClearColor(0x000000, 0);
     renderer.clear(true, true, true);
-    const ordered = [...layers.entries()].sort((a, b) => a[1].element.getBoundingClientRect().top - b[1].element.getBoundingClientRect().top);
+    const ordered = [...layers.entries()].sort((a, b) => {
+      if (a[1].overlay !== b[1].overlay) return a[1].overlay ? 1 : -1;
+      return a[1].element.getBoundingClientRect().top - b[1].element.getBoundingClientRect().top;
+    });
     for (const [id, layer] of ordered) {
       const rect = visible.get(id);
       if (!rect) {
