@@ -6,7 +6,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { registerLayer, sharedRenderer, unregisterLayer } from "./gl-host";
+import { registerLayer, sectionPixelRatio, sharedRenderer, unregisterLayer } from "./gl-host";
 
 export { THREE, RoundedBoxGeometry };
 
@@ -185,7 +185,7 @@ export function studio(options: StudioOptions): Studio {
   const key = options.key ?? { pos: [-5, 12, 7] as [number, number, number], int: 420, angle: 0.46 };
   let w = options.w;
   let h = options.h;
-  const dpr = sharedRenderer().getPixelRatio();
+  const dpr = sectionPixelRatio();
   const renderer = sharedRenderer();
   const grade = { mapping: THREE.NeutralToneMapping as THREE.ToneMapping, exposure: tone };
 
