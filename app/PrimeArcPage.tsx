@@ -4,7 +4,6 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { ArcCanvas } from "./home/ArcCanvas";
-import { JourneyHost } from "./home/v3/journey/JourneyHost";
 import { DebugHud } from "./home/v3/DebugHud";
 import { setDebug } from "./home/v3/gl-host";
 import { Stage, type SceneName } from "./home/v3/Stage";
@@ -67,7 +66,6 @@ export function PrimeArcPage() {
         <ArcCanvas trackRef={heroRef} />
         <HeroChrome />
       </header>
-      <JourneyHost />
       <main id="main">
         <Demo locked={locked} onProgress={setLocked} />
         <Engagements />
