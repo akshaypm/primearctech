@@ -81,22 +81,96 @@ export function PrimeArcPage() {
   );
 }
 
+const primaryNav = [
+  ["#engagements", "Engagements"],
+  ["#products", "Products"],
+  ["#partners", "Partners"],
+  ["#team", "Team"],
+] as const;
+
 function HeroChrome() {
+  const [open, setOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const first = panelRef.current?.querySelector<HTMLAnchorElement>("a");
+    first?.focus({ preventScroll: true });
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
+      menuButtonRef.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const restoreMenuFocus = () => {
+    menuButtonRef.current?.focus({ preventScroll: true });
+  };
+
+  const pickSection = (event: { preventDefault: () => void; currentTarget: HTMLAnchorElement }) => {
+    event.preventDefault();
+    const href = event.currentTarget.getAttribute("href");
+    event.currentTarget.blur();
+    setOpen(false);
+    window.setTimeout(() => {
+      if (href) {
+        const node = document.querySelector(href);
+        if (node) {
+          const top = node.getBoundingClientRect().top + window.scrollY;
+          const root = document.documentElement;
+          const previous = root.style.scrollBehavior;
+          root.style.scrollBehavior = "auto";
+          window.scrollTo({ top, left: 0, behavior: "instant" });
+          root.style.scrollBehavior = previous;
+        }
+        window.history.pushState(null, "", href);
+      }
+      restoreMenuFocus();
+    }, 0);
+  };
+
   return (
     <>
       <div className="pa-top">
         <a className="pa-wm" href="#hero">PrimeArcTech</a>
-        <nav aria-label="Primary">
-          <a href="#engagements">Engagements</a>
-          <a href="#products">Products</a>
-          <a href="#partners">Partners</a>
-          <a href="#team">Team</a>
+        <nav className="pa-nav" aria-label="Primary">
+          {primaryNav.map(([href, label]) => (
+            <a key={href} href={href}>{label}</a>
+          ))}
         </nav>
-        <a className="pa-textlink" href="#book">Book a call</a>
+        <div className="pa-top-end">
+          <button
+            ref={menuButtonRef}
+            className="pa-menu"
+            type="button"
+            aria-expanded={open}
+            aria-controls="primary-menu"
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? "Close" : "Menu"}
+          </button>
+          <a className="pa-textlink" href="#book">Book a call</a>
+        </div>
+      </div>
+      <div id="primary-menu" ref={panelRef} className="pa-menu-panel" hidden={!open}>
+        <nav aria-label="Sections">
+          {primaryNav.map(([href, label]) => (
+            <a key={href} href={href} onClick={pickSection}>{label}</a>
+          ))}
+        </nav>
       </div>
       <div className="pa-hero-copy">
         <p className="pa-eyebrow">Senior-engineer AI studio · US &amp; UK</p>
-        <h1>AI features, <br />from demo to production.</h1>
+        <h1>
+          <span className="pa-l1">AI features,</span>
+          <span className="pa-l2">from demo to production.</span>
+          <span className="pa-l3">from demo</span>
+          <span className="pa-l4">to production.</span>
+        </h1>
         <p className="pa-lede">We take the AI feature your team demoed and make it hold up under real users, real data and real cost. For B2B software companies, Seed to Series B.</p>
         <div className="pa-actions">
           <a className="pa-btn" href="#book">Book a call with an engineer <span>→</span></a>

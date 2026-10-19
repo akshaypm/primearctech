@@ -80,7 +80,10 @@ function groundNoise() {
     }
   }
   const randomGrain = hash(19);
-  return noiseTexture(size, size, (x, y) => Math.min(255, field[y * size + x] * 120 + randomGrain() * 40));
+  return noiseTexture(size, size, (x, y) => {
+    const shade = 188 + field[y * size + x] * 18 + (randomGrain() * 6 - 3);
+    return Math.max(0, Math.min(255, shade));
+  });
 }
 
 function cycloramaGeometry() {
@@ -176,10 +179,10 @@ const filmShader = {
       vec4 c=texture2D(tDiffuse,vUv);
       vec2 d=vUv-0.5;
       d.x*=res.x/res.y;
-      float v=smoothstep(1.15,0.25,length(d));
-      c.rgb*=mix(0.62,1.0,v);
-      float g=h(floor(vUv*res/1.5)+t)-0.5;
-      c.rgb+=g*0.045;
+      float v=smoothstep(1.4,0.45,length(d));
+      c.rgb*=mix(0.88,1.0,v);
+      float g=h(floor(vUv*res)+t)-0.5;
+      c.rgb+=g*0.018;
       gl_FragColor=c;
     }
   `,
@@ -194,7 +197,6 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   const { reducedMotion, mobile, onReady } = options;
   const parent = canvas.parentElement;
   const renderer = sharedRenderer();
-  const dpr = renderer.getPixelRatio();
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(INK);
@@ -207,11 +209,11 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     cycloramaGeometry(),
     new THREE.MeshStandardMaterial({
       color: 0x5c5e60,
-      roughness: 0.55,
+      roughness: 0.78,
       metalness: 0,
       roughnessMap: groundTexture,
       bumpMap: groundTexture,
-      bumpScale: 0.06,
+      bumpScale: 0.012,
     }),
   );
   ground.receiveShadow = true;
@@ -219,13 +221,13 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
 
   let model: ArcModel;
   try {
-    model = await createArcModel({ finCount: mobile ? 150 : 260 });
+    model = await createArcModel({ finCount: 260 });
   } catch (error) {
     renderer.dispose();
     scene.environment?.dispose();
     throw error;
   }
-  model.object.position.y = 0.18;
+  model.object.position.set(mobile ? 0.5 : 1.45, mobile ? 0.1 : 0.02, 0);
   scene.add(model.object);
 
   const key = new THREE.SpotLight(0xfaf6f0, mobile ? 360 : 420, 50, 0.46, 1, 2);
@@ -244,10 +246,14 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   rim.position.set(6, 4, -8);
   scene.add(rim);
   scene.add(new THREE.HemisphereLight(0x2a2f34, 0x0b0c0d, 0.25));
+  const floorWash = new THREE.SpotLight(0xf4f1ea, mobile ? 70 : 110, 36, 0.95, 1, 1.4);
+  floorWash.position.set(1.2, 7.5, 7);
+  floorWash.target.position.set(1.4, 0, -3);
+  scene.add(floorWash, floorWash.target);
 
-  const camera = new THREE.PerspectiveCamera(24, 1, 0.1, 100);
-  const restPosition = new THREE.Vector3(...(mobile ? [2.6, 1.2, 18.5] : [-1.2, 1.3, 12.6]));
-  const restTarget = new THREE.Vector3(...(mobile ? [-0.4, 0.9, 0] : [-3.4, 2.6, 0]));
+  const camera = new THREE.PerspectiveCamera(mobile ? 31 : 22, 1, 0.1, 100);
+  const restPosition = new THREE.Vector3(...(mobile ? [-1.95, 0.52, 7.05] : [0.15, 0.55, 13.2]));
+  const restTarget = new THREE.Vector3(...(mobile ? [-0.42, 1.92, -0.12] : [-3.55, 1.58, 0.1]));
   const endPosition = new THREE.Vector3(-0.2, 1.85, 7.9);
   const endTarget = new THREE.Vector3(-1.65, 3.55, 0.05);
   const position = restPosition.clone();
@@ -263,15 +269,14 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   camera.aspect = initial.width / Math.max(1, initial.height);
   camera.updateProjectionMatrix();
 
-  const samples = mobile ? 0 : Math.min(4, renderer.capabilities.maxSamples || 0);
+  const samples = Math.min(4, renderer.capabilities.maxSamples || 0);
   const renderTarget = new THREE.WebGLRenderTarget(1, 1, {
     type: THREE.HalfFloatType,
     samples,
   });
   const composer = new EffectComposer(renderer, renderTarget);
   composer.renderToScreen = false;
-  composer.setPixelRatio(dpr);
-  composer.setSize(initial.width, initial.height);
+  composer.setPixelRatio(1);
   const driver: { tick: (time: number) => void; resize: (width: number, height: number) => void } = {
     tick: () => {},
     resize: () => {},
@@ -280,7 +285,15 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     element: parent ?? canvas,
     tick: (time) => driver.tick(time),
     resize: (width, height) => driver.resize(width, height),
-    texture: () => composer.readBuffer?.texture ?? null,
+    texture: () => {
+      const texture = composer.readBuffer?.texture ?? null;
+      if (texture) {
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+      }
+      return texture;
+    },
   });
   composer.addPass(new RenderPass(scene, camera));
 
@@ -299,16 +312,40 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
   let readySent = false;
   const focusPoint = new THREE.Vector3(-2.2, 2, 0);
 
-  function resize() {
-    const next = size();
-    composer.setSize(next.width, next.height);
-    camera.aspect = next.width / next.height;
+  let bufferW = 0;
+  let bufferH = 0;
+
+  function fit(cssWidth: number, cssHeight: number) {
+    const width = Math.max(1, cssWidth);
+    const height = Math.max(1, cssHeight);
+    const deviceRatio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    // Fins are a few pixels wide. A 1x buffer with no MSAA stair-steps on mobile,
+    // and the old 640px cap upscaled that aliasing. Resolve at device pixels,
+    // and at 2x when the context cannot multisample.
+    const applied = mobile ? Math.max(2, deviceRatio) : (samples > 0 ? deviceRatio : Math.max(2, deviceRatio));
+    const w = Math.max(2, Math.round(width * applied));
+    const h = Math.max(2, Math.round(height * applied));
+    if (w !== bufferW || h !== bufferH) {
+      bufferW = w;
+      bufferH = h;
+      composer.setPixelRatio(1);
+      composer.setSize(w, h);
+    }
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    film.uniforms.res.value.set(next.width * dpr, next.height * dpr);
+    film.uniforms.res.value.set(w, h);
+    canvas.dataset.arcBuffer = `${w}x${h}`;
+    canvas.dataset.arcSamples = String(samples);
+    canvas.dataset.arcScale = String(applied);
     if (bokeh) {
       const uniforms = bokeh.uniforms as { aspect?: { value: number } };
       if (uniforms.aspect) uniforms.aspect.value = camera.aspect;
     }
+  }
+
+  function resize() {
+    const next = size();
+    fit(next.width, next.height);
   }
 
   function applyProgress(amount: number) {
@@ -317,8 +354,8 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     target.lerpVectors(restTarget, mobile ? restTarget : endTarget, eased);
     camera.position.copy(position);
     camera.lookAt(target);
-    const idle = reducedMotion ? 0 : Math.sin(performance.now() * 0.0011) * 0.22;
-    model.object.rotation.y = -0.62 + idle + eased * 0.24;
+    const idle = reducedMotion ? 0 : Math.sin(performance.now() * 0.0011) * (mobile ? 0.07 : 0.16);
+    model.object.rotation.y = (mobile ? -0.57 : -0.38) + idle + eased * 0.2;
     const along = 0.66 + eased * 0.26;
     model.setBand(along * (model.finCount - 1));
     if (bokeh) {
@@ -352,14 +389,7 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
 
   driver.tick = (time) => render(time);
   driver.resize = (width, height) => {
-    const cap = 640;
-    const scale = Math.min(1, cap / Math.max(1, width), cap / Math.max(1, height));
-    const w = Math.max(2, Math.round(width * scale));
-    const h = Math.max(2, Math.round(height * scale));
-    composer.setSize(w, h);
-    camera.aspect = width / Math.max(1, height);
-    camera.updateProjectionMatrix();
-    film.uniforms.res.value.set(w * dpr, h * dpr);
+    fit(width, height);
   };
 
   resize();

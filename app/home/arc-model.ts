@@ -76,7 +76,7 @@ function noiseTexture(width: number, height: number, sample: (x: number, y: numb
 function createProceduralArc(options: BuildOptions): ArcModel {
   const random = hash(7);
   const brushed = noiseTexture(512, 512, (_x, y) => {
-    return 150 + Math.sin(y * 0.9 + Math.sin(y * 0.07) * 4) * 12 + (random() * 60 - 30);
+    return 176 + Math.sin(y * 1.15) * 5 + (random() * 8 - 4);
   });
   brushed.repeat.set(1, 6);
 
@@ -86,7 +86,7 @@ function createProceduralArc(options: BuildOptions): ArcModel {
   const metal = new THREE.MeshPhysicalMaterial({
     color: 0xb3b1ac,
     metalness: 1,
-    roughness: 0.15,
+    roughness: 0.22,
     roughnessMap: brushed,
     anisotropy: 0.7,
     anisotropyRotation: Math.PI / 2,
@@ -96,8 +96,8 @@ function createProceduralArc(options: BuildOptions): ArcModel {
   });
   const hotMaterial = anodisedMaterial();
   const fins = new THREE.InstancedMesh(finGeometry, metal, count);
-  fins.castShadow = true;
-  fins.receiveShadow = true;
+  fins.castShadow = false;
+  fins.receiveShadow = false;
   fins.frustumCulled = false;
 
   const matrices: THREE.Matrix4[] = [];
@@ -121,7 +121,7 @@ function createProceduralArc(options: BuildOptions): ArcModel {
 
   const hots = [0, 1, 2].map(() => {
     const mesh = new THREE.Mesh(finGeometry, hotMaterial);
-    mesh.castShadow = true;
+    mesh.castShadow = false;
     mesh.frustumCulled = false;
     return mesh;
   });
