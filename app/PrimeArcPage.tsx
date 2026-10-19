@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { ArcCanvas } from "./home/ArcCanvas";
 import { DebugHud } from "./home/v3/DebugHud";
 import { setDebug } from "./home/v3/gl-host";
@@ -81,22 +81,96 @@ export function PrimeArcPage() {
   );
 }
 
+const sectionLinks = [
+  { href: "#engagements", label: "Engagements", index: "03" },
+  { href: "#products", label: "Products", index: "06" },
+  { href: "#partners", label: "Partners", index: "07" },
+  { href: "#team", label: "Team", index: "08" },
+] as const;
+
+function SiteNav() {
+  const [open, setOpen] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
+      buttonRef.current?.focus();
+    };
+    const onPointer = (event: PointerEvent) => {
+      if (!navRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    const narrow = window.matchMedia("(max-width: 820px)");
+    const onChange = () => {
+      if (!narrow.matches) setOpen(false);
+    };
+    narrow.addEventListener("change", onChange);
+    return () => narrow.removeEventListener("change", onChange);
+  }, []);
+
+  const pick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!open) return;
+    setOpen(false);
+    const href = event.currentTarget.getAttribute("href");
+    const section = href ? document.querySelector(href) : null;
+    if (!href || !section || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    // A native fragment jump runs its own focusing step after this handler and would drop focus on <body>.
+    event.preventDefault();
+    window.history.pushState(null, "", href);
+    section.scrollIntoView({ block: "start" });
+    buttonRef.current?.focus({ preventScroll: true });
+  };
+
+  return (
+    <nav ref={navRef} className="pa-nav" aria-label="Primary" data-open={open ? "true" : "false"}>
+      <button
+        ref={buttonRef}
+        type="button"
+        className="pa-menu-btn"
+        aria-expanded={open}
+        aria-controls="pa-nav-links"
+        onClick={() => setOpen((value) => !value)}
+      >
+        Menu<i aria-hidden="true" />
+      </button>
+      <ul id="pa-nav-links" className="pa-nav-links">
+        {sectionLinks.map((link) => (
+          <li key={link.href}>
+            <a href={link.href} onClick={pick}>
+              <span>{link.label}</span>
+              <em aria-hidden="true">{link.index}</em>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
 function HeroChrome() {
   return (
     <>
       <div className="pa-top">
         <a className="pa-wm" href="#hero">PrimeArcTech</a>
-        <nav aria-label="Primary">
-          <a href="#engagements">Engagements</a>
-          <a href="#products">Products</a>
-          <a href="#partners">Partners</a>
-          <a href="#team">Team</a>
-        </nav>
+        <SiteNav />
         <a className="pa-textlink" href="#book">Book a call</a>
       </div>
       <div className="pa-hero-copy">
         <p className="pa-eyebrow">Senior-engineer AI studio · US &amp; UK</p>
-        <h1>AI features, <br />from demo to production.</h1>
+        <h1>AI features,<br /> from demo<br className="pa-br-sm" /> to production.</h1>
         <p className="pa-lede">We take the AI feature your team demoed and make it hold up under real users, real data and real cost. For B2B software companies, Seed to Series B.</p>
         <div className="pa-actions">
           <a className="pa-btn" href="#book">Book a call with an engineer <span>→</span></a>
