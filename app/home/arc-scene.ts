@@ -25,6 +25,7 @@ const MAX_BUFFER_PIXELS = 2_100_000;
 const REST_YAW = -0.62;
 const SWAY_YAW = 0.14;
 const SWAY_RATE = 0.0011;
+const GRAIN = 0.026;
 const CLEAR_MARGIN = 6;
 // The mobile top bar is about 60px tall; keep the top of the Arc below it when reframing.
 const MOBILE_APEX_MIN = 76;
@@ -169,7 +170,7 @@ function studioEnvironment(renderer: THREE.WebGLRenderer) {
 }
 
 // Vignette in linear light, then tone map and encode, then grain in display space.
-// Grain is about one 8-bit step, per device pixel, and fades out on bright metal.
+// Grain is about 2.5 levels sigma in the darks, per device pixel, and fades out on bright metal.
 function finishMaterial() {
   return new THREE.RawShaderMaterial({
     uniforms: {
@@ -177,7 +178,7 @@ function finishMaterial() {
       toneMappingExposure: { value: 1 },
       seed: { value: 0 },
       aspect: { value: 1 },
-      grain: { value: 0.011 },
+      grain: { value: GRAIN },
     },
     vertexShader: `
       precision highp float;
@@ -443,6 +444,8 @@ export async function mountArcScene(canvas: HTMLCanvasElement, options: ArcMount
     bufferHeight = h;
     sceneTarget.setSize(w, h);
     outTarget.setSize(w, h);
+    // When the pixel budget caps the buffer below the canvas density, the blit's upscale softens the grain.
+    finish.uniforms.grain.value = GRAIN * Math.min(2, 1 / budget);
     dirty = true;
     setDebug("hero-buffer", `${w}x${h}`, `dpr ${ratio} msaa ${samples}x ${mobile ? 150 : 260} fins`);
   }

@@ -109,6 +109,8 @@
 .pa .pa-top :focus-visible, .pa .pa-hero-copy :focus-visible { outline: 2px solid var(--sig); outline-offset: 4px; border-radius: 1px; }
 .pa .pa-hero-copy a.pa-btn:focus-visible { outline-offset: 3px; }
 .pa-hero-copy { position: absolute; z-index: 3; left: var(--pad); bottom: calc(var(--pad) + 8px); max-width: 760px; }
+.pa-hero p.pa-eyebrow { margin-bottom: 20px; }
+.pa .pa-hero-copy a.pa-textlink { padding-bottom: 1px; }
 .pa-hero h1 { font-size: clamp(2.4rem, 3.9vw, 3.75rem); }
 .pa-hero h1 br.pa-br-sm { display: none; }
 .pa .pa-hero a.pa-btn { transition: background-color 160ms ease, color 160ms ease; }
@@ -119,7 +121,8 @@
 .pa-hero .pa-cap {
   position: absolute; z-index: 3; right: var(--pad); bottom: calc(var(--pad) + 8px);
   width: auto; transform: none;
-  color: var(--g1); text-align: right; line-height: 1.6; font-size: 12px;
+  color: var(--g2); text-align: right; line-height: 1.5; font-size: 12px;
+  letter-spacing: -0.015em; text-transform: none;
 }
 .pa-hero-scrim { display: none; }
 
@@ -322,6 +325,12 @@
   font-size: 12px; letter-spacing: 0.05em; color: #2a2e32;
 }
 
+@media (min-width: 821px) {
+  .pa-hero { --pad: 35px; }
+  .pa-top { padding-top: 36px; padding-bottom: 36px; }
+  .pa .pa-nav-links { top: -1px; }
+}
+
 @media (max-width: 820px) {
   .pa .pa-menu-btn {
     display: inline-flex; align-items: center; gap: 10px;
@@ -357,9 +366,12 @@
   .pa .pa-nav-links em { display: block; font: 400 11px/1 var(--font-mono); font-style: normal; letter-spacing: 0.04em; color: var(--g1); }
   .pa .pa-nav-links a:hover em { color: var(--sig); }
   .pa .pa-nav-links a:focus-visible { outline-offset: 2px; }
+  .pa-top { padding-top: calc(var(--pad) + 1px); }
   .pa-hero-copy { right: var(--pad); bottom: 28px; }
+  .pa-hero p.pa-eyebrow { margin-bottom: 21px; }
   .pa-hero h1 { font-size: 40px; }
   .pa-hero h1 br.pa-br-sm { display: inline; }
+  .pa-hero .pa-actions { margin-top: 27px; }
   .pa p.pa-lede { font-size: 15px; }
   .pa-actions { flex-direction: column; align-items: flex-start; gap: 18px; }
   .pa-hero .pa-cap { display: none; }
