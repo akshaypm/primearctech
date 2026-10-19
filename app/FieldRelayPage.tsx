@@ -504,12 +504,11 @@ function Capabilities() {
           <h2>You do not get another platform to babysit.</h2>
           <p>FieldRelay is installed, tested, and reviewed around one job: recovering calls your team cannot take.</p>
         </Reveal>
-        <div className="capability-accordion" role="list" aria-label="System capabilities">
+        <ul className="capability-accordion" aria-label="System capabilities">
           {capabilities.map((capability, index) => (
-            <motion.article
+            <motion.li
               key={capability.title}
               className={`capability-slice ${active === index ? "is-active" : ""}`}
-              role="listitem"
               tabIndex={0}
               onMouseEnter={() => setActive(index)}
               onFocus={() => setActive(index)}
@@ -522,9 +521,9 @@ function Capabilities() {
                 <h3>{capability.title}</h3>
                 <p>{capability.text}</p>
               </div>
-            </motion.article>
+            </motion.li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );

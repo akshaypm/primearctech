@@ -778,6 +778,9 @@ h2 {
   display: flex;
   height: 630px;
   gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .capability-slice {
