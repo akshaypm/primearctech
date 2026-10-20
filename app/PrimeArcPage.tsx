@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
-import { ArcCanvas } from "./home/ArcCanvas";
+import { JourneyExperience } from "./home/journey/JourneyExperience";
 import { DebugHud } from "./home/v3/DebugHud";
 import { setDebug } from "./home/v3/gl-host";
 import { Stage, type SceneName } from "./home/v3/Stage";
@@ -50,7 +50,6 @@ function EmailLine() {
 }
 
 export function PrimeArcPage() {
-  const heroRef = useRef<HTMLElement>(null);
   useEffect(() => {
     setDebug("team", "image", "portraits /v3/people");
   }, []);
@@ -62,14 +61,10 @@ export function PrimeArcPage() {
     <div className="pa">
       <DebugHud />
       <a className="pa-skip" href="#main">Skip to content</a>
-      <header className="pa-hero" id="hero" ref={heroRef}>
-        <ArcCanvas trackRef={heroRef} />
-        <HeroChrome />
-      </header>
+      <TopBar />
       <main id="main">
+        <JourneyExperience />
         <Demo locked={locked} onProgress={setLocked} />
-        <Engagements />
-        <How />
         <Proof />
         <Products handle={productHandle} onHandle={setProductHandle} />
         <Partners />
@@ -160,25 +155,13 @@ function SiteNav() {
   );
 }
 
-function HeroChrome() {
+function TopBar() {
   return (
-    <>
-      <div className="pa-top">
-        <a className="pa-wm" href="#hero">PrimeArcTech</a>
-        <SiteNav />
-        <a className="pa-textlink" href="#book">Book a call</a>
-      </div>
-      <div className="pa-hero-copy">
-        <p className="pa-eyebrow">Senior-engineer AI studio · US &amp; UK</p>
-        <h1>AI features,<br /> from demo<br className="pa-br-sm" /> to production.</h1>
-        <p className="pa-lede">We take the AI feature your team demoed and make it hold up under real users, real data and real cost. For B2B software companies, Seed to Series B.</p>
-        <div className="pa-actions">
-          <a className="pa-btn" href="#book">Book a call with an engineer <span>→</span></a>
-          <a className="pa-textlink" href="#how">How we work</a>
-        </div>
-      </div>
-      <p className="pa-cap">The Arc — real-time, 260 fins<br />Bangalore, IN</p>
-    </>
+    <div className="pa-top pj-nav">
+      <a className="pa-wm" href="#hero">PrimeArcTech</a>
+      <SiteNav />
+      <a className="pa-textlink" href="#book">Book a call</a>
+    </div>
   );
 }
 
@@ -206,76 +189,6 @@ function Demo({ locked, onProgress }: { locked: number; onProgress: (value: numb
         <p><span>Failure</span>Fallbacks, retries and a human path when the model is wrong</p>
         <p><span>Cost</span>Cost per request you can defend to finance</p>
       </div>
-    </section>
-  );
-}
-
-function Engagements() {
-  return (
-    <section className="pa-sec pa-eng" id="engagements" aria-labelledby="eng-title">
-      <div className="pa-ov pa-head">
-        <p className="pa-eyebrow">03 — Engagements</p>
-        <h2 id="eng-title">Three ways in. One standard of finish.</h2>
-      </div>
-      <p className="pa-ov pa-lede">Every engagement starts with an engineer reading your code, not a sales deck. <b>Projects start around $10K.</b></p>
-      <Scene id="engagements" scene="engagements" fallback="/v3/stills/engagements.jpg" mobileHeight={360} scrubCenter={0.5}>
-        {(anchors) => (
-          <>
-            <StageCopy id="s0" anchors={anchors} index="01 · Raw stock" title="Audit" meta={<>Fixed scope · <span className="ph">[placeholder] weeks · [placeholder] price</span></>}>
-              We read your AI feature end to end: prompts, retrieval, evals, infra and cost. You get a ranked fix list your team can act on.
-            </StageCopy>
-            <StageCopy id="s1" anchors={anchors} index="02 · Cut" title="Build to production" meta={<>Milestone-based · <span className="ph">[placeholder] price</span></>}>
-              We ship the feature with tracing, evals, fallbacks and a cost budget, in your repo and through your code review.
-            </StageCopy>
-            <StageCopy id="s2" anchors={anchors} index="03 · Installed" title="Embedded engineers" meta={<>Per quarter · <span className="ph">[placeholder] price</span></>}>
-              Senior engineers inside your team for a quarter: your standups, your backlog, your on-call.
-            </StageCopy>
-          </>
-        )}
-      </Scene>
-      <p className="pa-ov pa-cap">One bar, three stages of machining. Scroll moves the camera along it.</p>
-    </section>
-  );
-}
-
-function StageCopy({ id, anchors, index, title, meta, children }: { id: string; anchors: Anchor[]; index: string; title: string; meta: ReactNode; children: string }) {
-  return (
-    <div className="pa-anchor is-flow pa-stage-copy" style={place(anchors, id)}>
-      <p className="pa-n">{index}</p>
-      <h3>{title}</h3>
-      <p>{children}</p>
-      <p className="pa-meta">{meta}</p>
-    </div>
-  );
-}
-
-function How() {
-  return (
-    <section className="pa-sec pa-how pa-light" id="how" aria-labelledby="how-title">
-      <div className="pa-ov pa-head">
-        <p className="pa-eyebrow">04 — How we work</p>
-        <h2 id="how-title">Engineers on the call. Engineers on the code.</h2>
-      </div>
-      <p className="pa-ov pa-lede">No account managers and no handoff to a junior bench. <b>The engineer who scopes your work is the one who writes it.</b></p>
-      <Scene id="how" scene="how" fallback="/v3/stills/how.jpg" mobileHeight={330} scrubCenter={0.62} />
-      <div className="pa-steps">
-        <article>
-          <p className="pa-k"><i className="on" />Week 1</p>
-          <h3>Baseline</h3>
-          <p>We instrument the feature you already have: traces, an eval set, cost per request. Nothing ships yet. We measure.</p>
-        </article>
-        <article>
-          <p className="pa-k"><i className="on" />Weeks 2 – <span className="ph">[placeholder]</span></p>
-          <h3>Ship behind flags</h3>
-          <p>Small pull requests into your repo, reviewed by your team, each one measured against the baseline. A weekly call and written notes.</p>
-        </article>
-        <article>
-          <p className="pa-k"><i />Handover</p>
-          <h3>Your team owns it</h3>
-          <p>Runbooks, dashboards and an eval suite in your stack. We stay reachable for <span className="ph">[placeholder]</span> weeks after.</p>
-        </article>
-      </div>
-      <p className="pa-ov pa-note">The Arc as a toolpath. One fin per pull request, measured after each pass.</p>
     </section>
   );
 }
