@@ -1,0 +1,4 @@
+Posters are WebP derivatives of the approved Gate 1 v2 art frames.
+Masters live in the art store under primearc-art-v2/01–08.
+They are the first paint and the fallback for no WebGL, Save-Data, reduced motion, and context loss.
+The live scene is the Three.js journey, not these stills.
