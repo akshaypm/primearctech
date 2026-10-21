@@ -2,11 +2,10 @@ import gsap from "gsap";
 import * as THREE from "three";
 import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer.js";
 import { createAudio } from "./audio";
-import { DESKTOP_GRID, MOBILE_GRID, SWARM_SEED, sampleSwarm, type Shard } from "./creature";
+import { DESKTOP_GRID, MOBILE_GRID, SWARM_SEED, shardsFromBake, type Shard } from "./creature";
 import { frameFor, type SwarmFrame } from "./frame";
-import { createMatcaps } from "./matcap";
 import { SPRING_C, SPRING_K } from "./motion";
-import { backgroundFragment, backgroundVertex, displayFragment, displayVertex, floorFragment, floorVertex, positionShader, velocityShader } from "./shaders";
+import { backgroundFragment, backgroundVertex, displayFragment, displayVertex, positionShader, velocityShader } from "./shaders";
 import { createSliver } from "./sliver";
 
 export type SwarmHandle = {
@@ -32,7 +31,7 @@ type Options = {
   onFallback: (reason: string) => void;
 };
 
-const BOUNDS = { minX: -1.7, maxX: 1.45, minY: -1.05, maxY: 1.28 };
+const bounds = { minX: -1.6, maxX: 1.6, minY: -0.9, maxY: 0.9 };
 
 export function createEngine(options: Options): SwarmHandle {
   const audio = createAudio();
@@ -136,7 +135,7 @@ export function createEngine(options: Options): SwarmHandle {
   }
 
   function overCreature(point: THREE.Vector3) {
-    return point.x > BOUNDS.minX && point.x < BOUNDS.maxX && point.y > BOUNDS.minY && point.y < BOUNDS.maxY;
+    return point.x > bounds.minX && point.x < bounds.maxX && point.y > bounds.minY && point.y < bounds.maxY;
   }
 
   function updateCursor(event: PointerEvent) {
@@ -230,7 +229,7 @@ export function createEngine(options: Options): SwarmHandle {
       tangent.data[o + 3] = shard.length;
       shape.data[o] = shard.rough;
       shape.data[o + 1] = shard.twist;
-      shape.data[o + 2] = shard.ao;
+      shape.data[o + 2] = shard.wing;
       shape.data[o + 3] = shard.delay;
       extra.data[o] = shard.normal[0];
       extra.data[o + 1] = shard.normal[1];
@@ -261,10 +260,10 @@ export function createEngine(options: Options): SwarmHandle {
 
     const scroll = Math.min(1, Math.max(0, scrollY / Math.max(1, window.innerHeight * 0.9)));
     const eased = scroll * scroll * (3 - 2 * scroll);
-    const breathe = phase === "live" ? Math.sin(_time * 0.42) : 0;
-    const scale = frame.scale * (1 + breathe * 0.012);
+    const breathe = phase === "live" ? Math.sin(_time * 0.28) : 0;
+    const scale = frame.scale * (1 + breathe * 0.007);
     group.position.set(frame.x, frame.y - eased * 0.42, 0);
-    group.rotation.set(eased * 0.04, frame.yaw + breathe * 0.018 + eased * 0.36, eased * -0.05);
+    group.rotation.set(eased * 0.03, frame.yaw + breathe * 0.006 + eased * 0.28, eased * -0.03);
     group.scale.set(scale * (1 + eased * 0.05), scale * (1 + eased * 0.2), scale);
     if (phase === "live") {
       const fade = 1 - Math.min(1, Math.max(0, (eased - 0.62) / 0.38)) * 0.82;
@@ -372,8 +371,13 @@ export function createEngine(options: Options): SwarmHandle {
   void (async () => {
     try {
       report(0.04);
+      const bakePromise = fetch("/lab/swarm/falcon.bin").then(async (response) => {
+        if (!response.ok) throw new Error("falcon-bake-missing");
+        return response.arrayBuffer();
+      });
       await document.fonts.load('400 12px "IBM Plex Mono"');
       await document.fonts.load('500 96px "General Sans"');
+      const bake = await bakePromise;
       if (disposed) return;
       report(0.18);
 
@@ -394,8 +398,6 @@ export function createEngine(options: Options): SwarmHandle {
       const debug = gl.getExtension("WEBGL_debug_renderer_info");
       stats.renderer = debug ? String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)) : "webgl2";
 
-      const matcaps = createMatcaps();
-      disposables.push(matcaps.sharp, matcaps.broad);
       report(0.32);
       if (disposed) return;
 
@@ -405,7 +407,21 @@ export function createEngine(options: Options): SwarmHandle {
       stats.count = count;
       stats.grid = `${grid.x}x${grid.y}`;
       const t0 = performance.now();
-      const shards = sampleSwarm(count, SWARM_SEED);
+      const shards = shardsFromBake(bake, count, SWARM_SEED);
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      for (const shard of shards) {
+        minX = Math.min(minX, shard.home[0]);
+        maxX = Math.max(maxX, shard.home[0]);
+        minY = Math.min(minY, shard.home[1]);
+        maxY = Math.max(maxY, shard.home[1]);
+      }
+      bounds.minX = minX - 0.12;
+      bounds.maxX = maxX + 0.12;
+      bounds.minY = minY - 0.12;
+      bounds.maxY = maxY + 0.18;
       stats.sampleMs = performance.now() - t0;
       const textures = fillTextures(shards, grid.x, grid.y);
       report(0.62);
@@ -451,20 +467,6 @@ export function createEngine(options: Options): SwarmHandle {
       scene.add(background);
       disposables.push(background.geometry, background.material);
 
-      const floor = new THREE.Mesh(
-        new THREE.CircleGeometry(1.55, 48),
-        new THREE.ShaderMaterial({
-          vertexShader: floorVertex,
-          fragmentShader: floorFragment,
-          transparent: true,
-          depthWrite: false,
-        }),
-      );
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.y = -0.84;
-      group.add(floor);
-      disposables.push(floor.geometry, floor.material);
-
       display = new THREE.ShaderMaterial({
         uniforms: {
           uPosition: { value: gpu.getCurrentRenderTarget(positionVar).texture },
@@ -475,13 +477,13 @@ export function createEngine(options: Options): SwarmHandle {
           uExtra: { value: textures.extra.texture },
           uOrigin: sim.uOrigin,
           uGrid: { value: new THREE.Vector2(grid.x, grid.y) },
-          uShard: { value: mobile ? 0.15 : 0.094 },
+          uShard: { value: mobile ? 0.17 : 0.15 },
+          uGirth: { value: mobile ? 0.34 : 0.28 },
           uTime: sim.uTime,
           uMode: sim.uMode,
           uPulse: sim.uPulse,
-          uMatSharp: { value: matcaps.sharp },
-          uMatBroad: { value: matcaps.broad },
           uOrange: { value: new THREE.Color("#D8643E") },
+          uMineral: { value: new THREE.Color("#F1EFE9") },
         },
         vertexShader: displayVertex,
         fragmentShader: displayFragment,

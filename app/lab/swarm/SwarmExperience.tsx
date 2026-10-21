@@ -171,7 +171,7 @@ export function SwarmExperience() {
       <img
         className="swarm-poster"
         src="/lab/swarm/poster.webp"
-        alt="A hound formed from dark steel shards."
+        alt="A hawk formed from polished steel shards, wings half raised."
         width={1440}
         height={900}
         fetchPriority="high"

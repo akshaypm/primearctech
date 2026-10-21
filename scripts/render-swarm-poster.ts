@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import sharp from "sharp";
-import { sampleSwarm, SWARM_SEED, type V3 } from "../app/lab/swarm/engine/creature.ts";
+import { shardsFromBake, SWARM_SEED, type V3 } from "../app/lab/swarm/engine/creature.ts";
 import { frameFor } from "../app/lab/swarm/engine/frame.ts";
 
 const width = 1440;
@@ -38,7 +39,8 @@ function plot(data: Uint8Array, x: number, y: number, r: number, g: number, b: n
   data[o + 3] = 255;
 }
 
-const shards = sampleSwarm(24000, SWARM_SEED);
+const bake = readFileSync("public/lab/swarm/falcon.bin");
+const shards = shardsFromBake(bake.buffer.slice(bake.byteOffset, bake.byteOffset + bake.byteLength), 12288, SWARM_SEED);
 const data = new Uint8Array(width * height * 4);
 for (let i = 0; i < data.length; i += 4) {
   const y = Math.floor(i / 4 / width) / height;

@@ -158,11 +158,13 @@ uniform sampler2D uExtra;
 uniform sampler2D uOrigin;
 uniform vec2 uGrid;
 uniform float uShard;
+uniform float uGirth;
 uniform float uTime;
 uniform float uMode;
 uniform float uPulse;
 
 varying vec3 vViewN;
+varying vec3 vViewPos;
 varying vec3 vWorld;
 varying float vRough;
 varying float vSeam;
@@ -201,18 +203,31 @@ void main() {
   float squeeze = 1.0;
   if (uPulse < 0.25) squeeze = mix(1.0, 0.2, smoothstep(0.0, 0.25, uPulse));
   else if (uPulse < 0.95) squeeze = mix(0.2, 1.0, smoothstep(0.3, 0.95, uPulse));
-  vec3 local = (X * position.x * width + T * position.y * lenAttr * squeeze + Z * position.z * thin) * uShard;
   if (uMode > 0.5) {
-    float breathe = sin(uTime * 0.42 - home.x * 0.8) * 0.014;
-    local += coatN * breathe * (0.35 + shape.z);
-    float ear = smoothstep(0.78, 1.08, home.y) * smoothstep(-0.55, -0.9, home.x);
-    float tail = smoothstep(0.78, 1.15, home.x);
-    local.y += sin(uTime * 0.65 + home.x * 3.0) * (ear * 0.028 + tail * 0.022);
+    float breathe = sin(uTime * 0.33 + home.y * 1.6) * 0.012;
+    pos += coatN * breathe;
+    float wing = shape.z;
+    float cycle = fract(uTime * 0.16);
+    float settle = smoothstep(0.1, 0.36, cycle) * (1.0 - smoothstep(0.5, 0.86, cycle));
+    pos.y -= settle * wing * 0.035;
   }
+  vec3 worldP = (modelMatrix * vec4(pos, 1.0)).xyz;
+  vec3 worldN = normalize(mat3(modelMatrix) * coatN);
+  float facing = dot(worldN, normalize(cameraPosition - worldP));
+  float shell = smoothstep(-0.32, 0.04, facing);
+  float fringe = smoothstep(0.72, 0.08, facing);
+  float crown = smoothstep(0.88, 0.74, lenAttr);
+  float reach = mix(1.0, 0.66, fringe) * mix(1.0, 0.46, crown);
+  if (seam > 0.5) reach *= 1.2;
+  pos += coatN * lenAttr * uShard * 0.04 * shell;
+  float along = position.y + 0.5;
+  vec3 local = ((X * position.x * width + Z * position.z * thin) * uGirth + T * along * lenAttr * squeeze * uShard * reach) * shell;
 
   vec3 nLocal = normalize(X * normal.x + T * normal.y + Z * normal.z);
   vec4 world = modelMatrix * vec4(pos + local, 1.0);
+  vec4 viewPos = viewMatrix * world;
   vWorld = world.xyz;
+  vViewPos = viewPos.xyz;
   vViewN = normalize(mat3(viewMatrix) * mat3(modelMatrix) * nLocal);
   vRough = shape.x;
   vSeam = seam;
@@ -222,11 +237,11 @@ void main() {
 `;
 
 export const displayFragment = /* glsl */ `
-uniform sampler2D uMatSharp;
-uniform sampler2D uMatBroad;
 uniform vec3 uOrange;
+uniform vec3 uMineral;
 
 varying vec3 vViewN;
+varying vec3 vViewPos;
 varying vec3 vWorld;
 varying float vRough;
 varying float vSeam;
@@ -234,15 +249,25 @@ varying float vAo;
 
 void main() {
   vec3 N = normalize(vViewN);
-  vec2 muv = clamp(N.xy * 0.5 + 0.5, 0.02, 0.98);
-  vec3 sharp = texture2D(uMatSharp, muv).rgb;
-  vec3 broad = texture2D(uMatBroad, muv).rgb;
+  vec3 V = normalize(-vViewPos);
+  vec3 keyL = normalize(vec3(-0.64, 0.72, 0.38));
+  vec3 rimL = normalize(vec3(0.16, 0.28, -0.94));
+  float ndk = max(dot(N, keyL), 0.0);
+  float ndr = max(dot(N, rimL), 0.0);
+  vec3 H = normalize(keyL + V);
   float rough = clamp(vRough, 0.0, 1.0);
-  vec3 color = mix(sharp, broad, rough);
-  color *= mix(0.84, 1.0, clamp(vAo, 0.0, 1.0));
+  float spec = pow(max(dot(N, H), 0.0), mix(210.0, 96.0, rough));
+  float fres = pow(1.0 - max(dot(N, V), 0.0), 4.4);
   float salt = fract(sin(dot(vWorld.xy, vec2(19.13, 47.77))) * 43758.5453);
-  color *= 0.94 + salt * 0.1;
-  if (vSeam > 0.5) color = uOrange;
+  vec3 dark = vec3(0.008, 0.009, 0.011);
+  vec3 color = dark * (0.28 + 1.05 * ndk);
+  color += uMineral * spec * 2.15;
+  color += uMineral * fres * (0.015 + 0.72 * ndr);
+  color *= 0.92 + salt * 0.1;
+  if (vSeam > 0.5) {
+    color = uOrange * (0.62 + 0.55 * ndk) + uOrange * 0.72;
+    color += uMineral * spec * 0.12;
+  }
   gl_FragColor = linearToOutputTexel(vec4(color, 1.0));
 }
 `;

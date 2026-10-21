@@ -1,49 +1,49 @@
 {
   "desktop": {
     "loader": {
-      "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting ........",
+      "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting ........ ok\nshard ",
       "bar": "matrix(1, 0, 0, 1, 0, 0)"
     },
     "state": {
       "phase": "live",
-      "count": 32768,
+      "count": 12288,
       "dpr": 1,
-      "grid": "256x128",
+      "grid": "128x96",
       "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
-      "fps": 30.45685279187817,
-      "sampleMs": 80.1999999997206,
+      "fps": 15.329586101175268,
+      "sampleMs": 22.800000000745058,
       "error": "",
-      "frameCount": 91,
-      "avgFrameMs": 34.582417582417584,
+      "frameCount": 81,
+      "avgFrameMs": 80.44444444444444,
       "p50FrameMs": 33,
-      "p95FrameMs": 45,
-      "maxFrameMs": 263
+      "p95FrameMs": 456,
+      "maxFrameMs": 497
     }
   },
   "mobile": {
     "loader": {
-      "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting .......",
+      "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting ..",
       "bar": "matrix(1, 0, 0, 1, 0, 0)"
     },
     "state": {
       "phase": "live",
-      "count": 8192,
+      "count": 5120,
       "dpr": 1,
-      "grid": "128x64",
+      "grid": "80x64",
       "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
-      "fps": 6.469700237222342,
-      "sampleMs": 19.40000000037253,
+      "fps": 10.332357499569484,
+      "sampleMs": 7.7000000001862645,
       "error": "",
-      "frameCount": 103,
-      "avgFrameMs": 135.92233009708738,
-      "p50FrameMs": 154,
-      "p95FrameMs": 304,
-      "maxFrameMs": 464
+      "frameCount": 124,
+      "avgFrameMs": 89.8225806451613,
+      "p50FrameMs": 95,
+      "p95FrameMs": 209,
+      "maxFrameMs": 267
     }
   },
   "dprCap": {
     "dpr": 1.5,
-    "count": 32768
+    "count": 12288
   },
   "reduced": {
     "className": "swarm is-still",
@@ -51,7 +51,7 @@
     "loader": "none"
   },
   "poster": {
-    "bytes": 12684,
+    "bytes": 41504,
     "quality": 68
   },
   "logs": []

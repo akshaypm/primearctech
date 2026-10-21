@@ -1,14 +1,14 @@
 import * as THREE from "three";
 
-/** Flat-shaded diamond splinter. Long axis is Y, sharp tip at +Y. */
+/** Flat-shaded steel icicle. Long axis is Y, sharp tip at +Y, nearly square so each face can catch a rim. */
 export function createSliver() {
   const rings = [
-    { y: -0.5, rx: 0.015, rz: 0.008 },
-    { y: -0.3, rx: 0.085, rz: 0.028 },
-    { y: -0.04, rx: 0.125, rz: 0.036 },
-    { y: 0.22, rx: 0.07, rz: 0.022 },
-    { y: 0.4, rx: 0.032, rz: 0.012 },
-    { y: 0.5, rx: 0.004, rz: 0.0025 },
+    { y: -0.5, rx: 0.02, rz: 0.016 },
+    { y: -0.28, rx: 0.1, rz: 0.082 },
+    { y: 0.0, rx: 0.128, rz: 0.104 },
+    { y: 0.24, rx: 0.072, rz: 0.058 },
+    { y: 0.42, rx: 0.03, rz: 0.024 },
+    { y: 0.5, rx: 0.003, rz: 0.0024 },
   ];
   const positions: number[] = [];
   const normals: number[] = [];

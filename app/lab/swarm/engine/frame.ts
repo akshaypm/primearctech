@@ -1,4 +1,4 @@
-/** Desktop puts the hound in the right half. Portrait lifts it above the headline. */
+/** Desktop puts the hawk in the right half, seen from slightly below. Portrait lifts it above the headline. */
 
 export type SwarmFrame = {
   x: number;
@@ -16,26 +16,26 @@ export function frameFor(width: number, height: number): SwarmFrame {
   const aspect = width / Math.max(1, height);
   if (aspect < 0.92) {
     return {
-      x: 0.08,
-      y: 0.7,
-      scale: 0.78,
-      yaw: 0.2,
-      camZ: 6.15,
-      camY: 0.95,
-      lookX: 0.05,
-      lookY: 0.78,
-      fov: 30,
+      x: 0,
+      y: 0.88,
+      scale: 0.68,
+      yaw: 0,
+      camZ: 7.35,
+      camY: -0.08,
+      lookX: 0,
+      lookY: 0.16,
+      fov: 36,
     };
   }
   return {
-    x: 1.18,
+    x: 0.95,
     y: 0.04,
-    scale: 1,
-    yaw: 0.24,
-    camZ: 6.2,
-    camY: 0.2,
-    lookX: 0.36,
-    lookY: 0.1,
+    scale: 1.02,
+    yaw: -0.02,
+    camZ: 5.15,
+    camY: -0.42,
+    lookX: 0.42,
+    lookY: 0.06,
     fov: 28,
   };
 }

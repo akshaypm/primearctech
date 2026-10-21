@@ -106,8 +106,8 @@ desktopPage.on("console", (msg) => {
 });
 perf.desktop = await runSequence(desktopPage, {
   name: "1440",
-  sweep: { x0: 860, x1: 1240, y: 430 },
-  click: { x: 1080, y: 440 },
+  sweep: { x0: 820, x1: 1280, y: 400 },
+  click: { x: 1040, y: 430 },
 });
 if (!process.env.STILLS_ONLY) {
   const video = desktopPage.video();
@@ -125,8 +125,8 @@ const mobilePage = await mobile.newPage();
 mobilePage.on("pageerror", (error) => logs.push(`mobile ${error.message}`));
 perf.mobile = await runSequence(mobilePage, {
   name: "390",
-  sweep: { x0: 40, x1: 340, y: 340 },
-  click: { x: 190, y: 360 },
+  sweep: { x0: 30, x1: 350, y: 210 },
+  click: { x: 180, y: 230 },
 });
 if (!process.env.STILLS_ONLY) {
   const video = mobilePage.video();
@@ -138,7 +138,7 @@ await mobile.close();
 const hi = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
 const hiPage = await hi.newPage();
 await hiPage.goto("http://localhost:4173/lab/swarm", { waitUntil: "domcontentloaded" });
-await hiPage.waitForFunction(() => window.__SWARM__ && window.__SWARM__.dpr, null, { timeout: 45000 });
+await hiPage.waitForFunction(() => window.__SWARM__ && window.__SWARM__.phase === "live" && window.__SWARM__.count > 0, null, { timeout: 45000 });
 perf.dprCap = await hiPage.evaluate(() => ({ dpr: window.__SWARM__.dpr, count: window.__SWARM__.count }));
 await hi.close();
 
