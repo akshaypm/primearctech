@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshSurfaceSampler } from "three/addons/math/MeshSurfaceSampler.js";
-import { createAudio } from "./audio";
+import { createAudio, type SwarmAudio } from "./audio";
 import { SWARM_SEED, maskUrlForWidth, modelUrlForWidth, mulberry32, shardCountForWidth } from "./creature";
 import { createBladeMaterial, createFalconMaterial, type FalconUniforms } from "./falconMaterial";
 import { frameFor, type SwarmFrame } from "./frame";
@@ -28,7 +28,7 @@ export type SwarmHandle = {
 
 type Options = {
   canvas: HTMLCanvasElement;
-  sound: boolean;
+  audio?: SwarmAudio;
   onProgress: (value: number) => void;
   onReady: () => void;
   onLockStart: () => void;
@@ -83,8 +83,8 @@ function compose(out: Float32Array, offset: number, px: number, py: number, pz: 
 }
 
 export function createEngine(options: Options): SwarmHandle {
-  const audio = createAudio();
-  audio.setEnabled(options.sound);
+  const audio = options.audio ?? createAudio();
+  const ownsAudio = !options.audio;
   let disposed = false;
   let ready = false;
   let phase: "boot" | "lock" | "live" = "boot";
@@ -108,7 +108,7 @@ export function createEngine(options: Options): SwarmHandle {
   let rippleT = -1;
   let radius = 0;
   let frontHold = 0;
-  let hitSent = false;
+  let lockDuration = 1.12;
   const lock = { t: 0 };
   let lockTween: gsap.core.Tween | null = null;
   const frames: number[] = [];
@@ -145,6 +145,7 @@ export function createEngine(options: Options): SwarmHandle {
     drawTris: 0,
     ticks: 0,
     aim: { x: 0, y: 0 },
+    audioEvents: audio.events,
   };
   (window as unknown as { __SWARM__?: typeof stats }).__SWARM__ = stats;
 
@@ -212,8 +213,10 @@ export function createEngine(options: Options): SwarmHandle {
 
   function onPointerMove(event: PointerEvent) {
     if (event.pointerType === "touch" && !pressing) return;
+    const wasHovering = hovering;
     updateCursor(event);
     pointer = 1;
+    if (event.pointerType !== "touch" && hovering && !wasHovering && phase === "live" && burstT < 0) audio.hover();
   }
 
   function onPointerDown(event: PointerEvent) {
@@ -243,7 +246,8 @@ export function createEngine(options: Options): SwarmHandle {
     flashT = 0;
     flashPoint.copy(cursorWorld);
     stats.pulses += 1;
-    audio.hit();
+    audio.mark("burst");
+    audio.onBurst(BURST_END);
   }
 
   function onPointerLeave() {
@@ -614,6 +618,7 @@ export function createEngine(options: Options): SwarmHandle {
     stats.tickMs = performance.now() - tickStart;
     stats.pulse = burstT >= 0 ? burstT : 100;
 
+    if (phase === "lock") audio.followLock(lock.t);
     if (phase === "lock" && lock.t >= 1) {
       phase = "live";
       stats.phase = "live";
@@ -621,27 +626,24 @@ export function createEngine(options: Options): SwarmHandle {
       if (falcon) falcon.visible = true;
       options.onLive();
     }
-
-    if (phase === "live" && pointer > 0 && hovering && cursorVel.length() > 0.35) audio.grain();
   }
 
   function startLock(fast?: boolean) {
     if (phase !== "boot") return;
     phase = "lock";
     stats.phase = "lock";
-    hitSent = false;
     lock.t = 0;
+    lockDuration = fast ? 0.46 : 1.12;
     lockTween?.kill();
+    audio.mark("lock-start", fast ? "fast" : "full");
+    audio.onLock(lockDuration, 0);
     lockTween = gsap.to(lock, {
       t: 1,
-      duration: fast ? 0.46 : 1.12,
+      duration: lockDuration,
       ease: "none",
-      onUpdate: () => {
-        if (!hitSent && lock.t >= 0.9) {
-          hitSent = true;
-          audio.hit();
-          audio.stopHum();
-        }
+      onComplete: () => {
+        audio.followLock(1);
+        audio.mark("lock");
       },
     });
     options.onLockStart();
@@ -662,7 +664,7 @@ export function createEngine(options: Options): SwarmHandle {
     options.canvas.removeEventListener("pointerup", onPointerUp);
     options.canvas.removeEventListener("pointerleave", onPointerLeave);
     window.removeEventListener("resize", resize);
-    audio.dispose();
+    if (ownsAudio) audio.dispose();
     for (const item of disposables) item.dispose();
     renderer?.dispose();
     renderer = null;
@@ -953,8 +955,8 @@ export function createEngine(options: Options): SwarmHandle {
       startLock(opts?.fast);
     },
     setSound(on) {
-      audio.setEnabled(on);
-      if (on && (phase === "boot" || phase === "lock")) audio.startHum();
+      audio.setEnabled(on, { gesture: true });
+      if (on && phase === "lock") audio.onLock(lockDuration, lock.t);
     },
     dispose() {
       if (!disposed) cleanup();

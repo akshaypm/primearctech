@@ -73,8 +73,10 @@ describe("swarm copy and assets", () => {
     expect(poster.size).toBeGreaterThan(8_000);
     expect(poster.size).toBeLessThanOrEqual(200 * 1024);
     const sounds = readFileSync("public/lab/swarm/SOUNDS.md", "utf8");
-    expect(sounds).toContain("CC0");
+    expect(sounds).toContain("Krea");
+    expect(sounds).toContain("Business");
     expect(sounds).toContain("Web Audio");
+    expect(sounds).not.toContain("CC0");
     const assets = readFileSync("public/lab/swarm/ASSETS.md", "utf8");
     expect(assets).toContain("falcon-web.glb");
     expect(assets).toContain("falcon-mobile.glb");

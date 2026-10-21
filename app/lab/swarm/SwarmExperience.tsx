@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { createAudio, type SwarmAudio } from "./engine/audio";
 import { BOOT_LINES, NEXT_SECTION_COPY, SOUND_STORAGE_KEY, bootLine } from "./engine/copy";
 import type { SwarmHandle } from "./engine/createEngine";
 import "./swarm.css";
@@ -37,24 +38,52 @@ export function SwarmExperience() {
   const barRef = useRef<HTMLSpanElement>(null);
   const copyRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<SwarmHandle | null>(null);
+  const audioRef = useRef<SwarmAudio | null>(null);
   const [phase, setPhase] = useState<"boot" | "live" | "still" | "fallback">("boot");
   const [sound, setSound] = useState(false);
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const stored = window.localStorage.getItem(SOUND_STORAGE_KEY) === "on";
+    const audio = createAudio({ reducedMotion: reduce });
+    audioRef.current = audio;
+    if (stored) {
+      audio.setEnabled(true);
+      queueMicrotask(() => setSound(true));
+    }
+
+    const unlock = (event: Event) => {
+      const target = event.target;
+      const element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+      if (element?.closest(".swarm-sound")) return;
+      void audio.unlock();
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+
     if (reduce) {
       queueMicrotask(() => setPhase("still"));
-      return;
+      return () => {
+        window.removeEventListener("pointerdown", unlock);
+        window.removeEventListener("keydown", unlock);
+        audio.dispose();
+        audioRef.current = null;
+      };
     }
-    if (stored) queueMicrotask(() => setSound(true));
 
     const canvas = canvasRef.current;
     const loader = loaderRef.current;
     const readout = readoutRef.current;
     const bar = barRef.current;
     const copy = copyRef.current;
-    if (!canvas || !loader || !readout || !bar || !copy) return;
+    if (!canvas || !loader || !readout || !bar || !copy) {
+      return () => {
+        window.removeEventListener("pointerdown", unlock);
+        window.removeEventListener("keydown", unlock);
+        audio.dispose();
+        audioRef.current = null;
+      };
+    }
 
     let cancelled = false;
     let textDone = false;
@@ -117,13 +146,9 @@ export function SwarmExperience() {
       const gsap = gsapModule.default;
       gsap.ticker.add(boot);
       removeTicker = () => gsap.ticker.remove(boot);
-      if (stored) {
-        const unlock = () => engineRef.current?.setSound(true);
-        window.addEventListener("pointerdown", unlock, { once: true });
-      }
       engineRef.current = createEngine({
         canvas,
-        sound: stored,
+        audio,
         onProgress: (value) => {
           progress.value = value;
           bar.style.transform = `scaleX(${value.toFixed(4)})`;
@@ -146,16 +171,19 @@ export function SwarmExperience() {
           if (!cancelled) setPhase("fallback");
         },
       });
-      if (stored) engineRef.current.setSound(true);
     })();
 
     return () => {
       cancelled = true;
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
       window.removeEventListener("keydown", onKey);
       loader.removeEventListener("pointerdown", onPointerDown);
       removeTicker?.();
       engineRef.current?.dispose();
       engineRef.current = null;
+      audio.dispose();
+      audioRef.current = null;
     };
   }, []);
 
@@ -163,7 +191,8 @@ export function SwarmExperience() {
     const next = !sound;
     setSound(next);
     window.localStorage.setItem(SOUND_STORAGE_KEY, next ? "on" : "off");
-    engineRef.current?.setSound(next);
+    if (engineRef.current) engineRef.current.setSound(next);
+    else audioRef.current?.setEnabled(next, { gesture: true });
   };
 
   return (
