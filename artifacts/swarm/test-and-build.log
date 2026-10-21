@@ -1,0 +1,126 @@
+
+> fieldrelay-premium-homepage@0.1.0 test
+> npm run test:unit && npm run test:rendered
+
+
+> fieldrelay-premium-homepage@0.1.0 test:unit
+> vitest run
+
+
+ RUN  v4.1.10 /workspace
+
+
+ Test Files  6 passed (6)
+      Tests  27 passed (27)
+   Start at  07:24:28
+   Duration  572ms (transform 288ms, setup 0ms, import 515ms, tests 388ms, environment 0ms)
+
+
+> fieldrelay-premium-homepage@0.1.0 test:rendered
+> npm run build && node --test tests/rendered-html.test.mjs
+
+
+> fieldrelay-premium-homepage@0.1.0 build
+> vinext build --precompress
+
+
+  vinext build  (Vite 8.0.13)
+
+[1/5] analyze client references...
+[2Ktransforming...✓ 449 modules transformed.
+rendering chunks...
+✓ built in 668ms
+[2/5] analyze server references...
+[2Ktransforming...✓ 5176 modules transformed.
+rendering chunks...
+[33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
+  - vinext:middleware-server-only (33%)
+  - vinext:og-inline-fetch-assets (31%)
+  - vinext:css-data-url (8%)
+  - alias (7%)
+  - vinext:jsx-in-js (6%)
+See https://rolldown.rs/options/checks#plugintimings for more details.
+
+✓ built in 3.54s
+[3/5] build rsc environment...
+[2Ktransforming...✓ 448 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 615ms
+[4/5] build client environment...
+[2Ktransforming...✓ 5185 modules transformed.
+rendering chunks...
+computing gzip size...
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.34s
+[5/5] build ssr environment...
+[2Ktransforming...  Precompressed 38 assets (73.2% smaller with brotli)
+✓ 5182 modules transformed.
+rendering chunks...
+computing gzip size...
+[33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
+  - vinext:middleware-server-only (35%)
+  - vinext:og-inline-fetch-assets (32%)
+  - vinext:css-data-url (7%)
+  - alias (7%)
+  - rsc:virtual-client-package (7%)
+See https://rolldown.rs/options/checks#plugintimings for more details.
+
+✓ built in 3.94s
+[0m
+  Route (app)
+  ┌ ? /                    
+  ├ ? /about               
+  ├ λ /api/audit           
+  ├ λ /api/build-brief     
+  ├ λ /api/demo/session    
+  ├ λ /api/demo/vapi       
+  ├ λ /api/health          
+  ├ λ /api/pitch/auth      
+  ├ λ /api/pitch/session   
+  ├ ? /build-brief         
+  ├ ? /build-brief/received
+  ├ λ /demo                
+  ├ ? /fieldrelay          
+  ├ ? /fieldrelay/demo     
+  ├ ? /fieldrelay/pitch    
+  ├ ? /lab/swarm           
+  ├ ? /privacy             
+  ├ ? /security            
+  └ ? /terms               
+
+  λ API  ? Unknown
+
+  ? Some routes could not be classified. vinext currently uses static analysis
+    and cannot detect dynamic API usage (headers(), cookies(), etc.) at build time.
+    Automatic classification will be improved in a future release.
+
+  Build complete. Run `vinext start` to start the production server.
+
+TAP version 13
+# Subtest: production bundle contains the PrimeArcTech and FieldRelay conversion pages
+ok 1 - production bundle contains the PrimeArcTech and FieldRelay conversion pages
+  ---
+  duration_ms: 56.809235
+  type: 'test'
+  ...
+# Subtest: production output includes every purpose-built section image
+ok 2 - production output includes every purpose-built section image
+  ---
+  duration_ms: 5.380702
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 105.763686
+EXIT:0

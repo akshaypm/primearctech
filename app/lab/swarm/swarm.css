@@ -1,0 +1,228 @@
+.swarm {
+  min-height: 100vh;
+  background: #111315;
+  color: #f1efe9;
+  color-scheme: dark;
+}
+
+html:has(.swarm) {
+  scroll-behavior: auto;
+  scrollbar-color: #373c41 #111315;
+}
+
+.swarm-poster,
+.swarm-canvas,
+.swarm-vignette,
+.swarm-grain {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.swarm-poster {
+  z-index: 0;
+  object-fit: cover;
+  object-position: 72% 46%;
+  background: #111315;
+}
+
+.swarm-canvas {
+  z-index: 1;
+  display: block;
+  opacity: 0;
+  touch-action: pan-y;
+}
+
+.swarm-vignette,
+.swarm-grain {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.swarm-vignette {
+  background: radial-gradient(ellipse at 68% 44%, transparent 40%, rgba(0, 0, 0, 0.42) 100%);
+}
+
+.swarm-grain {
+  opacity: 0.16;
+  mix-blend-mode: overlay;
+  background-image: url("/lab/swarm/grain.png");
+  background-size: 180px 180px;
+}
+
+.swarm-hero,
+.swarm-next {
+  position: relative;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.swarm-hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 0 9vh 6vw;
+}
+
+.swarm-copy {
+  width: min(38vw, 640px);
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+}
+
+.swarm-copy h1 {
+  margin: 0;
+  max-width: 6.7em;
+  font-family: "General Sans", "Avenir Next", "Segoe UI", sans-serif;
+  font-weight: 500;
+  font-size: clamp(44px, 6vw, 96px);
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+  color: #f1efe9;
+  text-wrap: balance;
+}
+
+.swarm-cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  margin-top: 32px;
+  padding: 0 0 6px;
+  border-bottom: 1px solid #a7adb2;
+  color: #f1efe9;
+  font-family: "General Sans", "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.011em;
+  line-height: 1;
+  pointer-events: auto;
+}
+
+.swarm-cta:hover {
+  border-bottom-color: #f1efe9;
+}
+
+.swarm-next {
+  min-height: 78vh;
+  padding: 18vh 6vw 16vh;
+}
+
+.swarm-next p {
+  max-width: 36em;
+  margin: 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  line-height: 1.7;
+  color: #a7adb2;
+}
+
+.swarm-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  background: #111315;
+  cursor: pointer;
+}
+
+.swarm-readout {
+  position: absolute;
+  left: max(48px, 11vw);
+  top: 42%;
+  margin: 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  line-height: 1.9;
+  color: #a7adb2;
+  white-space: pre;
+}
+
+.swarm-hairline {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: #2a2e32;
+}
+
+.swarm-hairline span {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: #f1efe9;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
+.swarm-sound {
+  position: fixed;
+  right: 22px;
+  bottom: 16px;
+  z-index: 6;
+  min-width: 112px;
+  min-height: 48px;
+  padding: 12px 8px;
+  border: 0;
+  background: transparent;
+  color: #a7adb2;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-align: right;
+  cursor: pointer;
+}
+
+.swarm-sound:hover {
+  color: #f1efe9;
+}
+
+.swarm :focus-visible {
+  outline: 2px solid #f1efe9;
+  outline-offset: 4px;
+}
+
+.swarm ::selection {
+  background: #f1efe9;
+  color: #111315;
+}
+
+.swarm.is-live .swarm-poster,
+.swarm.is-fallback .swarm-canvas,
+.swarm.is-still .swarm-canvas {
+  opacity: 0;
+}
+
+.swarm.is-still .swarm-copy,
+.swarm.is-fallback .swarm-copy,
+.swarm.is-live .swarm-copy {
+  opacity: 1;
+  transform: none;
+}
+
+.swarm.is-still .swarm-loader,
+.swarm.is-fallback .swarm-loader {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .swarm-poster { object-position: 50% 32%; }
+  .swarm-hero { padding: 0 24px 56px; }
+  .swarm-copy { width: 100%; }
+  .swarm-copy h1 { max-width: 8.4em; }
+  .swarm-next { padding: 16vh 24px 18vh; }
+  .swarm-readout { left: 24px; }
+  .swarm-sound { right: 10px; bottom: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swarm-loader { display: none; }
+  .swarm-canvas { display: none; }
+  .swarm-copy { opacity: 1; transform: none; }
+  .swarm-poster { opacity: 1; }
+}
