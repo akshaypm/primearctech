@@ -1,65 +1,27 @@
-# Swarm round 5
+# Swarm round 6
 
-Draft only. No sends, no DNS, no deploy. The homepage, `/fieldrelay`, `/build-brief`, legal pages, APIs, and `DESIGN.md` are unchanged.
+Draft only. Chrome lighting, burst timing, and blade counts are unchanged. 2,000 desktop blades, 900 mobile.
 
-The falcon is the client mesh. It is not CC0. Sound is still original Web Audio and CC0 (`public/lab/swarm/SOUNDS.md`). The studio is a PMREM built in the page.
+## Orange line
 
-## Chrome
+The wing edge is no longer chrome with a tint. Where the line is, the fragment is base `#D8643E`, emissive `#D8643E` at 1.15, roughness 0.3, metalness 0. The fresnel coat is off on those pixels. The stroke is one continuous band, 1.5% of the 2.814 wingspan from edge to edge.
 
-The body is `MeshStandardMaterial`, metalness 1, roughness 0.08, colour `#E8E8E8`, `envMapIntensity` 1. Tone mapping is ACES at exposure 1. The room is darker on the floor than on the walls. Two narrow softboxes sit off the mean wing reflection, so neighbouring feathers split between the lamp and the dark floor. A small lamp still catches the beak.
+On `1440-rest.png` the bright core of the extended wing is 8px median, 12px at the 90th percentile. Hot pixels (red above 170 and clearly warmer than green and blue) average rgb 221, 137, 101 on desktop and 213, 132, 97 at 390. `#D8643E` is 216, 100, 62. ACES plus the diffuse lobe lifts it a little. It reads orange on both stills.
 
-`clearcoat: 1` is not on the material. On this machine that physical permutation drops the mesh to a few frames a second under SwiftShader, so the coat is a Schlick fresnel in the fragment shader (`0.42 * pow(1 - ndotv, 5)`).
+## Eye
 
-On `1440-hero.png`, bird pixels to the right of x=700 with luma above 28, excluding pixels that match the background:
+The 390 eye was a few mask texels and they were not landing. Both eyes are now small discs in mesh space, the same centers on both GLBs. `1440-rest.png` and `390-rest.png` each show one orange dot on the head. The far eye stays on the other side of the head.
 
-| | |
-| --- | --- |
-| count | 153,452 |
-| p10 / p50 / p90 luma | 63 / 104 / 211 |
-| deep (luma 28–85, the `#2a2d31`–`#55555b` band) | 35.2% |
-| mid (85–170) | 41.4% |
-| bright (170–235) | 23.2% |
-| clipped (above 235) | 0.1% |
-| orange pixels | 441 |
+## Dissolve
 
-35% is the top of the 25–35% aim. Round 4 was 8% deep, p50 luma 199, and the wings were a white mass. The wings now carry dark feathers next to bright ones. The head and chest stay darker than the wings.
+The cursor front no longer mixes a band of the lighting to orange. The hole is the same. The tint is an emissive hairline on the cut, about 2px, and it fades over 150ms after the front stops. Blades are the same chrome material as before.
 
-Layout at 1440×900: headline right edge x=578, bird x=738–1408, y=154–864. Gap 160px, right inset 31px, top 154px, bottom 35px. The right inset is tighter than round 4 because the outer feather tips now clear the luma threshold.
-
-## Orange
-
-The wing paint is no longer the texture mask. The mask breaks across UV islands, so the leading edge is a world-space band on the vertex position. The raised wing uses the front of the wing (low local x) with a smoothstep about 1.5% of a 2.81 wingspan. The extended wing uses the top rim of the rearward wing (local y against x). The eye stays on the mask, and only on the head (`x < -0.22`, small span), so the old dashed wing texels do not come back. Emissive `#D8643E` at intensity 0.4 is unchanged.
-
-## Burst
-
-2,000 blades on desktop, 900 on mobile. Hidden at rest. Width scale is 0.28, down from 0.40. Radial travel is 0.6× the round-4 lift (about 0.08–0.13). Length is `scaleY` 0.18–0.25. At the first hang the blades still pointed straight out and the outline was a cloud, because half the blade length was larger than the travel. They now lie mostly along the wing, with a small radial tilt, and the mesh stays up.
-
-The mesh does not fade globally. A 48³ grid marks the home cell of each blade that has moved more than 0.03, and the fragment shader discards only those cells. The cursor dissolve is the existing local hole. It does not set that grid and it does not hide the rest of the bird. `1440-scatter.png` is that local dissolve.
-
-`1440-pulse.png` is the hang, about 0.3–0.7s after the click. The outline is still a falcon: wings up, head left, tail right, talons below. The white ring is 120ms, additive, camera-facing. `1440-flash.png` is that frame from the recording, about 35.8s in.
-
-## Scrollbar
-
-The hero route was drawing a scrollbar because `.swarm-hero` (100vh) plus `.swarm-next` (78vh) is taller than the viewport, and `scrollbar-color` forced a classic track. At 1440 the content width was 1425. `html:has(.swarm)` now uses `scrollbar-width: none`, and the hero is clamped to 100vh. Wheel scroll still reaches the next section, which is what fades the bird. After the change, `clientWidth` is 1440 and matches `innerWidth`. The rightmost pixels of `1440-hero.png` are the page background, not a track.
+`1440-dissolve.png` and `390-dissolve.png` are the local hole with the blades up. There is no orange coil on the body. `1440-burst.png` and `390-burst.png` keep the orange on the wing edge and the eye. The blades stay grey.
 
 ## This machine
 
-Chromium is SwiftShader. Desktop: reported 26.8 fps, average frame 43ms, p50 33ms, p95 140ms, max 315ms, 2,000 blades, sample 19ms. Mobile: 11.2 fps, average 73ms, p50 78ms, p95 183ms, max 300ms, 900 blades. `deviceScaleFactor: 2` reports dpr 1.5, so the cap holds. Recordings are dpr 1. Poster is 27,534 bytes at quality 68. Reduced motion is `swarm is-still`, canvas and loader `display: none`. No page errors.
+Chromium is SwiftShader. Desktop: 30 fps, average frame 41ms, p50 33ms, p95 123ms, max 205ms, 2,000 blades. Mobile: 11 fps, average 72ms, p50 71ms, p95 210ms, max 339ms, 900 blades. `deviceScaleFactor: 2` reports dpr 1.5. Poster is 27,558 bytes at quality 68. Reduced motion is `swarm is-still`. No page errors. The right edge of `1440-rest.png` is the page background (rgb 18, 20, 22).
 
-Desktop recording 46.8s. Mobile recording 14.0s. Playwright padded both videos with a grey strip (22×14 desktop, 6×13 mobile). The mp4 and webm are cropped to the page. The stills are the viewport and were not cropped.
+Desktop recording 51.8s, cropped from a 22×14 grey pad to 1418×886. Mobile recording 13.7s, cropped from a 6×13 pad to 384×830. The stills are the viewport.
 
-## Critique
-
-The attached Blender render was not on disk. The prompt named `/workspace/primearc/creature/3d/renders/hunyuan-chrome-hero.png`, and that path is not in the workspace, not in git, and not under `/opt/cursor/artifacts`. `side-by-side.png` is round 4 against round 5, and the labels say so. There is no `target.png`.
-
-Against the Blender still, from memory of the attachment:
-
-- Rest pose is the same bird and the same framing. The wings are no longer a flat white. Dark feathers sit between bright ones. The body is darker than the wings. Deep share is 35%, at the top of the asked range.
-- Both leading edges are one line. The eye is there. The old dashed mask is not used on the wings.
-- The hang reads as a falcon made of separated blades. The mesh stays, with holes only where a blade has left. The cursor dissolve stays local.
-
-Three lighting passes this round: wide boxes left the wings white, a darker floor crushed the bird to about 59% deep, then this capture. Stopped here.
-
-## Kept
-
-Loader, sound toggle, springs, one renderer, one `gsap.ticker` loop, DPR caps, the mobile GLB below 768px, the HTML headline and `/build-brief`, and the reduced-motion poster.
+`1440-rest.png` is the rest pose, `1440-dissolve.png` is the cursor hole, `1440-burst.png` is the hang. The 390 files match. `1440-hero.png`, `1440-scatter.png`, and `1440-pulse.png` are the same three frames.

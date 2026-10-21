@@ -107,6 +107,7 @@ export function createEngine(options: Options): SwarmHandle {
   const boxMax = new THREE.Vector3(1, 1, 1);
   let rippleT = -1;
   let radius = 0;
+  let frontHold = 0;
   let hitSent = false;
   const lock = { t: 0 };
   let lockTween: gsap.core.Tween | null = null;
@@ -592,7 +593,13 @@ export function createEngine(options: Options): SwarmHandle {
 
     const radiusTarget = phase === "live" && hovering && burstT < 0 ? 0.42 * (frame.scale / 0.74) : 0;
     const rate = radiusTarget > radius ? 12 : 2.4;
+    const prevRadius = radius;
     radius += (radiusTarget - radius) * (1 - Math.exp(-dt * rate));
+    const opening = Math.abs(radius - prevRadius);
+    const sweeping = radius > 0.03 && cursorVel.length() > 0.2;
+    if (opening > 0.0004 || sweeping) frontHold = 0.15;
+    else frontHold = Math.max(0, frontHold - dt);
+    if (uniforms) uniforms.uFront.value = radius > 0.02 ? frontHold / 0.15 : 0;
 
     const computeStart = performance.now();
     simulate(dt, time);

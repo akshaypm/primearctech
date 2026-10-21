@@ -10,6 +10,7 @@ export type FalconUniforms = {
   uBeak: { value: number };
   uTail: { value: number };
   uOrange: { value: THREE.Color };
+  uFront: { value: number };
   uPeel: { value: number };
   uBoxMin: { value: THREE.Vector3 };
   uBoxMax: { value: THREE.Vector3 };
@@ -70,6 +71,7 @@ export function createFalconMaterial(map: THREE.Texture | null, envMap: THREE.Te
     uBeak: { value: -1 },
     uTail: { value: 1 },
     uOrange: { value: new THREE.Color("#D8643E") },
+    uFront: { value: 0 },
     uPeel: { value: 0 },
     uBoxMin: { value: new THREE.Vector3(-1, -1, -1) },
     uBoxMax: { value: new THREE.Vector3(1, 1, 1) },
@@ -89,7 +91,7 @@ export function createFalconMaterial(map: THREE.Texture | null, envMap: THREE.Te
     side: THREE.DoubleSide,
   });
 
-  material.customProgramCacheKey = () => "falcon-chrome-r5";
+  material.customProgramCacheKey = () => "falcon-chrome-r6";
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime;
     shader.uniforms.uCursor = uniforms.uCursor;
@@ -99,6 +101,7 @@ export function createFalconMaterial(map: THREE.Texture | null, envMap: THREE.Te
     shader.uniforms.uBeak = uniforms.uBeak;
     shader.uniforms.uTail = uniforms.uTail;
     shader.uniforms.uOrange = uniforms.uOrange;
+    shader.uniforms.uFront = uniforms.uFront;
     shader.uniforms.uPeel = uniforms.uPeel;
     shader.uniforms.uBoxMin = uniforms.uBoxMin;
     shader.uniforms.uBoxMax = uniforms.uBoxMax;
@@ -125,6 +128,7 @@ uniform float uWave;
 uniform float uBeak;
 uniform float uTail;
 uniform vec3 uOrange;
+uniform float uFront;
 uniform float uPeel;
 uniform vec3 uBoxMin;
 uniform vec3 uBoxMax;
@@ -141,29 +145,43 @@ ${FALCON_FRAG}`,
 	float painted = falconOrange(falconSrgb(sampledDiffuseColor.rgb));
 	float span = length(vFalconLocal.yz);
 	float wingspan = 2.814;
-	float band = wingspan * 0.015;
+	// Half-width. The hot line is this wide on each side of the leading edge,
+	// so the whole stroke is 1.5% of the wingspan.
+	float band = wingspan * 0.0075;
 	float t = clamp((span - 0.40) / 0.95, 0.0, 1.0);
 	float lead = mix(-0.52, -0.1, smoothstep(0.0, 1.0, t));
 	float wing = smoothstep(0.32, 0.48, span) * smoothstep(0.16, 0.34, vFalconLocal.y);
 	float rim = wing * (1.0 - smoothstep(0.0, band, abs(vFalconLocal.x - lead)));
 	float rearLead = -0.08 - 0.62 * vFalconLocal.x;
 	float rear = smoothstep(0.08, 0.28, vFalconLocal.x) * step(vFalconLocal.y, -0.05);
-	float rearRim = rear * (1.0 - smoothstep(0.05, 0.28, abs(vFalconLocal.z))) * (1.0 - smoothstep(0.0, band * 1.6, abs(vFalconLocal.y - rearLead)));
-	float eye = painted * (1.0 - smoothstep(0.1, 0.28, span)) * (1.0 - step(-0.22, vFalconLocal.x));
+	float rearRim = rear * (1.0 - smoothstep(0.05, 0.28, abs(vFalconLocal.z))) * (1.0 - smoothstep(0.0, band, abs(vFalconLocal.y - rearLead)));
+	// Both eyes, measured on the desktop and mobile meshes. A mask texel
+	// does not survive the 390 raster; the disc does. About 1.3% of the
+	// wingspan across, so it stays a dot.
+	float eyeA = 1.0 - smoothstep(0.006, 0.018, length(vFalconLocal - vec3(-0.807, -0.207, 0.077)));
+	float eyeB = 1.0 - smoothstep(0.006, 0.018, length(vFalconLocal - vec3(-0.809, -0.205, -0.076)));
+	float eye = max(eyeA, eyeB);
+	eye = max(eye, painted * eye);
 	falconMask = max(max(rim, rearRim), eye);
 	diffuseColor.rgb = mix(diffuseColor.rgb, uOrange, falconMask);
 #endif`,
       )
       .replace(
-        "#include <emissive_fragment>",
-        `#include <emissive_fragment>
-	totalEmissiveRadiance += uOrange * falconMask * 0.4;`,
+        "#include <roughnessmap_fragment>",
+        `#include <roughnessmap_fragment>
+	roughnessFactor = mix(roughnessFactor, 0.30, falconMask);`,
+      )
+      .replace(
+        "#include <metalnessmap_fragment>",
+        `#include <metalnessmap_fragment>
+	metalnessFactor = mix(metalnessFactor, 0.0, falconMask);`,
       )
       .replace(
         "#include <opaque_fragment>",
         `
 	float coatNdV = clamp(dot(geometryNormal, geometryViewDir), 0.0, 1.0);
-	outgoingLight += vec3(0.42) * pow(1.0 - coatNdV, 5.0);
+	outgoingLight += vec3(0.42) * pow(1.0 - coatNdV, 5.0) * (1.0 - falconMask);
+	outgoingLight += uOrange * falconMask * 1.15;
 	if (uWave < 50.0) {
 		float along = clamp((vFalconLocal.x - uBeak) / max(0.0001, uTail - uBeak), 0.0, 1.0);
 		float arrival = along * 0.48 + 0.42;
@@ -173,8 +191,11 @@ ${FALCON_FRAG}`,
 		float cursorDist = distance(vFalconWorld, uCursor);
 		float hole = smoothstep(uRadius, uRadius - 0.02, cursorDist);
 		if (hole > 0.72) discard;
-		float front = smoothstep(uRadius + 0.045, uRadius, cursorDist) * (1.0 - hole);
-		outgoingLight = mix(outgoingLight, uOrange, front * 0.92);
+		// Hole falls across 0.02 world units. 0.12 of that parameter is
+		// about 2px at the hero framing. Emissive only, and uFront dies
+		// over 150ms once the front stops, so it cannot sit as a band.
+		float hair = 1.0 - smoothstep(0.0, 0.12, abs(hole - 0.72));
+		outgoingLight += uOrange * hair * uFront * 1.15;
 	}
 	if (uFade < 0.999) {
 		float dither = fract(sin(dot(vFalconWorld.xy, vec2(12.9898, 78.233))) * 43758.5453);
