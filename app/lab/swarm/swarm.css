@@ -23,7 +23,7 @@ html:has(.swarm) {
 .swarm-poster {
   z-index: 0;
   object-fit: cover;
-  object-position: 68% 42%;
+  object-position: 70% 46%;
   background: #111315;
 }
 
@@ -41,7 +41,7 @@ html:has(.swarm) {
 }
 
 .swarm-vignette {
-  background: radial-gradient(ellipse at 68% 44%, transparent 40%, rgba(0, 0, 0, 0.42) 100%);
+  background: radial-gradient(ellipse at 70% 46%, transparent 40%, rgba(0, 0, 0, 0.42) 100%);
 }
 
 .swarm-grain {
@@ -211,7 +211,7 @@ html:has(.swarm) {
 }
 
 @media (max-width: 760px) {
-  .swarm-poster { object-position: 50% 18%; }
+  .swarm-poster { object-position: 50% 24%; }
   .swarm-hero { padding: 0 24px 56px; }
   .swarm-copy { width: 100%; }
   .swarm-copy h1 { max-width: 8.4em; }

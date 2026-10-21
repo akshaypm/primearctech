@@ -23,7 +23,7 @@ describe("swarm creature", () => {
     expect(shardsFromBake(bake, desktop, 11)).toHaveLength(desktop);
   });
 
-  it("reads as one hawk, with outward shards and an orange nervous system", () => {
+  it("reads as a spread-wing raptor, with feathers lying on the surface", () => {
     const shards = shardsFromBake(loadBake(), 12288, 11);
     const xs = shards.map((shard) => shard.home[0]);
     const ys = shards.map((shard) => shard.home[1]);
@@ -34,29 +34,37 @@ describe("swarm creature", () => {
     const spanX = maxX - minX;
     const spanY = maxY - minY;
     const picture = asciiSilhouette(shards, 78, 28).text;
-    expect(spanX, picture).toBeGreaterThan(spanY * 1.6);
-    const left = shards.filter((shard) => shard.home[0] < minX + spanX * 0.16 && shard.home[1] > minY + spanY * 0.35);
-    expect(left.length, picture).toBeGreaterThan(40);
-    const body = shards.filter((shard) => {
-      const x = (shard.home[0] - minX) / spanX;
-      const y = (shard.home[1] - minY) / spanY;
-      return x > 0.32 && x < 0.68 && y > 0.28 && y < 0.72;
+    expect(spanX, picture).toBeGreaterThan(spanY * 0.9);
+    const at = (shard: (typeof shards)[number]) => ({
+      x: (shard.home[0] - minX) / spanX,
+      y: (shard.home[1] - minY) / spanY,
     });
-    expect(body.length / shards.length, picture).toBeGreaterThan(0.08);
+    const head = shards.filter((shard) => {
+      const p = at(shard);
+      return p.x < 0.5 && p.y > 0.84;
+    });
+    expect(head.length, picture).toBeGreaterThan(40);
+    const wingTip = shards.filter((shard) => {
+      const p = at(shard);
+      return p.x > 0.72 && p.y < 0.55;
+    });
+    expect(wingTip.length, picture).toBeGreaterThan(80);
     const seam = shards.filter((shard) => shard.seamFlag > 0.5).length / shards.length;
-    expect(seam).toBeGreaterThan(0.03);
-    expect(seam).toBeLessThan(0.05);
+    expect(seam).toBeGreaterThan(0.01);
+    expect(seam).toBeLessThan(0.02);
     const wings = shards.filter((shard) => shard.wing > 0.5).length / shards.length;
-    expect(wings).toBeGreaterThan(0.2);
+    expect(wings).toBeGreaterThan(0.45);
     let align = 0;
     for (const shard of shards) {
       const tangent = Math.hypot(...shard.tangent);
       expect(tangent).toBeGreaterThan(0.9);
       expect(tangent).toBeLessThan(1.1);
-      align += shard.tangent[0] * shard.normal[0] + shard.tangent[1] * shard.normal[1] + shard.tangent[2] * shard.normal[2];
+      align += Math.abs(
+        shard.tangent[0] * shard.normal[0] + shard.tangent[1] * shard.normal[1] + shard.tangent[2] * shard.normal[2],
+      );
       expect(Number.isFinite(shard.home[0] + shard.length + shard.rough)).toBe(true);
     }
-    expect(align / shards.length).toBeGreaterThan(0.9);
+    expect(align / shards.length).toBeLessThan(0.12);
   });
 });
 
@@ -103,7 +111,7 @@ describe("swarm copy and assets", () => {
     expect(sounds).toContain("Web Audio");
     const assets = readFileSync("public/lab/swarm/ASSETS.md", "utf8");
     expect(assets).toContain("CC0");
-    expect(assets).toContain("https://zenodo.org/records/10325804");
-    expect(assets).toContain("sketchfab.com/3d-models/rough-legged-buzzard");
+    expect(assets).toContain("https://opengameart.org/content/animated-animales-low-poly");
+    expect(assets).toContain("Quaternius");
   });
 });

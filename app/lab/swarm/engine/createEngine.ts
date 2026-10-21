@@ -1,6 +1,7 @@
 import gsap from "gsap";
 import * as THREE from "three";
 import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { createAudio } from "./audio";
 import { DESKTOP_GRID, MOBILE_GRID, SWARM_SEED, shardsFromBake, type Shard } from "./creature";
 import { frameFor, type SwarmFrame } from "./frame";
@@ -110,6 +111,7 @@ export function createEngine(options: Options): SwarmHandle {
   const group = new THREE.Group();
   scene.add(group);
   let display: THREE.ShaderMaterial | null = null;
+  let backgroundMat: THREE.ShaderMaterial | null = null;
 
   function report(value: number) {
     if (!disposed) options.onProgress(Math.max(0, Math.min(1, value)));
@@ -122,6 +124,11 @@ export function createEngine(options: Options): SwarmHandle {
     camera.position.set(0, next.camY, next.camZ);
     camera.lookAt(next.lookX, next.lookY, 0);
     camera.updateProjectionMatrix();
+    if (backgroundMat && renderer) {
+      const portrait = window.innerWidth / Math.max(1, window.innerHeight) < 0.92;
+      backgroundMat.uniforms.uCenter.value.set(portrait ? 0.5 : 0.7, portrait ? 0.76 : 0.54);
+      backgroundMat.uniforms.uResolution.value.set(renderer.domElement.width, renderer.domElement.height);
+    }
   }
 
   function resize() {
@@ -451,17 +458,46 @@ export function createEngine(options: Options): SwarmHandle {
       velVar = velocityVar;
       report(0.82);
 
-      const top = new THREE.Color("#191c1f");
-      const bottom = new THREE.Color("#111315");
+      const room = new RoomEnvironment();
+      const cubeTarget = new THREE.WebGLCubeRenderTarget(256, {
+        type: THREE.HalfFloatType,
+        generateMipmaps: true,
+        minFilter: THREE.LinearMipmapLinearFilter,
+      });
+      cubeTarget.texture.colorSpace = THREE.LinearSRGBColorSpace;
+      const cubeCamera = new THREE.CubeCamera(0.1, 80, cubeTarget);
+      const savedTone = renderer.toneMapping;
+      const savedExposure = renderer.toneMappingExposure;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 0.9;
+      cubeCamera.update(renderer, room);
+      renderer.toneMapping = savedTone;
+      renderer.toneMappingExposure = savedExposure;
+      room.traverse((node) => {
+        const mesh = node as THREE.Mesh;
+        mesh.geometry?.dispose();
+        const material = mesh.material;
+        if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
+        else material?.dispose();
+      });
+      disposables.push(cubeTarget);
+
       const background = new THREE.Mesh(
         new THREE.PlaneGeometry(48, 28),
         new THREE.ShaderMaterial({
-          uniforms: { uTop: { value: top }, uBottom: { value: bottom } },
+          uniforms: {
+            uInk: { value: new THREE.Color("#111315") },
+            uLift: { value: new THREE.Color("#191C1F") },
+            uResolution: { value: new THREE.Vector2(renderer.domElement.width, renderer.domElement.height) },
+            uCenter: { value: new THREE.Vector2(0.7, 0.54) },
+          },
           vertexShader: backgroundVertex,
           fragmentShader: backgroundFragment,
           depthWrite: false,
         }),
       );
+      backgroundMat = background.material as THREE.ShaderMaterial;
+      applyFrame(frame);
       background.position.set(0, 0.2, -3);
       background.frustumCulled = false;
       scene.add(background);
@@ -477,17 +513,19 @@ export function createEngine(options: Options): SwarmHandle {
           uExtra: { value: textures.extra.texture },
           uOrigin: sim.uOrigin,
           uGrid: { value: new THREE.Vector2(grid.x, grid.y) },
-          uShard: { value: mobile ? 0.17 : 0.15 },
-          uGirth: { value: mobile ? 0.34 : 0.28 },
+          uShard: { value: mobile ? 0.2 : 0.2 },
+          uGirth: { value: mobile ? 0.3 : 0.3 },
           uTime: sim.uTime,
           uMode: sim.uMode,
           uPulse: sim.uPulse,
           uOrange: { value: new THREE.Color("#D8643E") },
           uMineral: { value: new THREE.Color("#F1EFE9") },
+          uSteel: { value: new THREE.Color("#C9CED2") },
+          uEnv: { value: cubeTarget.texture },
         },
         vertexShader: displayVertex,
         fragmentShader: displayFragment,
-        side: THREE.FrontSide,
+        side: THREE.DoubleSide,
       });
       const mesh = new THREE.InstancedMesh(createSliver(), display, count);
       mesh.frustumCulled = false;

@@ -1,4 +1,4 @@
-/** Desktop puts the hawk in the right half, seen from slightly below. Portrait lifts it above the headline. */
+/** Desktop keeps the eagle in the right half. Portrait fills the top half, wings spread. */
 
 export type SwarmFrame = {
   x: number;
@@ -17,25 +17,25 @@ export function frameFor(width: number, height: number): SwarmFrame {
   if (aspect < 0.92) {
     return {
       x: 0,
-      y: 0.88,
-      scale: 0.68,
+      y: 1.15,
+      scale: 0.64,
       yaw: 0,
-      camZ: 7.35,
-      camY: -0.08,
+      camZ: 6.8,
+      camY: 0.04,
       lookX: 0,
-      lookY: 0.16,
-      fov: 36,
+      lookY: 0.15,
+      fov: 32,
     };
   }
   return {
-    x: 0.95,
-    y: 0.04,
-    scale: 1.02,
-    yaw: -0.02,
-    camZ: 5.15,
-    camY: -0.42,
-    lookX: 0.42,
-    lookY: 0.06,
-    fov: 28,
+    x: 1.25,
+    y: 0.1,
+    scale: 0.78,
+    yaw: 0,
+    camZ: 6.5,
+    camY: 0.06,
+    lookX: 0.35,
+    lookY: 0.02,
+    fov: 26,
   };
 }

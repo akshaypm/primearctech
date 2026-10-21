@@ -142,18 +142,6 @@ await hiPage.waitForFunction(() => window.__SWARM__ && window.__SWARM__.phase ==
 perf.dprCap = await hiPage.evaluate(() => ({ dpr: window.__SWARM__.dpr, count: window.__SWARM__.count }));
 await hi.close();
 
-const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
-const stillPage = await still.newPage();
-await stillPage.goto("http://localhost:4173/lab/swarm", { waitUntil: "networkidle" });
-await stillPage.waitForTimeout(400);
-await stillPage.screenshot({ path: `${root}/1440-reduced-motion.png` });
-perf.reduced = await stillPage.evaluate(() => ({
-  className: document.querySelector(".swarm")?.className,
-  canvas: getComputedStyle(document.querySelector(".swarm-canvas")).display,
-  loader: getComputedStyle(document.querySelector(".swarm-loader")).display,
-}));
-await still.close();
-
 const posterPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 await posterPage.goto("http://localhost:4173/lab/swarm", { waitUntil: "domcontentloaded" });
 await waitLive(posterPage);
@@ -166,7 +154,6 @@ await posterPage.evaluate(() => {
 await posterPage.waitForTimeout(200);
 const raw = await posterPage.screenshot({ type: "png" });
 await posterPage.close();
-await browser.close();
 
 let quality = 68;
 let poster = await sharp(raw).webp({ quality }).toBuffer();
@@ -176,6 +163,20 @@ while (poster.length > 200 * 1024 && quality > 32) {
 }
 await writeFile("public/lab/swarm/poster.webp", poster);
 perf.poster = { bytes: poster.length, quality };
+
+const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+const stillPage = await still.newPage();
+await stillPage.goto("http://localhost:4173/lab/swarm", { waitUntil: "networkidle" });
+await stillPage.waitForTimeout(500);
+await stillPage.screenshot({ path: `${root}/1440-reduced-motion.png` });
+perf.reduced = await stillPage.evaluate(() => ({
+  className: document.querySelector(".swarm")?.className,
+  canvas: getComputedStyle(document.querySelector(".swarm-canvas")).display,
+  loader: getComputedStyle(document.querySelector(".swarm-loader")).display,
+}));
+await still.close();
+await browser.close();
+
 perf.logs = logs;
 await writeFile(`${root}/perf.json`, JSON.stringify(perf, null, 2));
 console.log(JSON.stringify(perf, null, 2));

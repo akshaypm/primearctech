@@ -164,6 +164,7 @@ uniform float uMode;
 uniform float uPulse;
 
 varying vec3 vViewN;
+varying vec3 vWorldN;
 varying vec3 vViewPos;
 varying vec3 vWorld;
 varying float vRough;
@@ -188,12 +189,17 @@ void main() {
 
   float speed = length(vel);
   vec3 T = normalize(tangent);
+  vec3 Nsurf = normalize(coatN);
   if (speed > 0.04) {
     T = normalize(mix(T, vel / speed, smoothstep(0.04, 0.75, speed)));
   }
-  vec3 side = abs(T.y) > 0.92 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-  vec3 B = normalize(cross(T, side));
-  vec3 Nn = cross(B, T);
+  vec3 B = cross(T, Nsurf);
+  if (dot(B, B) < 1e-4) {
+    vec3 side = abs(T.y) > 0.92 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+    B = cross(T, side);
+  }
+  B = normalize(B);
+  vec3 Nn = normalize(cross(B, T));
   float twist = shape.y;
   float c = cos(twist);
   float s = sin(twist);
@@ -211,24 +217,16 @@ void main() {
     float settle = smoothstep(0.1, 0.36, cycle) * (1.0 - smoothstep(0.5, 0.86, cycle));
     pos.y -= settle * wing * 0.035;
   }
-  vec3 worldP = (modelMatrix * vec4(pos, 1.0)).xyz;
-  vec3 worldN = normalize(mat3(modelMatrix) * coatN);
-  float facing = dot(worldN, normalize(cameraPosition - worldP));
-  float shell = smoothstep(-0.32, 0.04, facing);
-  float fringe = smoothstep(0.72, 0.08, facing);
-  float crown = smoothstep(0.88, 0.74, lenAttr);
-  float reach = mix(1.0, 0.66, fringe) * mix(1.0, 0.46, crown);
-  if (seam > 0.5) reach *= 1.2;
-  pos += coatN * lenAttr * uShard * 0.04 * shell;
   float along = position.y + 0.5;
-  vec3 local = ((X * position.x * width + Z * position.z * thin) * uGirth + T * along * lenAttr * squeeze * uShard * reach) * shell;
+  vec3 local = (X * position.x * width + Z * position.z * thin) * uGirth + T * along * lenAttr * squeeze * uShard;
 
   vec3 nLocal = normalize(X * normal.x + T * normal.y + Z * normal.z);
   vec4 world = modelMatrix * vec4(pos + local, 1.0);
   vec4 viewPos = viewMatrix * world;
   vWorld = world.xyz;
   vViewPos = viewPos.xyz;
-  vViewN = normalize(mat3(viewMatrix) * mat3(modelMatrix) * nLocal);
+  vWorldN = normalize(mat3(modelMatrix) * nLocal);
+  vViewN = normalize(mat3(viewMatrix) * vWorldN);
   vRough = shape.x;
   vSeam = seam;
   vAo = shape.z;
@@ -239,8 +237,11 @@ void main() {
 export const displayFragment = /* glsl */ `
 uniform vec3 uOrange;
 uniform vec3 uMineral;
+uniform vec3 uSteel;
+uniform samplerCube uEnv;
 
 varying vec3 vViewN;
+varying vec3 vWorldN;
 varying vec3 vViewPos;
 varying vec3 vWorld;
 varying float vRough;
@@ -250,23 +251,38 @@ varying float vAo;
 void main() {
   vec3 N = normalize(vViewN);
   vec3 V = normalize(-vViewPos);
-  vec3 keyL = normalize(vec3(-0.64, 0.72, 0.38));
-  vec3 rimL = normalize(vec3(0.16, 0.28, -0.94));
-  float ndk = max(dot(N, keyL), 0.0);
-  float ndr = max(dot(N, rimL), 0.0);
-  vec3 H = normalize(keyL + V);
+  vec3 Nw = normalize(vWorldN);
+  vec3 worldV = normalize(cameraPosition - vWorld);
+  vec3 keyL = normalize(vec3(-0.42, 0.78, 0.42));
+  float ndk = dot(N, keyL);
   float rough = clamp(vRough, 0.0, 1.0);
-  float spec = pow(max(dot(N, H), 0.0), mix(210.0, 96.0, rough));
-  float fres = pow(1.0 - max(dot(N, V), 0.0), 4.4);
   float salt = fract(sin(dot(vWorld.xy, vec2(19.13, 47.77))) * 43758.5453);
-  vec3 dark = vec3(0.008, 0.009, 0.011);
-  vec3 color = dark * (0.28 + 1.05 * ndk);
-  color += uMineral * spec * 2.15;
-  color += uMineral * fres * (0.015 + 0.72 * ndr);
-  color *= 0.92 + salt * 0.1;
+  vec3 albedo = mix(uSteel, uMineral, 0.28 + salt * 0.62);
+
+  float wrap = clamp(ndk * 0.45 + 0.62, 0.0, 1.0);
+  float cavity = smoothstep(0.35, -0.25, ndk) * smoothstep(0.65, 0.08, max(dot(N, V), 0.0));
+  vec3 crevice = vec3(0.62, 0.64, 0.66);
+  vec3 shade = albedo * mix(0.9, 1.0, wrap);
+  shade = mix(shade, shade * crevice, cavity * 0.8);
+
+  vec3 R = reflect(-worldV, Nw);
+  vec3 env = textureCube(uEnv, R, mix(0.0, 3.5, rough)).rgb;
+  float envLuma = dot(env, vec3(0.2126, 0.7152, 0.0722));
+  env = mix(vec3(envLuma), env, 0.22);
+  env *= vec3(0.94, 0.97, 1.0);
+  env = env / (env + vec3(0.85));
+
+  vec3 H = normalize(keyL + V);
+  float spec = pow(max(dot(N, H), 0.0), mix(360.0, 180.0, rough));
+  float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
+  vec3 color = shade * mix(vec3(0.82), vec3(1.0), clamp(env, 0.0, 1.0));
+  color += env * (0.08 + fres * 0.22);
+  color += vec3(1.0) * spec * mix(0.85, 0.45, rough);
+  color = min(color, vec3(1.05));
+
   if (vSeam > 0.5) {
-    color = uOrange * (0.62 + 0.55 * ndk) + uOrange * 0.72;
-    color += uMineral * spec * 0.12;
+    color = uOrange * (0.82 + 0.18 * clamp(ndk, 0.0, 1.0));
+    color += vec3(1.0) * spec * 0.08;
   }
   gl_FragColor = linearToOutputTexel(vec4(color, 1.0));
 }
@@ -281,12 +297,15 @@ void main() {
 `;
 
 export const backgroundFragment = /* glsl */ `
-varying vec2 vUv;
-uniform vec3 uTop;
-uniform vec3 uBottom;
+uniform vec3 uInk;
+uniform vec3 uLift;
+uniform vec2 uResolution;
+uniform vec2 uCenter;
 void main() {
-  float h = smoothstep(0.0, 1.0, vUv.y);
-  vec3 col = mix(uBottom, uTop, h);
+  vec2 uv = gl_FragCoord.xy / uResolution;
+  float d = distance(uv, uCenter);
+  float lift = smoothstep(0.52, 0.04, d);
+  vec3 col = mix(uInk, uLift, lift);
   gl_FragColor = linearToOutputTexel(vec4(col, 1.0));
 }
 `;

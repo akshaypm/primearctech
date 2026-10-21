@@ -12,8 +12,8 @@
 
  Test Files  6 passed (6)
       Tests  26 passed (26)
-   Start at  08:11:12
-   Duration  523ms (transform 224ms, setup 0ms, import 437ms, tests 434ms, environment 0ms)
+   Start at  08:46:48
+   Duration  565ms (transform 233ms, setup 0ms, import 448ms, tests 420ms, environment 0ms)
 
 
 > fieldrelay-premium-homepage@0.1.0 test:rendered
@@ -29,24 +29,24 @@
 [1/5] analyze client references...
 [2Ktransforming...✓ 449 modules transformed.
 rendering chunks...
-✓ built in 657ms
+✓ built in 697ms
 [2/5] analyze server references...
 [2Ktransforming...✓ 5175 modules transformed.
 rendering chunks...
 [33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
-  - vinext:middleware-server-only (36%)
-  - vinext:og-inline-fetch-assets (32%)
-  - vinext:css-data-url (8%)
-  - alias (8%)
+  - vinext:og-inline-fetch-assets (35%)
+  - vinext:middleware-server-only (30%)
+  - alias (9%)
+  - vinext:css-data-url (7%)
   - rsc:virtual-client-package (6%)
 See https://rolldown.rs/options/checks#plugintimings for more details.
 
-✓ built in 3.69s
+✓ built in 3.64s
 [3/5] build rsc environment...
 [2Ktransforming...✓ 448 modules transformed.
 rendering chunks...
 computing gzip size...
-✓ built in 617ms
+✓ built in 585ms
 [4/5] build client environment...
 [2Ktransforming...✓ 5184 modules transformed.
 rendering chunks...
@@ -57,28 +57,28 @@ computing gzip size...
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
 [33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
-  - vinext:og-inline-fetch-assets (35%)
-  - vinext:middleware-server-only (34%)
-  - vinext:css-data-url (7%)
+  - vinext:og-inline-fetch-assets (36%)
+  - vinext:middleware-server-only (28%)
+  - vinext:css-data-url (9%)
+  - alias (7%)
   - rsc:virtual-client-package (6%)
-  - alias (6%)
 See https://rolldown.rs/options/checks#plugintimings for more details.
 
-✓ built in 4.19s
+✓ built in 4.22s
 [5/5] build ssr environment...
-[2Ktransforming...  Precompressed 38 assets (73.2% smaller with brotli)
+[2Ktransforming...  Precompressed 39 assets (73.2% smaller with brotli)
 ✓ 5181 modules transformed.
 rendering chunks...
 computing gzip size...
 [33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
-  - vinext:og-inline-fetch-assets (38%)
-  - vinext:middleware-server-only (31%)
-  - alias (9%)
-  - vinext:css-data-url (7%)
-  - rsc:virtual-client-package (6%)
+  - vinext:og-inline-fetch-assets (35%)
+  - vinext:middleware-server-only (34%)
+  - vinext:css-data-url (8%)
+  - rsc:virtual-client-package (7%)
+  - alias (6%)
 See https://rolldown.rs/options/checks#plugintimings for more details.
 
-✓ built in 3.68s
+✓ built in 3.55s
 [0m
   Route (app)
   ┌ ? /                    
@@ -113,13 +113,13 @@ TAP version 13
 # Subtest: production bundle contains the PrimeArcTech and FieldRelay conversion pages
 ok 1 - production bundle contains the PrimeArcTech and FieldRelay conversion pages
   ---
-  duration_ms: 73.199954
+  duration_ms: 53.668818
   type: 'test'
   ...
 # Subtest: production output includes every purpose-built section image
 ok 2 - production output includes every purpose-built section image
   ---
-  duration_ms: 5.49905
+  duration_ms: 5.15794
   type: 'test'
   ...
 1..2
@@ -130,4 +130,4 @@ ok 2 - production output includes every purpose-built section image
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 121.041752
+# duration_ms 99.647851
