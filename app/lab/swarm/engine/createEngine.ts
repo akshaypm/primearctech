@@ -111,6 +111,7 @@ export function createEngine(options: Options): SwarmHandle {
   let lockDuration = 1.12;
   const lock = { t: 0 };
   let lockTween: gsap.core.Tween | null = null;
+  let lockPoll: number | null = null;
   const frames: number[] = [];
   const cursorWorld = new THREE.Vector3(80, 80, 80);
   const flashPoint = new THREE.Vector3();
@@ -618,14 +619,66 @@ export function createEngine(options: Options): SwarmHandle {
     stats.tickMs = performance.now() - tickStart;
     stats.pulse = burstT >= 0 ? burstT : 100;
 
-    if (phase === "lock") audio.followLock(lock.t);
-    if (phase === "lock" && lock.t >= 1) {
-      phase = "live";
-      stats.phase = "live";
-      if (uniforms) uniforms.uFade.value = 1;
-      if (falcon) falcon.visible = true;
-      options.onLive();
+    if (phase === "lock") syncLock();
+  }
+
+  function stopLockPoll() {
+    if (lockPoll == null) return;
+    window.clearInterval(lockPoll);
+    lockPoll = null;
+  }
+
+  function ensureLockPoll() {
+    if (lockPoll != null || typeof window === "undefined") return;
+    lockPoll = window.setInterval(() => {
+      if (phase !== "lock") {
+        stopLockPoll();
+        return;
+      }
+      const driven = audio.readLock();
+      if (driven == null) return;
+      lock.t = driven;
+      if (driven >= 1) completeLock();
+    }, 10);
+  }
+
+  function completeLock() {
+    if (phase !== "lock") return;
+    stopLockPoll();
+    lockTween?.kill();
+    lockTween = null;
+    lock.t = 1;
+    phase = "live";
+    stats.phase = "live";
+    if (uniforms) uniforms.uFade.value = 1;
+    if (falcon) falcon.visible = true;
+    audio.mark("lock");
+    options.onLive();
+  }
+
+  function syncLock() {
+    audio.onLock(lockDuration, lock.t);
+    const driven = audio.readLock();
+    if (driven != null) {
+      ensureLockPoll();
+      if (lockTween) {
+        lockTween.kill();
+        lockTween = null;
+      }
+      lock.t = driven;
     }
+    if (lock.t >= 1) completeLock();
+  }
+
+  function resumeLockTween() {
+    if (phase !== "lock" || lockTween || lock.t >= 1) return;
+    const remaining = Math.max(0.05, lockDuration * (1 - lock.t));
+    lockTween = gsap.to(lock, {
+      t: 1,
+      duration: remaining,
+      ease: "none",
+      onComplete: () => completeLock(),
+    });
   }
 
   function startLock(fast?: boolean) {
@@ -635,17 +688,19 @@ export function createEngine(options: Options): SwarmHandle {
     lock.t = 0;
     lockDuration = fast ? 0.46 : 1.12;
     lockTween?.kill();
+    lockTween = null;
     audio.mark("lock-start", fast ? "fast" : "full");
     audio.onLock(lockDuration, 0);
-    lockTween = gsap.to(lock, {
-      t: 1,
-      duration: lockDuration,
-      ease: "none",
-      onComplete: () => {
-        audio.followLock(1);
-        audio.mark("lock");
-      },
-    });
+    if (audio.readLock() == null) {
+      lockTween = gsap.to(lock, {
+        t: 1,
+        duration: lockDuration,
+        ease: "none",
+        onComplete: () => completeLock(),
+      });
+    } else {
+      ensureLockPoll();
+    }
     options.onLockStart();
   }
 
@@ -655,6 +710,7 @@ export function createEngine(options: Options): SwarmHandle {
 
   function cleanup() {
     disposed = true;
+    stopLockPoll();
     gsap.ticker.remove(keepTickerAwake);
     gsap.ticker.remove(tick);
     lockTween?.kill();
@@ -956,7 +1012,9 @@ export function createEngine(options: Options): SwarmHandle {
     },
     setSound(on) {
       audio.setEnabled(on, { gesture: true });
-      if (on && phase === "lock") audio.onLock(lockDuration, lock.t);
+      if (phase !== "lock") return;
+      if (on) syncLock();
+      else resumeLockTween();
     },
     dispose() {
       if (!disposed) cleanup();

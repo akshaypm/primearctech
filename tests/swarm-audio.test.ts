@@ -11,10 +11,14 @@ import {
   FADE_OUT_SEC,
   HOVER_GAIN,
   HOVER_GAP_MS,
+  LOCK_FLEX_SEC,
+  STINGER_MIN_LEAD,
   bufferPeakTime,
   createAudio,
   extensionFor,
+  lockAtFor,
   reassembleStart,
+  stingerLead,
   stingerStart,
 } from "../app/lab/swarm/engine/audio";
 
@@ -209,6 +213,12 @@ describe("swarm audio format and timing", () => {
     const early = stingerStart(0.5, 1.12);
     expect(early.offset).toBe(0);
     expect(early.delay).toBeCloseTo(0.62, 5);
+    expect(lockAtFor(10, 3.44, 2.32)).toBeCloseTo(11.12, 5);
+    expect(stingerLead(1.12, 3.44)).toBeCloseTo(1.12, 5);
+    expect(stingerLead(0.46, 3.44)).toBeCloseTo(0.46, 5);
+    expect(stingerLead(STINGER_MIN_LEAD - 0.01, 3.44)).toBeNull();
+    expect(stingerLead(1.12, 0.5)).toBeNull();
+    expect(LOCK_FLEX_SEC).toBe(0.3);
     const reassembled = reassembleStart(1.03, 1.65);
     expect(reassembled.offset).toBe(0);
     expect(reassembled.delay).toBeCloseTo(0.62, 5);
@@ -332,30 +342,18 @@ describe("swarm audio playback gate", () => {
     const stinger = rig.sources.find((source) => source.buffer?.duration === 5.55);
     expect(stinger?.started?.when).toBe(0);
     expect(stinger?.started?.offset).toBeCloseTo(2.32, 5);
+    expect(stinger?.dest?.gain.value).toBe(1);
     expect(rig.audio.events.some((event) => event.name === "stinger" && event.detail?.includes("impact=3.440"))).toBe(true);
-    clock.t = 4016;
-    rig.ctx.currentTime = 0.016;
-    rig.audio.followLock(0.016 / 1.12);
-    expect(stinger?.dest?.gain.events.some((event) => event.method === "set" && event.value === 1 && event.time === 0.016)).toBe(true);
-    expect(stinger?.dest?.gain.events.some((event) => event.method === "linear" && event.value === 0 && event.time === 0.136)).toBe(true);
-
-    const stalled = harness({ clock });
-    stalled.audio.setEnabled(true, { gesture: true });
-    await settled();
-    clock.t = 8000;
-    stalled.audio.onLock(1.12);
-    clock.t = 9500;
-    stalled.ctx.currentTime = 1.5;
-    stalled.audio.followLock(0.05);
-    const retriggered = stalled.sources.filter((source) => source.buffer?.duration === 5.55);
-    expect(retriggered.length).toBeGreaterThan(1);
-    expect(retriggered.at(-1)?.started?.offset).toBeCloseTo(3.44 - 1.12 * 0.95, 2);
+    rig.ctx.currentTime = 0.56;
+    expect(rig.audio.readLock()).toBeCloseTo(0.5, 5);
+    rig.ctx.currentTime = 1.12;
+    expect(rig.audio.readLock()).toBe(1);
+    expect(rig.audio.events.some((event) => event.name === "stinger-hit")).toBe(true);
 
     const late = harness();
     late.audio.setEnabled(true);
     late.audio.onLock(0.2);
     expect(late.fetches).toEqual([]);
-    clock.t = 0;
     const lateClock = { t: 0 };
     const missed = harness({ clock: lateClock });
     missed.audio.setEnabled(true);
@@ -366,6 +364,35 @@ describe("swarm audio playback gate", () => {
     expect(missed.sources.some((source) => source.buffer?.duration === 5.55)).toBe(false);
     expect(missed.sources.some((source) => source.loop)).toBe(true);
     expect(missed.audio.events.some((event) => event.name === "stinger-skip")).toBe(true);
+  });
+
+  it("starts the stinger source at most once per page load", async () => {
+    const rig = harness();
+    rig.audio.setEnabled(true, { gesture: true });
+    await settled();
+    rig.audio.onLock(1.12, 0);
+    for (let step = 1; step <= 8; step++) {
+      rig.ctx.currentTime = step * 0.3;
+      rig.audio.onLock(1.12, Math.min(0.99, step / 8));
+      rig.audio.readLock();
+    }
+    rig.ctx.currentTime = 4;
+    rig.audio.onLock(1.12, 0.4);
+    rig.audio.setEnabled(false);
+    rig.audio.setEnabled(true, { gesture: true });
+    await settled();
+    rig.audio.onLock(1.12, 0.2);
+    const stingers = rig.sources.filter((source) => source.buffer?.duration === 5.55);
+    expect(stingers).toHaveLength(1);
+
+    const late = harness();
+    late.audio.setEnabled(true, { gesture: true });
+    await settled();
+    const before = late.sources.length;
+    late.audio.onLock(1.12, 0.8);
+    expect(late.sources).toHaveLength(before);
+    expect(late.audio.readLock()).toBeNull();
+    expect(late.audio.events.some((event) => event.name === "stinger-skip" && event.detail === "late")).toBe(true);
   });
 
   it("throttles hover, keeps it quieter, and skips it for reduced motion", async () => {

@@ -7,7 +7,7 @@ Playback is one Web Audio `AudioContext`. The page prefers `.ogg` when `canPlayT
 | Moment | File | Behaviour |
 | --- | --- | --- |
 | Bed | `ambient-loop` | Looping `AudioBufferSourceNode` (`loop = true`, not an `<audio loop>` element). Fades in over 2.5 s and out over 0.6 s. About −6 dB under the SFX bus. Ducks about 4 dB for 0.8 s when shatter plays. The context suspends while the tab is hidden. |
-| Falcon lock | `boot-stinger` | If sound is already on during the loader, the impact (the peak sample in the decoded buffer, about 3.4 s) is aligned to the lock frame. If sound is turned on after that frame, the stinger does not play. |
+| Falcon lock | `boot-stinger` | Scheduled once. When sound is already on, the lock reads the audio clock and ends at `currentTime + (impact - offset)`, on the peak sample (about 3.4 s). The picture may run up to 300 ms longer or shorter so it meets that time. Turning sound on with under 0.25 s of lock left does not start the stinger. |
 | Click burst | `shatter` | Starts with the burst. A shatter that is already playing fades out over 50 ms. Detune is ±40 cents. |
 | Return | `reassemble` | Scheduled so the file ends as the beak-to-tail return completes. |
 | Cursor dissolve | `hover` | Plays when the dissolve begins, at most once every 700 ms, about −3 dB under the SFX bus, detune ±60 cents. No hover sound on touch, and none when `prefers-reduced-motion` is set. |

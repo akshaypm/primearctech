@@ -21,7 +21,8 @@ export const DUCK_RELEASE_SEC = 0.12;
 export const HOVER_GAP_MS = 700;
 export const SHATTER_CENTS = 40;
 export const HOVER_CENTS = 60;
-export const LOCK_LATE_SEC = 0.02;
+export const STINGER_MIN_LEAD = 0.25;
+export const LOCK_FLEX_SEC = 0.3;
 export const COMPRESSOR = { threshold: -6, ratio: 4, knee: 12, attack: 0.01, release: 0.2 };
 
 export type AudioEvent = { t: number; name: string; detail?: string };
@@ -56,7 +57,8 @@ export type SwarmAudio = {
   setEnabled: (on: boolean, opts?: { gesture?: boolean }) => void;
   unlock: () => Promise<void>;
   onLock: (durationSeconds: number, progress?: number) => void;
-  followLock: (progress: number) => void;
+  /** Picture progress driven by the audio clock, or null when the stinger is not running. */
+  readLock: () => number | null;
   onBurst: (endsInSeconds: number) => void;
   hover: () => void;
   mark: (name: string, detail?: string) => void;
@@ -87,6 +89,24 @@ export function stingerStart(impact: number, lockIn: number): { offset: number; 
   const lead = Math.max(0, lockIn);
   if (impact <= lead) return { offset: 0, delay: lead - impact };
   return { offset: impact - lead, delay: 0 };
+}
+
+/** Audio-clock time of the impact sample. `lockAt = currentTime + (impact - offset)`. */
+export function lockAtFor(currentTime: number, impact: number, offset: number): number {
+  return currentTime + (impact - offset);
+}
+
+/**
+ * How long the picture should run so it meets the impact.
+ * The designed remainder is kept when the file can hit it.
+ * Otherwise the picture may flex by ±300 ms. Null means skip the stinger.
+ */
+export function stingerLead(nominalRemaining: number, impact: number): number | null {
+  const nominal = Math.max(0, nominalRemaining);
+  if (nominal < STINGER_MIN_LEAD) return null;
+  const lead = Math.min(nominal, Math.max(0, impact));
+  if (Math.abs(lead - nominal) > LOCK_FLEX_SEC + 1e-6) return null;
+  return lead;
 }
 
 /** Place reassemble so the buffer ends when the return finishes. */
@@ -166,20 +186,12 @@ export function createAudio(deps: AudioDeps = {}): SwarmAudio {
   let session = 0;
   let pendingActivate: Promise<void> | null = null;
   let stingerState: "idle" | "armed" | "starting" | "played" | "skipped" = "idle";
-  let pendingLock: { remaining: number; at: number } | null = null;
+  let pendingLock: { origin: number; at: number } | null = null;
   let lockSpan = 0;
-  let lockProgress = 0;
-  let lockSeen = false;
+  let lockFrom = 0;
   let stingerImpact = -1;
-  const STINGER_LEASH = 0.12;
-  let lockFollow: {
-    impact: number;
-    originOffset: number;
-    originTime: number;
-    audible: boolean;
-    heard: boolean;
-    lastMs: number;
-  } | null = null;
+  let lockDrive: { startAt: number; lockAt: number; from: number; hit: boolean } | null = null;
+  let lockArmedMarked = false;
   let pendingBurst: { endsIn: number; at: number } | null = null;
   let lastHover = -Infinity;
   let ambientSource: AudioBufferSourceNode | null = null;
@@ -425,72 +437,46 @@ export function createAudio(deps: AudioDeps = {}): SwarmAudio {
     voices.push({ kind, source, gain, when });
   }
 
-  function stingerPlayhead() {
-    if (!lockFollow || !ctx) return 0;
-    return lockFollow.originOffset + Math.max(0, ctx.currentTime - lockFollow.originTime);
-  }
-
-  function stingerVoice() {
-    return voices.filter((item) => item.kind === "stinger").at(-1) ?? null;
-  }
-
-  function leashStinger(level: number) {
-    if (!lockFollow || !ctx || lockFollow.heard) return;
-    const voice = stingerVoice();
-    if (!voice) return;
-    const at = ctx.currentTime;
-    voice.gain.gain.cancelScheduledValues(at);
-    voice.gain.gain.setValueAtTime(level, at);
-    voice.gain.gain.linearRampToValueAtTime(0, at + STINGER_LEASH);
-  }
-
-  function openStinger() {
-    if (!lockFollow || lockFollow.audible) return;
-    lockFollow.audible = true;
-    leashStinger(1);
-    mark("stinger-open");
+  function skipStinger(reason: string) {
+    if (stingerState === "played" || stingerState === "skipped") return;
+    stingerState = "skipped";
+    pendingLock = null;
+    lockDrive = null;
+    mark("stinger-skip", reason);
   }
 
   function beginStinger(progress: number) {
+    if (stingerState === "played" || stingerState === "skipped") return;
     if (!buffers || !ctx || !enabled || !unlocked || disposed || lockSpan <= 0) return;
-    const buffer = buffers["boot-stinger"];
-    if (stingerImpact < 0) stingerImpact = bufferPeakTime(buffer);
-    const lead = Math.max(0, lockSpan * (1 - Math.min(1, Math.max(0, progress))));
-    const plan = stingerStart(stingerImpact, Math.max(lead, 0.001));
-    if (plan.offset >= buffer.duration - 0.01) {
-      stingerState = "skipped";
-      mark("stinger-skip", "offset");
-      return;
-    }
-    silence("stinger", 0.02);
-    startVoice("stinger", buffer, { gain: 0, detune: 0, offset: plan.offset, delay: plan.delay });
-    lockFollow = {
-      impact: stingerImpact,
-      originOffset: plan.offset,
-      originTime: ctx.currentTime + plan.delay,
-      audible: false,
-      heard: false,
-      lastMs: now(),
-    };
-    pendingLock = null;
-    stingerState = "played";
-    const impactIn = plan.delay + (stingerImpact - plan.offset);
-    mark("stinger", `offset=${plan.offset.toFixed(3)} delay=${plan.delay.toFixed(3)} impact=${stingerImpact.toFixed(3)} remaining=${lead.toFixed(3)} impactIn=${impactIn.toFixed(3)}`);
-    leashStinger(0);
-  }
-
-  function scheduleStinger() {
-    if (lockFollow || !buffers || !ctx || !enabled || !unlocked || disposed) return;
-    if (pendingLock && !lockSeen) {
+    const clamped = Math.min(1, Math.max(0, progress));
+    if (pendingLock && clamped <= 0.001) {
       const elapsed = Math.max(0, (now() - pendingLock.at) / 1000);
-      if (elapsed > pendingLock.remaining + 0.05) {
-        pendingLock = null;
-        stingerState = "skipped";
-        mark("stinger-skip", "elapsed");
+      if (elapsed > pendingLock.origin + 0.05) {
+        skipStinger("elapsed");
         return;
       }
     }
-    beginStinger(lockProgress);
+    const buffer = buffers["boot-stinger"];
+    if (stingerImpact < 0) stingerImpact = bufferPeakTime(buffer);
+    const nominal = lockSpan * (1 - clamped);
+    const lead = stingerLead(nominal, stingerImpact);
+    if (lead == null) {
+      skipStinger(clamped > 0 ? "late" : "short");
+      return;
+    }
+    const offset = Math.max(0, stingerImpact - lead);
+    if (offset >= buffer.duration - 0.01) {
+      skipStinger("offset");
+      return;
+    }
+    const startAt = ctx.currentTime;
+    const lockAt = lockAtFor(startAt, stingerImpact, offset);
+    stingerState = "played";
+    pendingLock = null;
+    lockDrive = { startAt, lockAt, from: clamped, hit: false };
+    startVoice("stinger", buffer, { gain: 1, detune: 0, offset, delay: 0 });
+    const impactIn = lockAt - startAt;
+    mark("stinger", `offset=${offset.toFixed(3)} delay=0.000 impact=${stingerImpact.toFixed(3)} remaining=${nominal.toFixed(3)} impactIn=${impactIn.toFixed(3)} lockAt=${lockAt.toFixed(3)}`);
   }
 
   async function prepareStinger() {
@@ -507,8 +493,9 @@ export function createAudio(deps: AudioDeps = {}): SwarmAudio {
       mark("load-error", error instanceof Error ? error.message : "load-error");
       return;
     }
+    if (stingerState !== "starting") return;
     if (session !== ticket || !enabled || !unlocked || disposed) {
-      if (stingerState === "starting") stingerState = "idle";
+      stingerState = "idle";
       return;
     }
     if (hidden()) {
@@ -516,7 +503,7 @@ export function createAudio(deps: AudioDeps = {}): SwarmAudio {
       return;
     }
     stingerState = "armed";
-    scheduleStinger();
+    beginStinger(lockFrom);
   }
 
   function playShatter() {
@@ -555,8 +542,8 @@ export function createAudio(deps: AudioDeps = {}): SwarmAudio {
     if (!enabled || !unlocked || !buffers || !ctx || disposed) return;
     if (hidden()) return;
     startAmbient();
-    if (stingerState === "armed") {
-      if (ctx.state === "running") scheduleStinger();
+    if (stingerState === "armed" || stingerState === "starting") {
+      if (ctx.state === "running") beginStinger(lockFrom);
       else void prepareStinger();
     }
     flushBurst();
@@ -594,75 +581,46 @@ export function createAudio(deps: AudioDeps = {}): SwarmAudio {
 
   function onLock(durationSeconds: number, progress = 0) {
     if (!enabled || disposed) return;
-    if (lockFollow?.heard || stingerState === "skipped") return;
-    if (lockFollow) return;
+    if (stingerState === "played" || stingerState === "skipped") return;
     const clamped = Math.min(1, Math.max(0, progress));
-    const lead = durationSeconds * (1 - clamped);
-    if (lead <= LOCK_LATE_SEC) {
-      stingerState = "skipped";
-      pendingLock = null;
-      mark("stinger-skip", "late");
+    const remaining = Math.max(0, durationSeconds) * (1 - clamped);
+    if (stingerLead(remaining, Number.POSITIVE_INFINITY) == null) {
+      skipStinger(clamped > 0 ? "late" : "short");
       return;
     }
     lockSpan = durationSeconds;
-    lockProgress = clamped;
-    pendingLock = { remaining: lead, at: now() };
-    stingerState = "armed";
-    mark("lock-armed", lead.toFixed(3));
-    if (!unlocked) return;
-    if (buffers && ctx && ctx.state === "running") {
-      scheduleStinger();
+    lockFrom = clamped;
+    if (!pendingLock) pendingLock = { origin: remaining, at: now() };
+    if (!lockArmedMarked) {
+      lockArmedMarked = true;
+      mark("lock-armed", remaining.toFixed(3));
+    }
+    if (!unlocked) {
+      stingerState = "armed";
       return;
     }
-    void prepareStinger();
+    if (buffers && ctx && ctx.state === "running") {
+      beginStinger(clamped);
+      return;
+    }
+    if (stingerState !== "starting") {
+      stingerState = "armed";
+      void prepareStinger();
+    }
   }
 
-  function followLock(progress: number) {
-    if (!enabled || !unlocked || disposed || lockFollow?.heard) return;
-    if (stingerState === "idle" || stingerState === "skipped" || stingerState === "starting") return;
-    const clamped = Math.min(1, Math.max(0, progress));
-    lockProgress = clamped;
-    lockSeen = true;
-    const stamp = now();
-    const dt = lockFollow ? stamp - lockFollow.lastMs : 0;
-    if (lockFollow) lockFollow.lastMs = stamp;
-    if (!buffers || !ctx || ctx.state !== "running" || lockSpan <= 0) return;
-    if (!lockFollow) {
-      beginStinger(clamped);
-      return;
+  function readLock(): number | null {
+    if (!lockDrive || !ctx || stingerState !== "played" || !enabled) return null;
+    const span = lockDrive.lockAt - lockDrive.startAt;
+    const u = span > 0 ? (ctx.currentTime - lockDrive.startAt) / span : 1;
+    const clamped = Math.min(1, Math.max(0, u));
+    const picture = lockDrive.from + (1 - lockDrive.from) * clamped;
+    if (clamped >= 1 && !lockDrive.hit) {
+      lockDrive.hit = true;
+      const lateMs = (ctx.currentTime - lockDrive.lockAt) * 1000;
+      mark("stinger-hit", `lateMs=${lateMs.toFixed(1)}`);
     }
-    const lead = Math.max(0, lockSpan * (1 - clamped));
-    const desired = lockFollow.impact - lead;
-    const actual = stingerPlayhead();
-    const drift = actual - desired;
-    const healthy = dt >= 8 && dt < 90;
-    const leashBroke = dt > STINGER_LEASH * 1000 + 30;
-    if (leashBroke) lockFollow.audible = false;
-    if (clamped >= 0.999) {
-      if (actual < lockFollow.impact - 0.03 || leashBroke) beginStinger(clamped);
-      const voice = stingerVoice();
-      if (voice && ctx) {
-        voice.gain.gain.cancelScheduledValues(ctx.currentTime);
-        voice.gain.gain.setValueAtTime(1, ctx.currentTime);
-      }
-      if (lockFollow) {
-        lockFollow.audible = true;
-        lockFollow.heard = true;
-      }
-      mark("stinger-hit");
-      return;
-    }
-    if (drift > 0.06 || drift < -0.06) {
-      if (!leashBroke && lockFollow.audible && actual >= lockFollow.impact - 0.02) {
-        lockFollow.heard = true;
-        mark("stinger-early");
-        return;
-      }
-      beginStinger(clamped);
-      return;
-    }
-    if (healthy && Math.abs(drift) < 0.05 && !lockFollow.audible) openStinger();
-    else if (lockFollow.audible) leashStinger(1);
+    return picture;
   }
 
   function onBurst(endsInSeconds: number) {
@@ -708,11 +666,11 @@ export function createAudio(deps: AudioDeps = {}): SwarmAudio {
       enabled = false;
       session += 1;
       pendingBurst = null;
-      if (!lockFollow?.heard && stingerState !== "skipped") {
+      lockDrive = null;
+      if (stingerState !== "played" && stingerState !== "skipped") {
         stingerState = "idle";
         pendingLock = null;
-        lockFollow = null;
-        lockSeen = false;
+        lockArmedMarked = false;
       }
       if (was) mark("disabled");
       stopAmbient();
@@ -733,7 +691,7 @@ export function createAudio(deps: AudioDeps = {}): SwarmAudio {
       return begin();
     },
     onLock,
-    followLock,
+    readLock,
     onBurst,
     hover,
     dispose() {
