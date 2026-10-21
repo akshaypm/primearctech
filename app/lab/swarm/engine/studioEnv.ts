@@ -2,17 +2,18 @@ import * as THREE from "three";
 
 /**
  * High-contrast studio, as an equirectangular radiance map.
- * The room is dark. Two softboxes sit where the wings reflect, and a small lamp
- * catches the beak. Feather gaps and the head stay in the deep band.
+ * The room is dark. Two narrow softboxes sit off the mean wing reflection so
+ * neighbouring feathers, whose normals differ, split between the lamp and the
+ * dark floor. A small lamp catches the beak.
  * Values are linear radiance. ACES at exposure 1 maps the floor to about
  * #2a2d31–#50555b and the softbox cores to white without a flat grey room.
  */
 
 const SOFTBOXES: { dir: THREE.Vector3; color: THREE.Color; power: number }[] = [
-  // Raised wing reflects upward. Wide enough for the whole wing, tight enough to fall off.
-  { dir: new THREE.Vector3(0.15, 0.9, -0.12), color: new THREE.Color().setRGB(1.05, 1.08, 1.12), power: 3.2 },
-  // Extended wing reflects down and toward the tail.
-  { dir: new THREE.Vector3(0.5, -0.78, 0.1), color: new THREE.Color().setRGB(0.95, 0.98, 1.04), power: 3.4 },
+  // Raised wing. Narrow, and above the mean, so only feathers that tilt into it go white.
+  { dir: new THREE.Vector3(0.48, 0.78, -0.22), color: new THREE.Color().setRGB(1.55, 1.58, 1.66), power: 20 },
+  // Extended wing. A tight lamp beside the downward cluster. The rest of those feathers read the floor.
+  { dir: new THREE.Vector3(0.78, -0.42, -0.22), color: new THREE.Color().setRGB(1.35, 1.4, 1.48), power: 18 },
   // A small lamp for the beak and the crown. The head itself stays in the dark base.
   { dir: new THREE.Vector3(-0.55, 0.25, 0.55), color: new THREE.Color().setRGB(1.4, 1.25, 1.05), power: 22 },
 ];
@@ -33,10 +34,11 @@ export function createStudioEnv(renderer: THREE.WebGLRenderer) {
       const u = x / (w - 1);
       const lon = (u - 0.5) * Math.PI * 2;
       dir.set(Math.cos(lon) * cosLat, dirY, Math.sin(lon) * cosLat);
-      // Dark room. Wings pick up the softboxes; head, belly, and feather gaps stay deep.
-      let r = 0.062;
-      let g = 0.066;
-      let b = 0.074;
+      // Dark room. The floor is deeper than the walls so feathers that miss a softbox land in the deep band.
+      const floor = Math.min(1, Math.max(0, (0.15 - dir.y) / 0.7));
+      let r = 0.128 - floor * 0.052;
+      let g = 0.132 - floor * 0.052;
+      let b = 0.14 - floor * 0.052;
       for (const box of SOFTBOXES) {
         const nd = Math.max(0, dir.dot(box.dir));
         const lobe = Math.pow(nd, box.power);

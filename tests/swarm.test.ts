@@ -6,8 +6,8 @@ import { stepSpring } from "../app/lab/swarm/engine/motion";
 
 describe("swarm creature", () => {
   it("uses the client falcon meshes and the brief's blade counts", () => {
-    expect(DESKTOP_SHARDS).toBe(3000);
-    expect(MOBILE_SHARDS).toBe(1200);
+    expect(DESKTOP_SHARDS).toBe(2000);
+    expect(MOBILE_SHARDS).toBe(900);
     expect(shardCountForWidth(1440)).toBe(DESKTOP_SHARDS);
     expect(shardCountForWidth(390)).toBe(MOBILE_SHARDS);
     expect(modelUrlForWidth(1440)).toBe("/lab/swarm/falcon-web.glb");

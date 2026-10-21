@@ -5,8 +5,8 @@
  */
 
 export const SWARM_SEED = 11;
-export const DESKTOP_SHARDS = 3000;
-export const MOBILE_SHARDS = 1200;
+export const DESKTOP_SHARDS = 2000;
+export const MOBILE_SHARDS = 900;
 export const MODEL_BREAKPOINT = 768;
 
 /** Harder than the first mask so the wing stripe stays a thin edge. #D8643E still passes. */

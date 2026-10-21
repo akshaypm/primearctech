@@ -100,6 +100,11 @@ export function createEngine(options: Options): SwarmHandle {
   let flashT = -1;
   let beakX = -1;
   let tailX = 1;
+  const PEEL = 48;
+  const peelGrid = new Uint8Array(PEEL * PEEL * PEEL);
+  let peelTex: THREE.Data3DTexture | null = null;
+  const boxMin = new THREE.Vector3(-1, -1, -1);
+  const boxMax = new THREE.Vector3(1, 1, 1);
   let rippleT = -1;
   let radius = 0;
   let hitSent = false;
@@ -289,7 +294,7 @@ export function createEngine(options: Options): SwarmHandle {
       _quat.y,
       _quat.z,
       _quat.w,
-      0.4 * s,
+      0.28 * s,
       scaleY[index] * stretch * s,
       0.055 * s,
     );
@@ -353,6 +358,7 @@ export function createEngine(options: Options): SwarmHandle {
       uniforms.uFade.value = 1;
       uniforms.uWave.value = 100;
       uniforms.uRadius.value = 0;
+      uniforms.uPeel.value = 0;
     }
     if (falcon) falcon.visible = true;
   }
@@ -372,11 +378,13 @@ export function createEngine(options: Options): SwarmHandle {
       uniforms.uFade.value = 1;
       uniforms.uRadius.value = 0;
       uniforms.uWave.value = 100;
+      uniforms.uPeel.value = 0;
       uniforms.uTime.value = time;
       if (falcon) falcon.visible = true;
       return;
     }
     const localRadius = radius / Math.max(0.001, group.scale.x);
+    if (bursting) peelGrid.fill(0);
     let shown = 0;
     const span = Math.max(0.001, tailX - beakX);
     _viewLocal.copy(camera.position);
@@ -423,7 +431,7 @@ export function createEngine(options: Options): SwarmHandle {
         show = 1 - smoothstep(0.84, 1, lock.t);
       } else if (bursting) {
         const radial = Math.hypot(hy, hz);
-        const lift = 0.14 + 0.06 * smoothstep(0.15, 0.95, radial) + seed[i] * 0.02;
+        const lift = 0.6 * (0.14 + 0.06 * smoothstep(0.15, 0.95, radial) + seed[i] * 0.02);
         const along = Math.min(1, Math.max(0, (hx - beakX) / span));
         let dist = lift;
         let vx = 0;
@@ -455,12 +463,29 @@ export function createEngine(options: Options): SwarmHandle {
           }
         }
         if (alive) {
+          if (dist > 0.03) {
+            const u = (hx - boxMin.x) / (boxMax.x - boxMin.x || 1);
+            const v = (hy - boxMin.y) / (boxMax.y - boxMin.y || 1);
+            const w = (hz - boxMin.z) / (boxMax.z - boxMin.z || 1);
+            const ix = Math.min(PEEL - 1, Math.max(0, (u * PEEL) | 0));
+            const iy = Math.min(PEEL - 1, Math.max(0, (v * PEEL) | 0));
+            const iz = Math.min(PEEL - 1, Math.max(0, (w * PEEL) | 0));
+            peelGrid[ix + iy * PEEL + iz * PEEL * PEEL] = 255;
+          }
           px = hx + nx * dist;
           py = hy + ny * dist;
           pz = hz + nz * dist;
           const speed = Math.hypot(vx, vy, vz);
           if (speed > 0.05) stretch = Math.min(2.8, 1 + speed * STRETCH_K);
-          aimOutward(nx, ny, nz, phase);
+          // Mostly along the wing, with a little radial tilt, so the hang stays a falcon of separated blades.
+          let tx = -nz;
+          let ty = nx * 0.2;
+          let tz = nx;
+          const tl = Math.hypot(tx, ty, tz) || 1;
+          tx /= tl;
+          ty /= tl;
+          tz /= tl;
+          aimOutward(nx * 0.34 + tx, ny * 0.34 + ty, nz * 0.34 + tz, phase);
           show = 1;
         }
       } else {
@@ -515,18 +540,12 @@ export function createEngine(options: Options): SwarmHandle {
     blades.instanceMatrix.needsUpdate = shown > 0;
 
     let fade = 1;
-    let wave = 100;
+    const wave = 100;
     if (locking) fade = smoothstep(0.58, 0.96, lock.t);
-    else if (bursting) {
-      if (burstT < 0.12) fade = 1 - burstT / 0.12;
-      else if (burstT < BURST_OUT + BURST_HANG) fade = 0;
-      else {
-        fade = 1;
-        wave = burstT - BURST_OUT - BURST_HANG;
-      }
-    }
     uniforms.uFade.value = fade;
     uniforms.uWave.value = wave;
+    uniforms.uPeel.value = bursting ? 1 : 0;
+    if (peelTex && bursting) peelTex.needsUpdate = true;
     uniforms.uTime.value = time;
     uniforms.uRadius.value = phase === "live" && burstT < 0 ? radius : 0;
     uniforms.uCursor.value.copy(cursorWorld);
@@ -682,7 +701,7 @@ export function createEngine(options: Options): SwarmHandle {
       quat[q + 2] = _quat.z;
       quat[q + 3] = _quat.w;
       seed[i] = rng();
-      scaleY[i] = 0.26 + rng() * 0.1;
+      scaleY[i] = 0.18 + rng() * 0.07;
       const fromRight = rng() < 0.72;
       origin[o] = fromRight ? 3.4 + rng() * 2.4 : (rng() - 0.2) * 3.2;
       origin[o + 1] = fromRight ? (rng() - 0.45) * 2.6 : 2.6 + rng() * 1.8;
@@ -760,7 +779,23 @@ export function createEngine(options: Options): SwarmHandle {
       if (geometry.boundingBox) {
         beakX = geometry.boundingBox.min.x;
         tailX = geometry.boundingBox.max.x;
+        boxMin.copy(geometry.boundingBox.min);
+        boxMax.copy(geometry.boundingBox.max);
       }
+      peelTex = new THREE.Data3DTexture(peelGrid, PEEL, PEEL, PEEL);
+      peelTex.format = THREE.RedFormat;
+      peelTex.type = THREE.UnsignedByteType;
+      peelTex.minFilter = THREE.NearestFilter;
+      peelTex.magFilter = THREE.NearestFilter;
+      peelTex.wrapS = THREE.ClampToEdgeWrapping;
+      peelTex.wrapT = THREE.ClampToEdgeWrapping;
+      peelTex.wrapR = THREE.ClampToEdgeWrapping;
+      peelTex.generateMipmaps = false;
+      peelTex.flipY = false;
+      peelTex.colorSpace = THREE.NoColorSpace;
+      peelTex.needsUpdate = true;
+      disposables.push(peelTex);
+
       const sourceMaterial = Array.isArray(sourceMesh.material) ? sourceMesh.material[0] : sourceMesh.material;
       const map = (sourceMaterial as THREE.MeshStandardMaterial).map ?? null;
       if (map) {
@@ -781,7 +816,9 @@ export function createEngine(options: Options): SwarmHandle {
       fill.position.set(5, 1.5, 4);
       scene.add(key, rim, fill);
 
-      const built = createFalconMaterial(map, envMap);
+      const built = createFalconMaterial(map, envMap, peelTex);
+      built.uniforms.uBoxMin.value.copy(boxMin);
+      built.uniforms.uBoxMax.value.copy(boxMax);
       uniforms = built.uniforms;
       uniforms.uBeak.value = beakX;
       uniforms.uTail.value = tailX;

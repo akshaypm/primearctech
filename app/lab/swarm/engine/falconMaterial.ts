@@ -10,6 +10,10 @@ export type FalconUniforms = {
   uBeak: { value: number };
   uTail: { value: number };
   uOrange: { value: THREE.Color };
+  uPeel: { value: number };
+  uBoxMin: { value: THREE.Vector3 };
+  uBoxMax: { value: THREE.Vector3 };
+  uBladeGrid: { value: THREE.Texture };
 };
 
 const FALCON_VERT = /* glsl */ `
@@ -56,7 +60,7 @@ const CHROME = {
   envMapIntensity: 1,
 };
 
-export function createFalconMaterial(map: THREE.Texture | null, envMap: THREE.Texture) {
+export function createFalconMaterial(map: THREE.Texture | null, envMap: THREE.Texture, peelMap: THREE.Texture) {
   const uniforms: FalconUniforms = {
     uTime: { value: 0 },
     uCursor: { value: new THREE.Vector3(80, 80, 80) },
@@ -66,6 +70,10 @@ export function createFalconMaterial(map: THREE.Texture | null, envMap: THREE.Te
     uBeak: { value: -1 },
     uTail: { value: 1 },
     uOrange: { value: new THREE.Color("#D8643E") },
+    uPeel: { value: 0 },
+    uBoxMin: { value: new THREE.Vector3(-1, -1, -1) },
+    uBoxMax: { value: new THREE.Vector3(1, 1, 1) },
+    uBladeGrid: { value: peelMap },
   };
 
   // Standard, not physical. The physical clearcoat permutation (clearcoat 1,
@@ -81,7 +89,7 @@ export function createFalconMaterial(map: THREE.Texture | null, envMap: THREE.Te
     side: THREE.DoubleSide,
   });
 
-  material.customProgramCacheKey = () => "falcon-chrome-r4";
+  material.customProgramCacheKey = () => "falcon-chrome-r5";
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime;
     shader.uniforms.uCursor = uniforms.uCursor;
@@ -91,6 +99,10 @@ export function createFalconMaterial(map: THREE.Texture | null, envMap: THREE.Te
     shader.uniforms.uBeak = uniforms.uBeak;
     shader.uniforms.uTail = uniforms.uTail;
     shader.uniforms.uOrange = uniforms.uOrange;
+    shader.uniforms.uPeel = uniforms.uPeel;
+    shader.uniforms.uBoxMin = uniforms.uBoxMin;
+    shader.uniforms.uBoxMax = uniforms.uBoxMax;
+    shader.uniforms.uBladeGrid = uniforms.uBladeGrid;
 
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -113,6 +125,10 @@ uniform float uWave;
 uniform float uBeak;
 uniform float uTail;
 uniform vec3 uOrange;
+uniform float uPeel;
+uniform vec3 uBoxMin;
+uniform vec3 uBoxMax;
+uniform sampler3D uBladeGrid;
 varying vec3 vFalconWorld;
 varying vec3 vFalconLocal;
 float falconMask;
@@ -122,7 +138,19 @@ ${FALCON_FRAG}`,
         "#include <map_fragment>",
         `#ifdef USE_MAP
 	vec4 sampledDiffuseColor = texture2D( map, vMapUv );
-	falconMask = falconOrange(falconSrgb(sampledDiffuseColor.rgb));
+	float painted = falconOrange(falconSrgb(sampledDiffuseColor.rgb));
+	float span = length(vFalconLocal.yz);
+	float wingspan = 2.814;
+	float band = wingspan * 0.015;
+	float t = clamp((span - 0.40) / 0.95, 0.0, 1.0);
+	float lead = mix(-0.52, -0.1, smoothstep(0.0, 1.0, t));
+	float wing = smoothstep(0.32, 0.48, span) * smoothstep(0.16, 0.34, vFalconLocal.y);
+	float rim = wing * (1.0 - smoothstep(0.0, band, abs(vFalconLocal.x - lead)));
+	float rearLead = -0.08 - 0.62 * vFalconLocal.x;
+	float rear = smoothstep(0.08, 0.28, vFalconLocal.x) * step(vFalconLocal.y, -0.05);
+	float rearRim = rear * (1.0 - smoothstep(0.05, 0.28, abs(vFalconLocal.z))) * (1.0 - smoothstep(0.0, band * 1.6, abs(vFalconLocal.y - rearLead)));
+	float eye = painted * (1.0 - smoothstep(0.1, 0.28, span)) * (1.0 - step(-0.22, vFalconLocal.x));
+	falconMask = max(max(rim, rearRim), eye);
 	diffuseColor.rgb = mix(diffuseColor.rgb, uOrange, falconMask);
 #endif`,
       )
@@ -151,6 +179,10 @@ ${FALCON_FRAG}`,
 	if (uFade < 0.999) {
 		float dither = fract(sin(dot(vFalconWorld.xy, vec2(12.9898, 78.233))) * 43758.5453);
 		if (dither > uFade) discard;
+	}
+	if (uPeel > 0.5) {
+		vec3 uvw = (vFalconLocal - uBoxMin) / max(uBoxMax - uBoxMin, vec3(0.0001));
+		if (texture(uBladeGrid, clamp(uvw, 0.0, 1.0)).r > 0.5) discard;
 	}
 	#include <opaque_fragment>`,
       );

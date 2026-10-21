@@ -1,52 +1,52 @@
 {
   "desktop": {
     "loader": {
-      "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting .....",
+      "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting ",
       "bar": "matrix(1, 0, 0, 1, 0, 0)"
     },
     "state": {
       "phase": "live",
-      "count": 3000,
+      "count": 2000,
       "dpr": 1.0000000577419996,
-      "grid": "web-3000",
+      "grid": "web-2000",
       "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
-      "fps": 12.549675800041832,
-      "sampleMs": 12.800000000745058,
+      "fps": 26.833631484794275,
+      "sampleMs": 19.100000001490116,
       "error": "",
-      "frameCount": 78,
-      "avgFrameMs": 79.46153846153847,
+      "frameCount": 79,
+      "avgFrameMs": 42.64556962025316,
       "p50FrameMs": 33,
-      "p95FrameMs": 365,
-      "maxFrameMs": 444
+      "p95FrameMs": 140,
+      "maxFrameMs": 315
     }
   },
   "mobile": {
     "loader": {
-      "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting .",
+      "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting ...",
       "bar": "matrix(1, 0, 0, 1, 0, 0)"
     },
     "state": {
       "phase": "live",
-      "count": 1200,
+      "count": 900,
       "dpr": 1.0000000577419996,
-      "grid": "mobile-1200",
+      "grid": "mobile-900",
       "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
-      "fps": 12.878300064391498,
-      "sampleMs": 6.099999999627471,
+      "fps": 11.238059561715676,
+      "sampleMs": 5.800000000745058,
       "error": "",
-      "frameCount": 160,
-      "avgFrameMs": 67.79375,
-      "p50FrameMs": 57,
-      "p95FrameMs": 201,
-      "maxFrameMs": 304
+      "frameCount": 156,
+      "avgFrameMs": 73.17307692307692,
+      "p50FrameMs": 78,
+      "p95FrameMs": 183,
+      "maxFrameMs": 300
     }
   },
   "dprCap": {
     "dpr": 1.5,
-    "count": 3000
+    "count": 2000
   },
   "poster": {
-    "bytes": 26732,
+    "bytes": 27534,
     "quality": 68
   },
   "reduced": {
