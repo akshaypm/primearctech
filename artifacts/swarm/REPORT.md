@@ -1,46 +1,70 @@
-# The Swarm, round 3
+# Swarm round 4
 
-The hero is the client falcon mesh, not a generated creature. Desktop loads `falcon-web.glb` (150,000 triangles, Draco). Below 768px the page loads `falcon-mobile.glb` (40,000 triangles). At rest the mesh is polished chrome. The blades are hidden until the cursor, the click, or the lock.
+Draft only. No sends, no DNS, no deploy. The homepage, `/fieldrelay`, `/build-brief`, legal pages, APIs, and `DESIGN.md` are unchanged.
 
-## Rest pose, against the render
+The falcon is the client mesh. It is not CC0. Sound is still original Web Audio and CC0 (`public/lab/swarm/SOUNDS.md`). There is no environment file to licence: the studio is a PMREM built in the page.
 
-The attached Blender still was not on disk. `primearc/creature/3d/renders/hunyuan-chrome-hero.png` and `primearc/creature/ref3d-C-padded.png` were not in the workspace, so there is no side-by-side file. The comparison below is against that render as it was shown with the brief: black ground, bird on the right, three-quarter side, bright chrome, orange only on the wing leading edges and the eye.
+## Chrome
 
-Three passes:
+The body is `MeshStandardMaterial`, metalness 1, roughness 0.08, colour `#E8E8E8`, `envMapIntensity` 1. Tone mapping is ACES at exposure 1. The environment is a dark room (linear radiance about 0.06) plus two wide softboxes aimed at the wing reflections and a tight lamp on the beak.
 
-1. The first frame was the right animal and the orange mask landed, but the wingtips touched the top edge, the head crossed the headline, and the lights clipped most of the metal to white.
-2. The bird moved into the right half and shrank until every edge had more than 6% of margin. Exposure and the key light came down so the feather grooves stay grey metal. The upper wing faces are still hotter than the Blender frame. They read as chrome, not as a flat white card.
-3. On a 390px screen the same mesh was too wide and sat on the headline. It is smaller now and sits entirely in the top half.
+`clearcoat: 1` / `clearcoatRoughness: 0.05` is not on the material. On this machine that physical permutation drops the 150k mesh to a few frames a second under SwiftShader, so the coat is a Schlick fresnel in the fragment shader (`0.42 * pow(1 - ndotv, 5)`). A real GPU can run the physical shader. These recordings cannot.
 
-Desktop rest, measured on `1440-hero.png` with the headline and the sound label left out of the bounds: left edge at 51% of the width, right margin 10.8%, top 17.1%, bottom 12.3%. Mean linear luminance of the bird is 0.599, against 0.0078 in the empty ground beside it, about 77 times. The phone bird, measured above the headline, has margins of 13.1% left, 13.8% right, and 6.9% top, and its lowest pixel is at 48.8% of the height. Its luminance ratio is about 82 times. Headline ink is `#111315` and the type is `#f1efe9`, about 16:1.
+On `1440-hero.png`, bird pixels to the right of the headline (luma above 48):
 
-Orange is not painted by hand. The GLB colour JPEG is a mask. A texel becomes `#D8643E` only when it is a saturated orange. Grey metal stays `#E8E8E8`.
+| | |
+| --- | --- |
+| count | 150,317 |
+| p10 / p50 / p90 luma | 108 / 199 / 219 |
+| deep (48–100) | 8.3% |
+| mid (100–180) | 28.4% |
+| bright (180–235) | 63.3% |
+| clipped (above 235) | 0.1% |
+| orange pixels | 2,910 |
 
-## What the interaction does
+That is short of the 30–40% deep-band target. The wings are the bright mass, which matches the Blender still. The head, chest, and feather gaps are the dark part, and they are not as dark as `#2a2d31`–`#50555b` across a third of the body. Adding more horizon light to force that split washed the grooves (an earlier pass in this round moved p10 from the previous capture’s 94 up to 120). This capture keeps the grooves.
 
-After the boot readout, about 8,000 blades on desktop and 3,000 on a phone stream in from off screen and land on the surface. The mesh fades in as they arrive. The lock bass hit still fires as the ease crosses 0.9, and only if sound is on.
+Layout at 1440×900, unchanged framing: headline right edge x=578, bird x=730–1393, y=154–864. Gap 152px, right inset 46px, top 154px, bottom 35px.
 
-At rest the blade count is zero. The mesh idles with a slow hover, a very small wing-root twist in the vertex shader, and a small camera drift.
+## Orange
 
-The cursor opens a hole in the mesh. The hole is the cursor's world distance, and its size scales with the bird so a phone does not dissolve the whole animal. The rim of that hole is a thin orange band. Blades inside the radius kick off the surface and drift on a swirl, then the same overdamped spring (k = 18, c = 9, about 1.2s, no overshoot) brings them home and the mesh closes.
+The mask is unchanged. A texel is orange only when saturation is at least 0.55 and value at least 0.18, inside the red hue. On `falcon-mask.jpg` the median horizontal run is 3px, against 7px at saturation 0.32, about 43% of the previous width. Pixel count fell from 19,833 to 8,550. The stripe is emissive `#D8643E` at intensity 0.4. The eye stays. The upper wing is still a broken line, because the paint sits on separate UV islands. Eroding the JPEG deleted the eye, so the masks were not rebaked.
 
-A click hides the mesh and holds every blade in the shape of the bird for 0.6s, then the spring reassembles it. The click plays the bass hit when sound is on. Touch still ripples instead of bursting.
+## Burst
 
-## Performance, measured here
+3,000 blades on desktop, 1,200 on mobile. Hidden at rest. Each blade is a flat tapered diamond, about 2–3× the round-3 length (`scaleY` 0.26–0.36), with the same chrome env as the body at roughness 0.06 and `envMapIntensity` 1.2.
 
-No GPU. Chromium was ANGLE SwiftShader. These are the frame gaps in `window.__SWARM__` during the recordings, which include the cursor sweep and the click. The recording itself ran at DPR 1. A separate load with `deviceScaleFactor: 2` reported DPR 1.5 and 8,000 blades, so the cap is in force. The phone cap is 1.25.
+Motion, in group space, along the surface normal:
 
-| Viewport | Mesh | Blades | DPR | FPS | p50 | p95 | avg |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 1440×900 | 150,000 tris | 8,000, hidden at rest | 1 | ~23 | 33 ms | 114 ms | 41 ms |
-| 390×844 | 40,000 tris | 3,000, hidden at rest | 1 | ~9 | 64 ms | 225 ms | 87 ms |
+- 0.25s out, ease-out quartic
+- 0.50s hang, spinning about the normal so the face sweeps the env
+- 0.90s return, delayed from beak (`boundingBox.min.x`) to tail, ease-out cubic
+- stretch `min(2.8, 1 + speed * 0.7)` along that axis
 
-This machine does not hold 60. The desktop median is a frame every 33 ms, with a long tail when the click turns all 8,000 blades on. The phone is slower than that. Sampling the blades took about 21 ms on desktop and 8 ms on the phone, once, during the loader.
+The cursor dissolve uses the same blade and the same overdamped spring (k=18, c=9).
 
-`npm test` passed: 26 unit tests, the production `vinext build`, and the rendered-HTML checks. Log: `artifacts/swarm/test-and-build.log`. Poster: `public/lab/swarm/poster.webp` (32,056 bytes).
+`1440-pulse.png` is the hang, about 0.3–0.7s after the click. Blade pixels: 36% deep, 33% mid, 32% bright, 0.1% clipped. p10 / p50 / p90 luma 74 / 134 / 223. The outline is still a falcon (wings up, head left, tail right), not the round-3 grey cloud. It is dense. 3,000 blades cover the bird, so it reads as a shard falcon rather than a handful of separate feathers. The left edge of the burst is x=644, 66px clear of the headline.
 
-## Licence
+The white ring is 120ms, additive, not tone-mapped, camera-facing, centred on the hit. The hang still is taken after it has gone. `1440-flash.png` is that frame from `swarm-1440.mp4` (about 36.6s). The ring sits on the bird.
 
-The falcon is client-supplied. `public/lab/swarm/ASSETS.md` does not call it CC0. The page does not download an HDRI. Reflections are a PMREM of three.js `RoomEnvironment`. Sound is still original Web Audio and CC0, in `public/lab/swarm/SOUNDS.md`.
+## This machine
 
-The homepage, FieldRelay, `/build-brief`, legal pages, and APIs were not changed. Nothing here sends mail or changes DNS.
+Chromium is SwiftShader. Desktop: reported 12.5 fps, average frame 79ms, p50 33ms, p95 365ms, max 444ms, 3,000 blades, sample 13ms. Mobile: 12.9 fps, average 68ms, p50 57ms, p95 201ms, max 304ms, 1,200 blades. `deviceScaleFactor: 2` reports dpr 1.5, so the cap holds. The recordings themselves are dpr 1, because this Chrome reports a device pixel ratio of 1. Poster is 26,732 bytes at quality 68. Reduced motion is `swarm is-still`, canvas and loader `display: none`. No page errors.
+
+Desktop recording 44.9s. Mobile recording 13.5s.
+
+## Critique
+
+`hunyuan-chrome-hero.png` was not in the workspace (not under `primearc/`, not under `/opt/cursor/artifacts`, not in git). The attached still was used as the visual reference. `side-by-side.png` is round 3 against round 4, and it says so on the image.
+
+Against that Blender still:
+
+- Rest pose is the same bird, same framing, with dark feather gaps, a darker head and chest, a thin orange leading edge, and an orange eye. Round 3 was a near-white body with a thick stripe. The deep area is still less than a third of the bird.
+- The upper orange edge is dashed. The lower edge is a thin continuous line. The eye is there.
+- The click is a falcon of sharp chrome blades with white faces and grey ones, plus the flash ring in the recording. Round 3 was a soft grey cloud. The hang is still crowded.
+
+Three passes this round: a needle ball that left the frame, horizon lights that washed the rest pose, then this capture. Stopped here.
+
+## Kept
+
+Loader, sound toggle, springs, one renderer, one `gsap.ticker` loop, DPR caps, the mobile GLB below 768px, the HTML headline and `/build-brief`, and the reduced-motion poster.

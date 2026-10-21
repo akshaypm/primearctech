@@ -1,6 +1,5 @@
 import gsap from "gsap";
 import * as THREE from "three";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshSurfaceSampler } from "three/addons/math/MeshSurfaceSampler.js";
@@ -11,6 +10,15 @@ import { frameFor, type SwarmFrame } from "./frame";
 import { lockEase, SPRING_C, SPRING_K } from "./motion";
 import { backgroundFragment, backgroundVertex } from "./shaders";
 import { createSliver } from "./sliver";
+import { createStudioEnv } from "./studioEnv";
+
+const BURST_OUT = 0.25;
+const BURST_HANG = 0.5;
+const BURST_BACK = 0.9;
+const BURST_END = BURST_OUT + BURST_HANG + BURST_BACK;
+const STRETCH_K = 0.7;
+
+function keepTickerAwake() {}
 
 export type SwarmHandle = {
   playLock: (options?: { fast?: boolean }) => void;
@@ -74,16 +82,6 @@ function compose(out: Float32Array, offset: number, px: number, py: number, pz: 
   out[o + 15] = 1;
 }
 
-const _swirl = { x: 0, y: 0, z: 0 };
-
-function swirl(x: number, y: number, z: number, time: number) {
-  const a = time * 1.35 + x * 2.4 + y * 1.6;
-  const b = time * 1.05 + z * 2.2 - x * 1.1;
-  _swirl.x = Math.sin(a);
-  _swirl.y = Math.cos(a + b);
-  _swirl.z = Math.sin(b + y * 2.0);
-}
-
 export function createEngine(options: Options): SwarmHandle {
   const audio = createAudio();
   audio.setEnabled(options.sound);
@@ -99,7 +97,9 @@ export function createEngine(options: Options): SwarmHandle {
   let pressX = 0;
   let pressY = 0;
   let burstT = -1;
-  let burstSnap = false;
+  let flashT = -1;
+  let beakX = -1;
+  let tailX = 1;
   let rippleT = -1;
   let radius = 0;
   let hitSent = false;
@@ -107,6 +107,11 @@ export function createEngine(options: Options): SwarmHandle {
   let lockTween: gsap.core.Tween | null = null;
   const frames: number[] = [];
   const cursorWorld = new THREE.Vector3(80, 80, 80);
+  const flashPoint = new THREE.Vector3();
+  const _spin = new THREE.Quaternion();
+  const _face = new THREE.Vector3();
+  const _viewLocal = new THREE.Vector3();
+  const _basis = new THREE.Matrix4();
   const cursorPrev = new THREE.Vector3(80, 80, 80);
   const cursorVel = new THREE.Vector3();
   const rippleAt = new THREE.Vector3();
@@ -130,6 +135,9 @@ export function createEngine(options: Options): SwarmHandle {
     tickMs: 0,
     pulse: 100,
     tris: 0,
+    calls: 0,
+    drawTris: 0,
+    ticks: 0,
     aim: { x: 0, y: 0 },
   };
   (window as unknown as { __SWARM__?: typeof stats }).__SWARM__ = stats;
@@ -138,6 +146,7 @@ export function createEngine(options: Options): SwarmHandle {
   let falcon: THREE.Mesh | null = null;
   let blades: THREE.InstancedMesh | null = null;
   let uniforms: FalconUniforms | null = null;
+  let flashMesh: THREE.Mesh | null = null;
   let bladeCount = 0;
   let home = new Float32Array(0);
   let normal = new Float32Array(0);
@@ -225,7 +234,8 @@ export function createEngine(options: Options): SwarmHandle {
       return;
     }
     burstT = 0;
-    burstSnap = true;
+    flashT = 0;
+    flashPoint.copy(cursorWorld);
     stats.pulses += 1;
     audio.hit();
   }
@@ -237,22 +247,51 @@ export function createEngine(options: Options): SwarmHandle {
     }
   }
 
-  function writeBlade(slot: number, index: number, px: number, py: number, pz: number, s: number) {
-    if (!blades) return;
+  function aimVelocity(dx: number, dy: number, dz: number) {
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 1e-5) return 0;
+    _preferred.set(dx / len, dy / len, dz / len);
+    _quat.setFromUnitVectors(UP, _preferred);
+    return len;
+  }
+
+  function aimOutward(nx: number, ny: number, nz: number, roll: number) {
+    _preferred.set(nx, ny, nz);
+    if (_preferred.lengthSq() < 1e-8) _preferred.copy(UP);
+    else _preferred.normalize();
+    _face.copy(_viewLocal);
+    _face.addScaledVector(_preferred, -_face.dot(_preferred));
+    if (_face.lengthSq() < 1e-5) _face.set(0, 0, 1);
+    _face.normalize();
+    _tangent.crossVectors(_preferred, _face).normalize();
+    _basis.makeBasis(_tangent, _preferred, _face);
+    _quat.setFromRotationMatrix(_basis);
+    if (roll !== 0) {
+      _spin.setFromAxisAngle(_preferred, roll);
+      _quat.premultiply(_spin);
+    }
+  }
+
+  function useRestQuat(index: number) {
     const q = index * 4;
+    _quat.set(quat[q], quat[q + 1], quat[q + 2], quat[q + 3]);
+  }
+
+  function writeBlade(slot: number, index: number, px: number, py: number, pz: number, s: number, stretch: number) {
+    if (!blades) return;
     compose(
       blades.instanceMatrix.array as Float32Array,
       slot * 16,
       px,
       py,
       pz,
-      quat[q],
-      quat[q + 1],
-      quat[q + 2],
-      quat[q + 3],
-      0.16 * s,
-      scaleY[index] * s,
-      0.07 * s,
+      _quat.x,
+      _quat.y,
+      _quat.z,
+      _quat.w,
+      0.4 * s,
+      scaleY[index] * stretch * s,
+      0.055 * s,
     );
   }
 
@@ -298,8 +337,32 @@ export function createEngine(options: Options): SwarmHandle {
     stats.aim.y = (-aimPoint.y * 0.5 + 0.5) * window.innerHeight;
   }
 
+  function finishBurst() {
+    burstT = -1;
+    for (let i = 0; i < bladeCount; i++) {
+      const o = i * 3;
+      pos[o] = home[o];
+      pos[o + 1] = home[o + 1];
+      pos[o + 2] = home[o + 2];
+      vel[o] = 0;
+      vel[o + 1] = 0;
+      vel[o + 2] = 0;
+    }
+    if (blades) blades.count = 0;
+    if (uniforms) {
+      uniforms.uFade.value = 1;
+      uniforms.uWave.value = 100;
+      uniforms.uRadius.value = 0;
+    }
+    if (falcon) falcon.visible = true;
+  }
+
   function simulate(dt: number, time: number) {
     if (!blades || !uniforms || bladeCount === 0) return;
+    if (burstT >= 0) {
+      burstT += dt;
+      if (burstT > BURST_END) finishBurst();
+    }
     group.updateWorldMatrix(true, false);
     _localCursor.copy(cursorWorld);
     group.worldToLocal(_localCursor);
@@ -308,14 +371,19 @@ export function createEngine(options: Options): SwarmHandle {
     if (phase === "live" && !bursting && rippleT < 0 && radius < 0.02 && blades.count === 0) {
       uniforms.uFade.value = 1;
       uniforms.uRadius.value = 0;
+      uniforms.uWave.value = 100;
       uniforms.uTime.value = time;
       if (falcon) falcon.visible = true;
       return;
     }
     const localRadius = radius / Math.max(0.001, group.scale.x);
     let shown = 0;
+    const span = Math.max(0.001, tailX - beakX);
+    _viewLocal.copy(camera.position);
+    group.worldToLocal(_viewLocal);
+    if (_viewLocal.lengthSq() < 1e-6) _viewLocal.set(0, 0, 1);
+    else _viewLocal.normalize();
 
-    if (bursting && burstT < 2.4) burstT += dt;
     if (rippleT >= 0 && rippleT < 1.4) rippleT += dt;
     else rippleT = -1;
 
@@ -331,6 +399,7 @@ export function createEngine(options: Options): SwarmHandle {
       let px = hx;
       let py = hy;
       let pz = hz;
+      let stretch = 1;
 
       if (locking) {
         const delay = seed[i] * 0.34;
@@ -348,31 +417,52 @@ export function createEngine(options: Options): SwarmHandle {
         vel[o] = 0;
         vel[o + 1] = 0;
         vel[o + 2] = 0;
+        const travel = aimVelocity(hx - px, hy - py, hz - pz);
+        if (travel === 0) useRestQuat(i);
+        stretch = Math.min(2.2, 1 + travel * 0.85);
         show = 1 - smoothstep(0.84, 1, lock.t);
-      } else if (bursting && burstT < 2.2) {
-        swirl(hx, hy, hz, time + seed[i] * 2);
-        let tx = hx;
-        let ty = hy;
-        let tz = hz;
-        if (burstT < 0.6) {
-          const lift = 0.07 + seed[i] * 0.06;
-          tx = hx + nx * lift + _swirl.x * 0.08;
-          ty = hy + ny * lift + _swirl.y * 0.08;
-          tz = hz + nz * lift + _swirl.z * 0.08;
+      } else if (bursting) {
+        const radial = Math.hypot(hy, hz);
+        const lift = 0.14 + 0.06 * smoothstep(0.15, 0.95, radial) + seed[i] * 0.02;
+        const along = Math.min(1, Math.max(0, (hx - beakX) / span));
+        let dist = lift;
+        let vx = 0;
+        let vy = 0;
+        let vz = 0;
+        const phase = seed[i] * Math.PI * 2 + burstT * 7.2;
+        let alive = true;
+        if (burstT < BURST_OUT) {
+          const u = burstT / BURST_OUT;
+          const ease = 1 - Math.pow(1 - u, 4);
+          const deriv = (4 * Math.pow(1 - u, 3)) / BURST_OUT;
+          dist = lift * ease;
+          const speed = lift * deriv;
+          vx = nx * speed;
+          vy = ny * speed;
+          vz = nz * speed;
+        } else if (burstT >= BURST_OUT + BURST_HANG) {
+          const backT = burstT - BURST_OUT - BURST_HANG;
+          const local = (backT - along * 0.48) / 0.42;
+          if (local >= 1) alive = false;
+          else if (local > 0) {
+            const ease = 1 - Math.pow(1 - local, 3);
+            const deriv = (3 * Math.pow(1 - local, 2)) / 0.42;
+            dist = lift * (1 - ease);
+            const speed = lift * deriv;
+            vx = -nx * speed;
+            vy = -ny * speed;
+            vz = -nz * speed;
+          }
         }
-        if (burstSnap) {
-          pos[o] = tx;
-          pos[o + 1] = ty;
-          pos[o + 2] = tz;
-          vel[o] = _swirl.x * 0.35;
-          vel[o + 1] = _swirl.y * 0.35;
-          vel[o + 2] = _swirl.z * 0.35;
+        if (alive) {
+          px = hx + nx * dist;
+          py = hy + ny * dist;
+          pz = hz + nz * dist;
+          const speed = Math.hypot(vx, vy, vz);
+          if (speed > 0.05) stretch = Math.min(2.8, 1 + speed * STRETCH_K);
+          aimOutward(nx, ny, nz, phase);
+          show = 1;
         }
-        springTo(i, tx, ty, tz, dt);
-        px = pos[o];
-        py = pos[o + 1];
-        pz = pos[o + 2];
-        show = burstT < 1.15 ? 1 : 1 - smoothstep(1.15, 1.7, burstT);
       } else {
         const dx = hx - _localCursor.x;
         const dy = hy - _localCursor.y;
@@ -383,52 +473,86 @@ export function createEngine(options: Options): SwarmHandle {
         let ty = hy;
         let tz = hz;
         if (inside) {
-          swirl(hx, hy, hz, time + seed[i] * 3);
-          const influence = 1 - smoothstep(localRadius * 0.35, localRadius + 0.06, dist);
-          const lift = (0.1 + seed[i] * 0.1) * influence;
-          tx = hx + nx * lift + _swirl.x * 0.11 * influence;
-          ty = hy + ny * lift + _swirl.y * 0.11 * influence;
-          tz = hz + nz * lift + _swirl.z * 0.11 * influence;
+          const influence = 1 - smoothstep(localRadius * 0.25, localRadius, dist);
+          const lift = (0.18 + seed[i] * 0.08) * influence;
+          const tangent = seed[i] * 2 - 1;
+          tx = hx + nx * lift - nz * tangent * 0.04 * influence;
+          ty = hy + ny * lift;
+          tz = hz + nz * lift + nx * tangent * 0.04 * influence;
           const speed = Math.hypot(vel[o], vel[o + 1], vel[o + 2]);
           if (speed < 0.08 && Math.hypot(pos[o] - hx, pos[o + 1] - hy, pos[o + 2] - hz) < 0.02) {
-            vel[o] += nx * 0.85;
-            vel[o + 1] += ny * 0.85;
-            vel[o + 2] += nz * 0.85;
+            vel[o] += nx * 1.7;
+            vel[o + 1] += ny * 1.7;
+            vel[o + 2] += nz * 1.7;
           }
         }
         if (rippleT >= 0) {
           const rd = Math.hypot(hx - rippleAt.x, hy - rippleAt.y, hz - rippleAt.z);
           const ring = rippleT * 1.5;
           const band = Math.exp(-((rd - ring) * (rd - ring)) / 0.02);
-          tx += nx * band * 0.16;
-          ty += ny * band * 0.16;
-          tz += nz * band * 0.16;
+          tx += nx * band * 0.2;
+          ty += ny * band * 0.2;
+          tz += nz * band * 0.2;
         }
         springTo(i, tx, ty, tz, dt);
         px = pos[o];
         py = pos[o + 1];
         pz = pos[o + 2];
+        const speed = aimVelocity(vel[o], vel[o + 1], vel[o + 2]);
+        if (speed > 0.05) stretch = Math.min(2.6, 1 + speed * STRETCH_K);
+        else useRestQuat(i);
         const off = Math.hypot(px - hx, py - hy, pz - hz);
-        show = off > 0.008 || inside || rippleT >= 0 ? 1 : 0;
+        show = off > 0.012 || inside || rippleT >= 0 ? 1 : 0;
       }
 
       if (show > 0.02) {
-        writeBlade(shown, i, px, py, pz, show);
+        writeBlade(shown, i, px, py, pz, show, stretch);
         shown += 1;
       }
     }
 
-    burstSnap = false;
-    if (burstT > 2.2) burstT = -1;
     blades.count = shown;
     blades.instanceMatrix.needsUpdate = shown > 0;
 
-    const fade = locking ? smoothstep(0.58, 0.96, lock.t) : bursting && burstT >= 0 ? (burstT < 0.7 ? 0 : smoothstep(0.85, 1.45, burstT)) : 1;
+    let fade = 1;
+    let wave = 100;
+    if (locking) fade = smoothstep(0.58, 0.96, lock.t);
+    else if (bursting) {
+      if (burstT < 0.12) fade = 1 - burstT / 0.12;
+      else if (burstT < BURST_OUT + BURST_HANG) fade = 0;
+      else {
+        fade = 1;
+        wave = burstT - BURST_OUT - BURST_HANG;
+      }
+    }
     uniforms.uFade.value = fade;
+    uniforms.uWave.value = wave;
     uniforms.uTime.value = time;
     uniforms.uRadius.value = phase === "live" && burstT < 0 ? radius : 0;
     uniforms.uCursor.value.copy(cursorWorld);
     if (falcon) falcon.visible = fade > 0.02;
+  }
+
+  function updateFlash(dt: number) {
+    if (!flashMesh) return;
+    const material = flashMesh.material as THREE.MeshBasicMaterial;
+    if (flashT < 0) {
+      flashMesh.visible = false;
+      return;
+    }
+    flashT += dt;
+    const u = flashT / 0.12;
+    if (u >= 1) {
+      flashT = -1;
+      flashMesh.visible = false;
+      material.opacity = 0;
+      return;
+    }
+    flashMesh.visible = true;
+    flashMesh.position.copy(flashPoint);
+    flashMesh.quaternion.copy(camera.quaternion);
+    flashMesh.scale.setScalar(0.28 + u * 0.72);
+    material.opacity = Math.pow(1 - u, 0.65);
   }
 
   function tick(time: number, deltaMs: number) {
@@ -453,10 +577,14 @@ export function createEngine(options: Options): SwarmHandle {
 
     const computeStart = performance.now();
     simulate(dt, time);
+    updateFlash(dt);
     const renderStart = performance.now();
     renderer.render(scene, camera);
     stats.computeMs = renderStart - computeStart;
     stats.renderMs = performance.now() - renderStart;
+    stats.calls = renderer.info.render.calls;
+    stats.drawTris = renderer.info.render.triangles;
+    stats.ticks += 1;
     stats.tickMs = performance.now() - tickStart;
     stats.pulse = burstT >= 0 ? burstT : 100;
 
@@ -499,6 +627,7 @@ export function createEngine(options: Options): SwarmHandle {
 
   function cleanup() {
     disposed = true;
+    gsap.ticker.remove(keepTickerAwake);
     gsap.ticker.remove(tick);
     lockTween?.kill();
     window.removeEventListener("scroll", onScroll);
@@ -553,7 +682,7 @@ export function createEngine(options: Options): SwarmHandle {
       quat[q + 2] = _quat.z;
       quat[q + 3] = _quat.w;
       seed[i] = rng();
-      scaleY[i] = 0.08 + rng() * 0.045;
+      scaleY[i] = 0.26 + rng() * 0.1;
       const fromRight = rng() < 0.72;
       origin[o] = fromRight ? 3.4 + rng() * 2.4 : (rng() - 0.2) * 3.2;
       origin[o + 1] = fromRight ? (rng() - 0.45) * 2.6 : 2.6 + rng() * 1.8;
@@ -604,8 +733,8 @@ export function createEngine(options: Options): SwarmHandle {
       });
       if (!renderer.capabilities.isWebGL2) throw new Error("webgl2-unavailable");
       renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.NeutralToneMapping;
-      renderer.toneMappingExposure = 1.02;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1;
       renderer.setClearColor(0x111315, 1);
       resize();
       const gl = renderer.getContext();
@@ -628,6 +757,10 @@ export function createEngine(options: Options): SwarmHandle {
       geometry.applyMatrix4(sourceMesh.matrixWorld);
       if (!geometry.getAttribute("normal")) geometry.computeVertexNormals();
       geometry.computeBoundingBox();
+      if (geometry.boundingBox) {
+        beakX = geometry.boundingBox.min.x;
+        tailX = geometry.boundingBox.max.x;
+      }
       const sourceMaterial = Array.isArray(sourceMesh.material) ? sourceMesh.material[0] : sourceMesh.material;
       const map = (sourceMaterial as THREE.MeshStandardMaterial).map ?? null;
       if (map) {
@@ -636,31 +769,22 @@ export function createEngine(options: Options): SwarmHandle {
       }
       sourceMaterial.dispose();
 
-      const pmrem = new THREE.PMREMGenerator(renderer);
-      const room = new RoomEnvironment();
-      const envMap = pmrem.fromScene(room, 0.04).texture;
+      const envMap = createStudioEnv(renderer);
       scene.environment = envMap;
-      scene.environmentIntensity = 1.05;
-      pmrem.dispose();
-      room.traverse((node) => {
-        const mesh = node as THREE.Mesh;
-        mesh.geometry?.dispose();
-        const material = mesh.material;
-        if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
-        else material?.dispose();
-      });
       disposables.push(envMap, draco);
 
-      const key = new THREE.DirectionalLight(0xfff7f0, 3.4);
+      const key = new THREE.DirectionalLight(0xfff4ea, 0.42);
       key.position.set(-6, 8, 5);
-      const rim = new THREE.DirectionalLight(0xd5deea, 2.4);
+      const rim = new THREE.DirectionalLight(0xd5deea, 0.22);
       rim.position.set(2.5, 3.5, -6);
-      const fill = new THREE.DirectionalLight(0xf4f7fb, 0.85);
+      const fill = new THREE.DirectionalLight(0xf4f7fb, 0.08);
       fill.position.set(5, 1.5, 4);
       scene.add(key, rim, fill);
 
       const built = createFalconMaterial(map, envMap);
       uniforms = built.uniforms;
+      uniforms.uBeak.value = beakX;
+      uniforms.uTail.value = tailX;
       falcon = new THREE.Mesh(geometry, built.material);
       falcon.frustumCulled = false;
       falcon.visible = false;
@@ -688,6 +812,24 @@ export function createEngine(options: Options): SwarmHandle {
       group.add(blades);
       disposables.push(blades.geometry, bladeMaterial);
 
+      const flashGeometry = new THREE.RingGeometry(0.88, 1, 80);
+      const flashMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        depthTest: false,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      });
+      flashMesh = new THREE.Mesh(flashGeometry, flashMaterial);
+      flashMesh.visible = false;
+      flashMesh.renderOrder = 5;
+      flashMesh.frustumCulled = false;
+      scene.add(flashMesh);
+      disposables.push(flashGeometry, flashMaterial);
+
       const background = new THREE.Mesh(
         new THREE.PlaneGeometry(24, 24),
         new THREE.ShaderMaterial({
@@ -712,9 +854,30 @@ export function createEngine(options: Options): SwarmHandle {
       applyFrame(frame);
       report(0.88);
 
+      if (blades) {
+        blades.count = 1;
+        const warm = blades.instanceMatrix.array as Float32Array;
+        warm[0] = 1;
+        warm[5] = 1;
+        warm[10] = 1;
+        warm[15] = 1;
+        blades.instanceMatrix.needsUpdate = true;
+      }
+      if (flashMesh) {
+        flashMesh.visible = true;
+        flashMesh.position.set(0, -30, 0);
+        const flashMaterial = flashMesh.material as THREE.MeshBasicMaterial;
+        flashMaterial.opacity = 1;
+      }
       renderer.compile(scene, camera);
       placeCamera(0);
       renderer.render(scene, camera);
+      if (blades) blades.count = 0;
+      if (flashMesh) {
+        flashMesh.visible = false;
+        flashMesh.position.set(0, 0, 0);
+        (flashMesh.material as THREE.MeshBasicMaterial).opacity = 0;
+      }
       report(1);
       if (disposed) return;
 
@@ -725,6 +888,8 @@ export function createEngine(options: Options): SwarmHandle {
       options.canvas.addEventListener("pointerdown", onPointerDown);
       options.canvas.addEventListener("pointerup", onPointerUp);
       options.canvas.addEventListener("pointerleave", onPointerLeave);
+      // GSAP sleeps the ticker when fewer than two listeners remain and no tween is active.
+      gsap.ticker.add(keepTickerAwake);
       gsap.ticker.add(tick);
       options.onReady();
       if (queued) startLock(queued.fast);

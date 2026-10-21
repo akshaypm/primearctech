@@ -1,52 +1,52 @@
 {
   "desktop": {
     "loader": {
-      "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting ........ o",
-      "bar": "matrix(1, 0, 0, 1, 0, 0)"
-    },
-    "state": {
-      "phase": "live",
-      "count": 8000,
-      "dpr": 1,
-      "grid": "web-8000",
-      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
-      "fps": 22.813688212927755,
-      "sampleMs": 21.300000000745058,
-      "error": "",
-      "frameCount": 71,
-      "avgFrameMs": 41.45070422535211,
-      "p50FrameMs": 33,
-      "p95FrameMs": 114,
-      "maxFrameMs": 329
-    }
-  },
-  "mobile": {
-    "loader": {
       "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting .....",
       "bar": "matrix(1, 0, 0, 1, 0, 0)"
     },
     "state": {
       "phase": "live",
       "count": 3000,
-      "dpr": 1,
-      "grid": "mobile-3000",
+      "dpr": 1.0000000577419996,
+      "grid": "web-3000",
       "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
-      "fps": 9.45179584120983,
-      "sampleMs": 7.900000000372529,
+      "fps": 12.549675800041832,
+      "sampleMs": 12.800000000745058,
       "error": "",
-      "frameCount": 121,
-      "avgFrameMs": 86.68595041322314,
-      "p50FrameMs": 64,
-      "p95FrameMs": 225,
-      "maxFrameMs": 299
+      "frameCount": 78,
+      "avgFrameMs": 79.46153846153847,
+      "p50FrameMs": 33,
+      "p95FrameMs": 365,
+      "maxFrameMs": 444
+    }
+  },
+  "mobile": {
+    "loader": {
+      "text": "PRIMEARC / SYSTEMS\ncalibrating agents ........ 100%\nrouting .",
+      "bar": "matrix(1, 0, 0, 1, 0, 0)"
+    },
+    "state": {
+      "phase": "live",
+      "count": 1200,
+      "dpr": 1.0000000577419996,
+      "grid": "mobile-1200",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "fps": 12.878300064391498,
+      "sampleMs": 6.099999999627471,
+      "error": "",
+      "frameCount": 160,
+      "avgFrameMs": 67.79375,
+      "p50FrameMs": 57,
+      "p95FrameMs": 201,
+      "maxFrameMs": 304
     }
   },
   "dprCap": {
     "dpr": 1.5,
-    "count": 8000
+    "count": 3000
   },
   "poster": {
-    "bytes": 32056,
+    "bytes": 26732,
     "quality": 68
   },
   "reduced": {

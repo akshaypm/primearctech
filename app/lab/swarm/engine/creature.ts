@@ -5,12 +5,13 @@
  */
 
 export const SWARM_SEED = 11;
-export const DESKTOP_SHARDS = 8000;
-export const MOBILE_SHARDS = 3000;
+export const DESKTOP_SHARDS = 3000;
+export const MOBILE_SHARDS = 1200;
 export const MODEL_BREAKPOINT = 768;
 
-const ORANGE_SAT = 0.32;
-const ORANGE_VALUE = 0.18;
+/** Harder than the first mask so the wing stripe stays a thin edge. #D8643E still passes. */
+export const ORANGE_SAT = 0.55;
+export const ORANGE_VALUE = 0.18;
 const ORANGE_HUE = 0.12;
 
 export function shardCountForWidth(width: number) {

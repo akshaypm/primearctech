@@ -10,10 +10,10 @@ The hero is a falcon mesh supplied by the client. It is not a procedural animal.
 | Compression | Draco, decoded with the three.js decoder in `public/lab/swarm/draco/` |
 | Generator | Khronos glTF Blender I/O |
 
-The colour texture is a mask, not albedo. It is extracted to `falcon-mask.jpg` (1024) and `falcon-mask-mobile.jpg` (512) so the page can load it as an image instead of a blob. Polished chrome stays `#E8E8E8`. A texel becomes `#D8643E` only where the texture is a saturated orange, which paints the wing leading edges and the eye. Using the texture as albedo makes the metal look dirty.
+The colour texture is a mask, not albedo. It is extracted to `falcon-mask.jpg` (1024) and `falcon-mask-mobile.jpg` (512) so the page can load it as an image instead of a blob. Polished chrome stays `#E8E8E8`. A texel becomes `#D8643E` only where the texture is a strongly saturated orange, which keeps the wing leading edges thin and leaves the eye. Using the texture as albedo makes the metal look dirty.
 
 Draco decodes in `draco-worker.js`, a same-origin worker. The site content security policy does not allow workers built from blob URLs.
 
-Reflections come from a PMREM of three.js `RoomEnvironment` (MIT, part of the three.js examples). The page does not download an HDRI.
+Reflections come from a PMREM built in the page: three softbox panels over a dark floor, not a flat grey room. The map is generated at load, so there is no environment file to fetch.
 
-Blades are not stored. About 8,000 on desktop and 3,000 on mobile are sampled from the mesh surface when the page loads, aligned to the local tangent, and hidden at rest.
+Blades are not stored. About 3,000 on desktop and 1,200 on mobile are sampled from the mesh surface when the page loads and hidden at rest. They are the burst and the cursor dissolve, not the resting bird.

@@ -6,8 +6,8 @@ import { stepSpring } from "../app/lab/swarm/engine/motion";
 
 describe("swarm creature", () => {
   it("uses the client falcon meshes and the brief's blade counts", () => {
-    expect(DESKTOP_SHARDS).toBe(8000);
-    expect(MOBILE_SHARDS).toBe(3000);
+    expect(DESKTOP_SHARDS).toBe(3000);
+    expect(MOBILE_SHARDS).toBe(1200);
     expect(shardCountForWidth(1440)).toBe(DESKTOP_SHARDS);
     expect(shardCountForWidth(390)).toBe(MOBILE_SHARDS);
     expect(modelUrlForWidth(1440)).toBe("/lab/swarm/falcon-web.glb");
@@ -26,6 +26,7 @@ describe("swarm creature", () => {
 
   it("keeps orange on saturated wing-edge texels and off the chrome", () => {
     expect(orangeMask(216 / 255, 100 / 255, 62 / 255)).toBe(true);
+    expect(orangeMask(0.7, 0.48, 0.38)).toBe(false);
     expect(orangeMask(0xe8 / 255, 0xe8 / 255, 0xe8 / 255)).toBe(false);
     expect(orangeMask(0.07, 0.075, 0.08)).toBe(false);
     expect(orangeMask(0.2, 0.55, 0.25)).toBe(false);

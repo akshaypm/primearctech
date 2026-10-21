@@ -2,7 +2,7 @@ import { chromium } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 
-const root = "artifacts/swarm";
+const root = process.env.SWARM_OUT || "artifacts/swarm";
 await mkdir(root, { recursive: true });
 
 const chromeArgs = [
@@ -12,6 +12,9 @@ const chromeArgs = [
   "--ignore-gpu-blocklist",
   "--enable-unsafe-swiftshader",
   "--disable-gpu-sandbox",
+  "--disable-background-timer-throttling",
+  "--disable-renderer-backgrounding",
+  "--disable-backgrounding-occluded-windows",
 ];
 
 function shots(name) {
@@ -62,8 +65,8 @@ async function runSequence(page, box) {
   await page.mouse.click(aim.x, aim.y);
   await page.waitForFunction(() => {
     const pulse = window.__SWARM__ && window.__SWARM__.pulse;
-    return typeof pulse === "number" && pulse > 0.05 && pulse < 0.58;
-  }, null, { timeout: 8000 });
+    return typeof pulse === "number" && pulse > 0.3 && pulse < 0.72;
+  }, null, { timeout: 22000 });
   await page.screenshot({ path: file.pulse });
   await page.mouse.wheel(0, 520);
   await page.waitForTimeout(700);
@@ -97,7 +100,7 @@ async function readStats(page) {
   });
 }
 
-const browser = await chromium.launch({ channel: "chrome", args: chromeArgs });
+const browser = await chromium.launch({ channel: "chrome", headless: false, args: chromeArgs });
 const logs = [];
 const perf = {};
 
