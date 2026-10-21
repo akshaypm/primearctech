@@ -1,4 +1,4 @@
-/** Desktop keeps the eagle in the right half. Portrait fills the top half, wings spread. */
+/** Desktop keeps the falcon in the right half. Portrait fills the top half. */
 
 export type SwarmFrame = {
   x: number;
@@ -17,25 +17,25 @@ export function frameFor(width: number, height: number): SwarmFrame {
   if (aspect < 0.92) {
     return {
       x: 0,
-      y: 1.15,
-      scale: 0.64,
-      yaw: 0,
-      camZ: 6.8,
-      camY: 0.04,
+      y: 1.48,
+      scale: 0.42,
+      yaw: 0.38,
+      camZ: 3.85,
+      camY: 1.05,
       lookX: 0,
-      lookY: 0.15,
+      lookY: 1.05,
       fov: 32,
     };
   }
   return {
-    x: 1.25,
-    y: 0.1,
-    scale: 0.78,
-    yaw: 0,
-    camZ: 6.5,
-    camY: 0.06,
-    lookX: 0.35,
-    lookY: 0.02,
+    x: 1.22,
+    y: -0.16,
+    scale: 0.74,
+    yaw: 0.32,
+    camZ: 4.55,
+    camY: 0.34,
+    lookX: 0.55,
+    lookY: -0.06,
     fov: 26,
   };
 }

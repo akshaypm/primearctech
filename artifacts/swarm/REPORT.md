@@ -1,43 +1,46 @@
-# The Swarm prototype
+# The Swarm, round 3
 
-Route: `/lab/swarm` on `codex/swarm-prototype`. The homepage, FieldRelay routes, `/build-brief`, legal pages, and APIs were not changed. Nothing here sends mail or changes DNS.
+The hero is the client falcon mesh, not a generated creature. Desktop loads `falcon-web.glb` (150,000 triangles, Draco). Below 768px the page loads `falcon-mobile.glb` (40,000 triangles). At rest the mesh is polished chrome. The blades are hidden until the cursor, the click, or the lock.
 
-Preview: `npm run dev`, then open `/lab/swarm`. Sound stays off until the bottom-right toggle is pressed.
+## Rest pose, against the render
 
-## What shipped
+The attached Blender still was not on disk. `primearc/creature/3d/renders/hunyuan-chrome-hero.png` and `primearc/creature/ref3d-C-padded.png` were not in the workspace, so there is no side-by-side file. The comparison below is against that render as it was shown with the brief: black ground, bird on the right, three-quarter side, bright chrome, orange only on the wing leading edges and the eye.
 
-- A skippable ink loader. Placeholder boot lines are marked in `app/lab/swarm/engine/copy.ts`. The hairline is the real GPU/font/compile progress, not a timer.
-- The creature is a low-poly eagle with the wings spread and the head in profile, standing in for a peregrine. The mesh is the Eagle from Quaternius Animal Pack Vol.2, CC0. Source and licence are in `public/lab/swarm/ASSETS.md`.
-- 12,288 points are sampled on the surface, with extra weight on the silhouette, the head, and the wing leading edges. Each shard is a thin blade, about 1:5 to 1:6, lying along the feather flow: root to tip on the wings, head to tail on the body. Only the trailing edge and the tail lift off the surface. Mobile draws a strided 5,120 of the same points. The bake is `public/lab/swarm/falcon.bin` (589,840 bytes).
-- The shards are polished chrome. Albedo runs from mineral white `#F1EFE9` to light steel `#C9CED2`. Reflections come from three.js `RoomEnvironment`, pulled toward a cool neutral, with small specular peaks and no bloom pass. Crevices darken toward a soft grey, not black. About 1.1% of the shards are orange `#D8643E`: the wing leading edges and a single eye. The background stays ink `#111315`, with a subtle radial lift to `#191C1F` behind the bird.
-- Desktop framing keeps the eagle in the right half (mesh coverage about x 50–90%, y 19–74%). Nothing sits in the headline column. On a 390-wide screen the eagle fills the top half, about 86% of the width, wings spread, beak to the left. Cursor movement lifts nearby feathers. A click contracts them and then bursts. Idle motion is a slow breath plus a wing settle about every six seconds. Springs are unchanged (`SPRING_K` 18, `SPRING_C` 9).
-- Sound is original Web Audio synthesis, CC0, documented in `public/lab/swarm/SOUNDS.md`. Nothing is downloaded.
-- `prefers-reduced-motion` and a failed WebGL context both keep the same poster and skip the canvas. Poster: `public/lab/swarm/poster.webp` (21,034 bytes).
+Three passes:
 
-## Silhouette and contrast
+1. The first frame was the right animal and the orange mask landed, but the wingtips touched the top edge, the head crossed the headline, and the lights clipped most of the metal to white.
+2. The bird moved into the right half and shrank until every edge had more than 6% of margin. Exposure and the key light came down so the feather grooves stay grey metal. The upper wing faces are still hotter than the Blender frame. They read as chrome, not as a flat white card.
+3. On a 390px screen the same mesh was too wide and sat on the headline. It is smaller now and sits entirely in the top half.
 
-The settled mesh, drawn as a pure black silhouette, reads as a bird of prey: hooked beak to the left, two swept wings, tail between them. Those tests are `artifacts/swarm/1440-silhouette.png` and `artifacts/swarm/390-silhouette.png`.
+Desktop rest, measured on `1440-hero.png` with the headline and the sound label left out of the bounds: left edge at 51% of the width, right margin 10.8%, top 17.1%, bottom 12.3%. Mean linear luminance of the bird is 0.599, against 0.0078 in the empty ground beside it, about 77 times. The phone bird, measured above the headline, has margins of 13.1% left, 13.8% right, and 6.9% top, and its lowest pixel is at 48.8% of the height. Its luminance ratio is about 82 times. Headline ink is `#111315` and the type is `#f1efe9`, about 16:1.
 
-On the lit frames the same pose is ice-white on ink. Measured relative luminance of creature pixels against a background sample: about 150× at 1440×900 (bird 0.67, ink 0.0044) and about 89× at 390×844 (bird 0.62, ink 0.007). Both clear the 4× floor. The headline, mineral white on the ink column, measured about 14.7:1 at desktop and 14.2:1 at 390. The bird does not cross into that column.
+Orange is not painted by hand. The GLB colour JPEG is a mask. A texel becomes `#D8643E` only when it is a saturated orange. Grey metal stays `#E8E8E8`.
+
+## What the interaction does
+
+After the boot readout, about 8,000 blades on desktop and 3,000 on a phone stream in from off screen and land on the surface. The mesh fades in as they arrive. The lock bass hit still fires as the ease crosses 0.9, and only if sound is on.
+
+At rest the blade count is zero. The mesh idles with a slow hover, a very small wing-root twist in the vertex shader, and a small camera drift.
+
+The cursor opens a hole in the mesh. The hole is the cursor's world distance, and its size scales with the bird so a phone does not dissolve the whole animal. The rim of that hole is a thin orange band. Blades inside the radius kick off the surface and drift on a swirl, then the same overdamped spring (k = 18, c = 9, about 1.2s, no overshoot) brings them home and the mesh closes.
+
+A click hides the mesh and holds every blade in the shape of the bird for 0.6s, then the spring reassembles it. The click plays the bass hit when sound is on. Touch still ripples instead of bursting.
 
 ## Performance, measured here
 
-No GPU. Chromium was ANGLE SwiftShader. `window.__SWARM__` frame gaps during the recordings:
+No GPU. Chromium was ANGLE SwiftShader. These are the frame gaps in `window.__SWARM__` during the recordings, which include the cursor sweep and the click. The recording itself ran at DPR 1. A separate load with `deviceScaleFactor: 2` reported DPR 1.5 and 8,000 blades, so the cap is in force. The phone cap is 1.25.
 
-| Viewport | Shards | DPR | FPS | p50 frame | p95 frame | avg frame |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1440×900 | 12,288 | 1 | ~18 | 33 ms | 344 ms | 63 ms |
-| 390×844 | 5,120 | 1 | ~6 | 185 ms | 327 ms | 146 ms |
+| Viewport | Mesh | Blades | DPR | FPS | p50 | p95 | avg |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1440×900 | 150,000 tris | 8,000, hidden at rest | 1 | ~23 | 33 ms | 114 ms | 41 ms |
+| 390×844 | 40,000 tris | 3,000, hidden at rest | 1 | ~9 | 64 ms | 225 ms | 87 ms |
 
-A second load with `deviceScaleFactor: 2` reported DPR 1.5 and 12,288 shards, so the cap is in force. The recording itself ran at DPR 1. The spikes are Playwright readback on SwiftShader. This VM cannot show whether a laptop holds 60. Both faces of each feather are drawn, which costs more on the small grid than the previous single-sided icicles.
+This machine does not hold 60. The desktop median is a frame every 33 ms, with a long tail when the click turns all 8,000 blades on. The phone is slower than that. Sampling the blades took about 21 ms on desktop and 8 ms on the phone, once, during the loader.
 
-`npm test` passed: 26 unit tests, the production `vinext build`, and the rendered-HTML checks. Log: `artifacts/swarm/test-and-build.log`.
+`npm test` passed: 26 unit tests, the production `vinext build`, and the rendered-HTML checks. Log: `artifacts/swarm/test-and-build.log`. Poster: `public/lab/swarm/poster.webp` (32,056 bytes).
 
-## Other weak spots
+## Licence
 
-- The desktop recording is 77.5 s and the mobile recording is 16.2 s. Both show the loader, the lock, a cursor sweep, and a click. The pulse stills are mid-contraction.
-- The beak is a small hook. It reads on the desktop silhouette and on the lit desktop frame. At 390 it is easier to lose in the head feathers.
-- The wing tips are low-poly and a little ragged. That is the Quaternius mesh, not a flame of orange shards.
-- Recordings were taken with sound off. The hum, bass hit, and grains were not heard in this environment.
-- The poster is a compressed settled frame. It is within the 200KB cap.
-- Grain and vignette are CSS, not a post-process pass. There is no bloom.
+The falcon is client-supplied. `public/lab/swarm/ASSETS.md` does not call it CC0. The page does not download an HDRI. Reflections are a PMREM of three.js `RoomEnvironment`. Sound is still original Web Audio and CC0, in `public/lab/swarm/SOUNDS.md`.
+
+The homepage, FieldRelay, `/build-brief`, legal pages, and APIs were not changed. Nothing here sends mail or changes DNS.

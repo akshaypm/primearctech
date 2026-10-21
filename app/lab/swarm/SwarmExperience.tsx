@@ -171,7 +171,7 @@ export function SwarmExperience() {
       <img
         className="swarm-poster"
         src="/lab/swarm/poster.webp"
-        alt="An eagle formed from steel feathers, wings spread, head in profile."
+        alt="A chrome falcon, wings raised, head in profile."
         width={1440}
         height={900}
         fetchPriority="high"

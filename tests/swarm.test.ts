@@ -1,70 +1,35 @@
 import { readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { COPY_NOTE, NEXT_SECTION_COPY, bootLine } from "../app/lab/swarm/engine/copy";
-import { DESKTOP_GRID, MOBILE_GRID, asciiSilhouette, shardsFromBake } from "../app/lab/swarm/engine/creature";
+import { DESKTOP_SHARDS, MOBILE_SHARDS, maskUrlForWidth, modelUrlForWidth, orangeMask, shardCountForWidth } from "../app/lab/swarm/engine/creature";
 import { stepSpring } from "../app/lab/swarm/engine/motion";
 
-function loadBake() {
-  const file = readFileSync("public/lab/swarm/falcon.bin");
-  return file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength);
-}
-
 describe("swarm creature", () => {
-  it("uses desktop and mobile shard counts inside the brief", () => {
-    const desktop = DESKTOP_GRID.x * DESKTOP_GRID.y;
-    const mobile = MOBILE_GRID.x * MOBILE_GRID.y;
-    expect(desktop).toBeGreaterThanOrEqual(10_000);
-    expect(desktop).toBeLessThanOrEqual(14_000);
-    expect(mobile).toBeGreaterThanOrEqual(4_000);
-    expect(mobile).toBeLessThanOrEqual(6_000);
-    const bake = loadBake();
-    expect(bake.byteLength).toBeLessThanOrEqual(1024 * 1024);
-    expect(shardsFromBake(bake, mobile, 11)).toHaveLength(mobile);
-    expect(shardsFromBake(bake, desktop, 11)).toHaveLength(desktop);
+  it("uses the client falcon meshes and the brief's blade counts", () => {
+    expect(DESKTOP_SHARDS).toBe(8000);
+    expect(MOBILE_SHARDS).toBe(3000);
+    expect(shardCountForWidth(1440)).toBe(DESKTOP_SHARDS);
+    expect(shardCountForWidth(390)).toBe(MOBILE_SHARDS);
+    expect(modelUrlForWidth(1440)).toBe("/lab/swarm/falcon-web.glb");
+    expect(modelUrlForWidth(390)).toBe("/lab/swarm/falcon-mobile.glb");
+    expect(maskUrlForWidth(1440)).toBe("/lab/swarm/falcon-mask.jpg");
+    expect(maskUrlForWidth(390)).toBe("/lab/swarm/falcon-mask-mobile.jpg");
+    const web = statSync("public/lab/swarm/falcon-web.glb");
+    const mobile = statSync("public/lab/swarm/falcon-mobile.glb");
+    expect(statSync("public/lab/swarm/falcon-mask.jpg").size).toBeGreaterThan(50_000);
+    expect(statSync("public/lab/swarm/draco/draco-worker.js").size).toBeGreaterThan(1000);
+    expect(web.size).toBeGreaterThan(mobile.size);
+    expect(web.size).toBeGreaterThan(500_000);
+    expect(mobile.size).toBeGreaterThan(100_000);
+    expect(statSync("public/lab/swarm/draco/draco_decoder.wasm").size).toBeGreaterThan(1000);
   });
 
-  it("reads as a spread-wing raptor, with feathers lying on the surface", () => {
-    const shards = shardsFromBake(loadBake(), 12288, 11);
-    const xs = shards.map((shard) => shard.home[0]);
-    const ys = shards.map((shard) => shard.home[1]);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    const spanX = maxX - minX;
-    const spanY = maxY - minY;
-    const picture = asciiSilhouette(shards, 78, 28).text;
-    expect(spanX, picture).toBeGreaterThan(spanY * 0.9);
-    const at = (shard: (typeof shards)[number]) => ({
-      x: (shard.home[0] - minX) / spanX,
-      y: (shard.home[1] - minY) / spanY,
-    });
-    const head = shards.filter((shard) => {
-      const p = at(shard);
-      return p.x < 0.5 && p.y > 0.84;
-    });
-    expect(head.length, picture).toBeGreaterThan(40);
-    const wingTip = shards.filter((shard) => {
-      const p = at(shard);
-      return p.x > 0.72 && p.y < 0.55;
-    });
-    expect(wingTip.length, picture).toBeGreaterThan(80);
-    const seam = shards.filter((shard) => shard.seamFlag > 0.5).length / shards.length;
-    expect(seam).toBeGreaterThan(0.01);
-    expect(seam).toBeLessThan(0.02);
-    const wings = shards.filter((shard) => shard.wing > 0.5).length / shards.length;
-    expect(wings).toBeGreaterThan(0.45);
-    let align = 0;
-    for (const shard of shards) {
-      const tangent = Math.hypot(...shard.tangent);
-      expect(tangent).toBeGreaterThan(0.9);
-      expect(tangent).toBeLessThan(1.1);
-      align += Math.abs(
-        shard.tangent[0] * shard.normal[0] + shard.tangent[1] * shard.normal[1] + shard.tangent[2] * shard.normal[2],
-      );
-      expect(Number.isFinite(shard.home[0] + shard.length + shard.rough)).toBe(true);
-    }
-    expect(align / shards.length).toBeLessThan(0.12);
+  it("keeps orange on saturated wing-edge texels and off the chrome", () => {
+    expect(orangeMask(216 / 255, 100 / 255, 62 / 255)).toBe(true);
+    expect(orangeMask(0xe8 / 255, 0xe8 / 255, 0xe8 / 255)).toBe(false);
+    expect(orangeMask(0.07, 0.075, 0.08)).toBe(false);
+    expect(orangeMask(0.2, 0.55, 0.25)).toBe(false);
+    expect(orangeMask(0.85, 0.82, 0.78)).toBe(false);
   });
 });
 
@@ -110,8 +75,10 @@ describe("swarm copy and assets", () => {
     expect(sounds).toContain("CC0");
     expect(sounds).toContain("Web Audio");
     const assets = readFileSync("public/lab/swarm/ASSETS.md", "utf8");
-    expect(assets).toContain("CC0");
-    expect(assets).toContain("https://opengameart.org/content/animated-animales-low-poly");
-    expect(assets).toContain("Quaternius");
+    expect(assets).toContain("falcon-web.glb");
+    expect(assets).toContain("falcon-mobile.glb");
+    expect(assets).toContain("Draco");
+    expect(assets).toContain("mask");
+    expect(assets).not.toContain("Quaternius");
   });
 });

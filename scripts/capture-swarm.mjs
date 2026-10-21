@@ -44,20 +44,26 @@ async function runSequence(page, box) {
   await waitLive(page);
   await page.screenshot({ path: file.hero });
 
-  const sweep = box.sweep;
+  const aim = await page.evaluate(() => window.__SWARM__.aim);
+  const sweep = {
+    x0: Math.max(16, aim.x - box.half),
+    x1: Math.min(box.width - 16, aim.x + box.half),
+    y: Math.max(48, aim.y - 28),
+  };
   await page.mouse.move(sweep.x0, sweep.y);
   for (let i = 1; i <= 7; i++) {
-    await page.mouse.move(sweep.x0 + ((sweep.x1 - sweep.x0) * i) / 14, sweep.y + Math.sin(i) * 18, { steps: 2 });
+    await page.mouse.move(sweep.x0 + ((sweep.x1 - sweep.x0) * i) / 14, sweep.y + Math.sin(i) * 14, { steps: 2 });
   }
+  await page.waitForTimeout(240);
   await page.screenshot({ path: file.scatter });
   for (let i = 8; i <= 14; i++) {
-    await page.mouse.move(sweep.x0 + ((sweep.x1 - sweep.x0) * i) / 14, sweep.y + Math.sin(i) * 12, { steps: 2 });
+    await page.mouse.move(sweep.x0 + ((sweep.x1 - sweep.x0) * i) / 14, sweep.y + Math.sin(i) * 10, { steps: 2 });
   }
-  await page.mouse.click(box.click.x, box.click.y);
+  await page.mouse.click(aim.x, aim.y);
   await page.waitForFunction(() => {
     const pulse = window.__SWARM__ && window.__SWARM__.pulse;
-    return typeof pulse === "number" && pulse > 0.08 && pulse < 0.22;
-  }, null, { timeout: 5000 });
+    return typeof pulse === "number" && pulse > 0.05 && pulse < 0.58;
+  }, null, { timeout: 8000 });
   await page.screenshot({ path: file.pulse });
   await page.mouse.wheel(0, 520);
   await page.waitForTimeout(700);
@@ -106,8 +112,8 @@ desktopPage.on("console", (msg) => {
 });
 perf.desktop = await runSequence(desktopPage, {
   name: "1440",
-  sweep: { x0: 820, x1: 1280, y: 400 },
-  click: { x: 1040, y: 430 },
+  width: 1440,
+  half: 190,
 });
 if (!process.env.STILLS_ONLY) {
   const video = desktopPage.video();
@@ -125,8 +131,8 @@ const mobilePage = await mobile.newPage();
 mobilePage.on("pageerror", (error) => logs.push(`mobile ${error.message}`));
 perf.mobile = await runSequence(mobilePage, {
   name: "390",
-  sweep: { x0: 30, x1: 350, y: 210 },
-  click: { x: 180, y: 230 },
+  width: 390,
+  half: 80,
 });
 if (!process.env.STILLS_ONLY) {
   const video = mobilePage.video();

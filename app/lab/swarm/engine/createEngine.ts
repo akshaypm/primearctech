@@ -1,25 +1,21 @@
 import gsap from "gsap";
 import * as THREE from "three";
-import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshSurfaceSampler } from "three/addons/math/MeshSurfaceSampler.js";
 import { createAudio } from "./audio";
-import { DESKTOP_GRID, MOBILE_GRID, SWARM_SEED, shardsFromBake, type Shard } from "./creature";
+import { SWARM_SEED, maskUrlForWidth, modelUrlForWidth, mulberry32, shardCountForWidth } from "./creature";
+import { createBladeMaterial, createFalconMaterial, type FalconUniforms } from "./falconMaterial";
 import { frameFor, type SwarmFrame } from "./frame";
-import { SPRING_C, SPRING_K } from "./motion";
-import { backgroundFragment, backgroundVertex, displayFragment, displayVertex, positionShader, velocityShader } from "./shaders";
+import { lockEase, SPRING_C, SPRING_K } from "./motion";
+import { backgroundFragment, backgroundVertex } from "./shaders";
 import { createSliver } from "./sliver";
 
 export type SwarmHandle = {
   playLock: (options?: { fast?: boolean }) => void;
   setSound: (on: boolean) => void;
   dispose: () => void;
-};
-
-type Uniforms = Record<string, { value: unknown }>;
-
-type ComputeVariable = {
-  material: THREE.ShaderMaterial;
-  name: string;
 };
 
 type Options = {
@@ -32,7 +28,61 @@ type Options = {
   onFallback: (reason: string) => void;
 };
 
-const bounds = { minX: -1.6, maxX: 1.6, minY: -0.9, maxY: 0.9 };
+const UP = new THREE.Vector3(0, 1, 0);
+const _quat = new THREE.Quaternion();
+const _normal = new THREE.Vector3();
+const _tangent = new THREE.Vector3();
+const _preferred = new THREE.Vector3();
+const _sample = new THREE.Vector3();
+const _localCursor = new THREE.Vector3();
+const _cursorDelta = new THREE.Vector3();
+
+function smoothstep(edge0: number, edge1: number, x: number) {
+  const t = Math.min(1, Math.max(0, (x - edge0) / Math.max(1e-5, edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+function compose(out: Float32Array, offset: number, px: number, py: number, pz: number, qx: number, qy: number, qz: number, qw: number, sx: number, sy: number, sz: number) {
+  const x2 = qx + qx;
+  const y2 = qy + qy;
+  const z2 = qz + qz;
+  const xx = qx * x2;
+  const xy = qx * y2;
+  const xz = qx * z2;
+  const yy = qy * y2;
+  const yz = qy * z2;
+  const zz = qz * z2;
+  const wx = qw * x2;
+  const wy = qw * y2;
+  const wz = qw * z2;
+  const o = offset;
+  out[o] = (1 - (yy + zz)) * sx;
+  out[o + 1] = (xy + wz) * sx;
+  out[o + 2] = (xz - wy) * sx;
+  out[o + 3] = 0;
+  out[o + 4] = (xy - wz) * sy;
+  out[o + 5] = (1 - (xx + zz)) * sy;
+  out[o + 6] = (yz + wx) * sy;
+  out[o + 7] = 0;
+  out[o + 8] = (xz + wy) * sz;
+  out[o + 9] = (yz - wx) * sz;
+  out[o + 10] = (1 - (xx + yy)) * sz;
+  out[o + 11] = 0;
+  out[o + 12] = px;
+  out[o + 13] = py;
+  out[o + 14] = pz;
+  out[o + 15] = 1;
+}
+
+const _swirl = { x: 0, y: 0, z: 0 };
+
+function swirl(x: number, y: number, z: number, time: number) {
+  const a = time * 1.35 + x * 2.4 + y * 1.6;
+  const b = time * 1.05 + z * 2.2 - x * 1.1;
+  _swirl.x = Math.sin(a);
+  _swirl.y = Math.cos(a + b);
+  _swirl.z = Math.sin(b + y * 2.0);
+}
 
 export function createEngine(options: Options): SwarmHandle {
   const audio = createAudio();
@@ -45,23 +95,24 @@ export function createEngine(options: Options): SwarmHandle {
   let scrollY = window.scrollY;
   let pointer = 0;
   let pressing = false;
+  let hovering = false;
   let pressX = 0;
   let pressY = 0;
-  let pulseTime = 100;
-  let burstArmed = false;
-  let pendingBurst = false;
+  let burstT = -1;
+  let burstSnap = false;
   let rippleT = -1;
+  let radius = 0;
   let hitSent = false;
   const lock = { t: 0 };
   let lockTween: gsap.core.Tween | null = null;
   const frames: number[] = [];
-  const cursor = new THREE.Vector3(40, 40, 0);
-  const cursorPrev = new THREE.Vector3(40, 40, 0);
+  const cursorWorld = new THREE.Vector3(80, 80, 80);
+  const cursorPrev = new THREE.Vector3(80, 80, 80);
   const cursorVel = new THREE.Vector3();
+  const rippleAt = new THREE.Vector3();
   const ndc = new THREE.Vector2();
-  const hitPoint = new THREE.Vector3();
   const raycaster = new THREE.Raycaster();
-  const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+  const aimPoint = new THREE.Vector3();
 
   const stats = {
     phase: "boot",
@@ -77,40 +128,32 @@ export function createEngine(options: Options): SwarmHandle {
     computeMs: 0,
     renderMs: 0,
     tickMs: 0,
+    pulse: 100,
+    tris: 0,
+    aim: { x: 0, y: 0 },
   };
   (window as unknown as { __SWARM__?: typeof stats }).__SWARM__ = stats;
 
   let renderer: THREE.WebGLRenderer | null = null;
-  let gpu: { compute: () => void; getCurrentRenderTarget: (variable: ComputeVariable) => THREE.WebGLRenderTarget; dispose: () => void } | null = null;
-  let posVar: ComputeVariable | null = null;
-  let velVar: ComputeVariable | null = null;
+  let falcon: THREE.Mesh | null = null;
+  let blades: THREE.InstancedMesh | null = null;
+  let uniforms: FalconUniforms | null = null;
+  let bladeCount = 0;
+  let home = new Float32Array(0);
+  let normal = new Float32Array(0);
+  let pos = new Float32Array(0);
+  let vel = new Float32Array(0);
+  let quat = new Float32Array(0);
+  let seed = new Float32Array(0);
+  let origin = new Float32Array(0);
+  let scaleY = new Float32Array(0);
   const disposables: { dispose: () => void }[] = [];
 
-  const sim: Uniforms = {
-    uHome: { value: null },
-    uOrigin: { value: null },
-    uSeam: { value: null },
-    uShape: { value: null },
-    uDt: { value: 0.016 },
-    uMode: { value: 0 },
-    uLock: { value: 0 },
-    uPulse: { value: 100 },
-    uBurst: { value: 0 },
-    uTime: { value: 0 },
-    uCursor: { value: cursor },
-    uCursorVel: { value: cursorVel },
-    uPointer: { value: 0 },
-    uRipple: { value: new THREE.Vector3(40, 40, 0) },
-    uRippleT: { value: -1 },
-    uSpringK: { value: SPRING_K },
-    uSpringC: { value: SPRING_C },
-  };
-
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(frame.fov, 1, 0.1, 40);
+  const camera = new THREE.PerspectiveCamera(frame.fov, 1, 0.08, 40);
   const group = new THREE.Group();
   scene.add(group);
-  let display: THREE.ShaderMaterial | null = null;
+  scene.add(camera);
   let backgroundMat: THREE.ShaderMaterial | null = null;
 
   function report(value: number) {
@@ -121,19 +164,17 @@ export function createEngine(options: Options): SwarmHandle {
     frame = next;
     camera.fov = next.fov;
     camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
-    camera.position.set(0, next.camY, next.camZ);
-    camera.lookAt(next.lookX, next.lookY, 0);
     camera.updateProjectionMatrix();
     if (backgroundMat && renderer) {
       const portrait = window.innerWidth / Math.max(1, window.innerHeight) < 0.92;
-      backgroundMat.uniforms.uCenter.value.set(portrait ? 0.5 : 0.7, portrait ? 0.76 : 0.54);
+      backgroundMat.uniforms.uCenter.value.set(portrait ? 0.5 : 0.72, portrait ? 0.72 : 0.52);
       backgroundMat.uniforms.uResolution.value.set(renderer.domElement.width, renderer.domElement.height);
     }
   }
 
   function resize() {
     if (!renderer) return;
-    const mobile = window.innerWidth < 760;
+    const mobile = window.innerWidth < 768;
     const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.5);
     renderer.setPixelRatio(dpr);
     renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -141,22 +182,17 @@ export function createEngine(options: Options): SwarmHandle {
     applyFrame(frameFor(window.innerWidth, window.innerHeight));
   }
 
-  function overCreature(point: THREE.Vector3) {
-    return point.x > bounds.minX && point.x < bounds.maxX && point.y > bounds.minY && point.y < bounds.maxY;
-  }
-
   function updateCursor(event: PointerEvent) {
-    if (!renderer) return;
-    camera.updateMatrixWorld();
+    if (!renderer || !falcon) return;
     const rect = options.canvas.getBoundingClientRect();
     ndc.x = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
     ndc.y = -((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
-    group.updateWorldMatrix(true, false);
-    const worldPlane = plane.clone().applyMatrix4(group.matrixWorld);
+    camera.updateMatrixWorld();
+    group.updateWorldMatrix(true, true);
     raycaster.setFromCamera(ndc, camera);
-    if (!raycaster.ray.intersectPlane(worldPlane, hitPoint)) return;
-    group.worldToLocal(hitPoint);
-    cursor.copy(hitPoint);
+    const hits = raycaster.intersectObject(falcon, false);
+    hovering = hits.length > 0;
+    if (hits[0]) cursorWorld.copy(hits[0].point);
   }
 
   function onPointerMove(event: PointerEvent) {
@@ -176,157 +212,263 @@ export function createEngine(options: Options): SwarmHandle {
 
   function onPointerUp(event: PointerEvent) {
     const moved = Math.hypot(event.clientX - pressX, event.clientY - pressY);
-    const local = cursor.clone();
+    const hit = hovering;
     pressing = false;
     if (event.pointerType === "touch") pointer = 0;
-    if (phase !== "live" || moved > 14 || !overCreature(local)) return;
+    if (phase !== "live" || moved > 14 || !hit) return;
     if (event.pointerType === "touch") {
       rippleT = 0;
-      (sim.uRipple.value as THREE.Vector3).copy(local);
+      group.updateWorldMatrix(true, false);
+      _localCursor.copy(cursorWorld);
+      group.worldToLocal(_localCursor);
+      rippleAt.copy(_localCursor);
       return;
     }
-    pulseTime = 0;
-    sim.uPulse.value = 0;
-    burstArmed = true;
-    pendingBurst = false;
+    burstT = 0;
+    burstSnap = true;
     stats.pulses += 1;
+    audio.hit();
   }
 
   function onPointerLeave() {
-    if (!pressing) pointer = 0;
-  }
-
-  function fillTextures(shards: Shard[], gridX: number, gridY: number) {
-    const count = gridX * gridY;
-    const make = (track: boolean) => {
-      const data = new Float32Array(count * 4);
-      const texture = new THREE.DataTexture(data, gridX, gridY, THREE.RGBAFormat, THREE.FloatType);
-      texture.wrapS = THREE.ClampToEdgeWrapping;
-      texture.wrapT = THREE.ClampToEdgeWrapping;
-      texture.magFilter = THREE.NearestFilter;
-      texture.minFilter = THREE.NearestFilter;
-      texture.colorSpace = THREE.NoColorSpace;
-      texture.generateMipmaps = false;
-      texture.needsUpdate = true;
-      if (track) disposables.push(texture);
-      return { data, texture };
-    };
-    const home = make(true);
-    const origin = make(true);
-    const tangent = make(true);
-    const shape = make(true);
-    const extra = make(true);
-    const seam = make(true);
-    const position = make(false);
-    const velocity = make(false);
-    for (let i = 0; i < count; i++) {
-      const shard = shards[i];
-      const o = i * 4;
-      home.data[o] = shard.home[0];
-      home.data[o + 1] = shard.home[1];
-      home.data[o + 2] = shard.home[2];
-      home.data[o + 3] = shard.seamFlag;
-      origin.data[o] = shard.origin[0];
-      origin.data[o + 1] = shard.origin[1];
-      origin.data[o + 2] = shard.origin[2];
-      origin.data[o + 3] = shard.thin;
-      tangent.data[o] = shard.tangent[0];
-      tangent.data[o + 1] = shard.tangent[1];
-      tangent.data[o + 2] = shard.tangent[2];
-      tangent.data[o + 3] = shard.length;
-      shape.data[o] = shard.rough;
-      shape.data[o + 1] = shard.twist;
-      shape.data[o + 2] = shard.wing;
-      shape.data[o + 3] = shard.delay;
-      extra.data[o] = shard.normal[0];
-      extra.data[o + 1] = shard.normal[1];
-      extra.data[o + 2] = shard.normal[2];
-      extra.data[o + 3] = shard.width;
-      seam.data[o] = shard.seam[0];
-      seam.data[o + 1] = shard.seam[1];
-      seam.data[o + 2] = shard.seam[2];
-      seam.data[o + 3] = 1;
-      position.data[o] = shard.origin[0];
-      position.data[o + 1] = shard.origin[1];
-      position.data[o + 2] = shard.origin[2];
-      position.data[o + 3] = 1;
+    if (!pressing) {
+      pointer = 0;
+      hovering = false;
     }
-    for (const tex of [home, origin, tangent, shape, extra, seam, position, velocity]) tex.texture.needsUpdate = true;
-    return { home, origin, tangent, shape, extra, seam, position, velocity };
   }
 
-  function tick(_time: number, deltaMs: number) {
+  function writeBlade(slot: number, index: number, px: number, py: number, pz: number, s: number) {
+    if (!blades) return;
+    const q = index * 4;
+    compose(
+      blades.instanceMatrix.array as Float32Array,
+      slot * 16,
+      px,
+      py,
+      pz,
+      quat[q],
+      quat[q + 1],
+      quat[q + 2],
+      quat[q + 3],
+      0.16 * s,
+      scaleY[index] * s,
+      0.07 * s,
+    );
+  }
+
+  function springTo(index: number, tx: number, ty: number, tz: number, dt: number) {
+    const o = index * 3;
+    let vx = vel[o];
+    let vy = vel[o + 1];
+    let vz = vel[o + 2];
+    let px = pos[o];
+    let py = pos[o + 1];
+    let pz = pos[o + 2];
+    vx += (SPRING_K * (tx - px) - SPRING_C * vx) * dt;
+    vy += (SPRING_K * (ty - py) - SPRING_C * vy) * dt;
+    vz += (SPRING_K * (tz - pz) - SPRING_C * vz) * dt;
+    pos[o] = px + vx * dt;
+    pos[o + 1] = py + vy * dt;
+    pos[o + 2] = pz + vz * dt;
+    vel[o] = vx;
+    vel[o + 1] = vy;
+    vel[o + 2] = vz;
+  }
+
+  function placeCamera(time: number) {
+    const live = phase === "live" ? 1 : 0;
+    const driftX = Math.sin(time * 0.15) * 0.045 * live;
+    const driftY = Math.sin(time * 0.11) * 0.028 * live;
+    camera.position.set(driftX, frame.camY + driftY, frame.camZ);
+    camera.lookAt(frame.lookX, frame.lookY, 0);
+    const bob = Math.sin(time * 0.6) * 0.028 * live;
+    const scroll = Math.min(1, Math.max(0, scrollY / Math.max(1, window.innerHeight * 0.9)));
+    const eased = scroll * scroll * (3 - 2 * scroll);
+    group.position.set(frame.x, frame.y + bob - eased * 0.5, 0);
+    group.rotation.set(0, frame.yaw, 0);
+    group.scale.setScalar(frame.scale);
+    if (phase === "live") {
+      const fade = 1 - Math.min(1, Math.max(0, (eased - 0.62) / 0.38)) * 0.82;
+      options.canvas.style.opacity = String(fade);
+    }
+    group.updateWorldMatrix(true, false);
+    aimPoint.set(frame.x, frame.y + bob, 0);
+    aimPoint.project(camera);
+    stats.aim.x = (aimPoint.x * 0.5 + 0.5) * window.innerWidth;
+    stats.aim.y = (-aimPoint.y * 0.5 + 0.5) * window.innerHeight;
+  }
+
+  function simulate(dt: number, time: number) {
+    if (!blades || !uniforms || bladeCount === 0) return;
+    group.updateWorldMatrix(true, false);
+    _localCursor.copy(cursorWorld);
+    group.worldToLocal(_localCursor);
+    const bursting = burstT >= 0;
+    const locking = phase === "lock";
+    if (phase === "live" && !bursting && rippleT < 0 && radius < 0.02 && blades.count === 0) {
+      uniforms.uFade.value = 1;
+      uniforms.uRadius.value = 0;
+      uniforms.uTime.value = time;
+      if (falcon) falcon.visible = true;
+      return;
+    }
+    const localRadius = radius / Math.max(0.001, group.scale.x);
+    let shown = 0;
+
+    if (bursting && burstT < 2.4) burstT += dt;
+    if (rippleT >= 0 && rippleT < 1.4) rippleT += dt;
+    else rippleT = -1;
+
+    for (let i = 0; i < bladeCount; i++) {
+      const o = i * 3;
+      const hx = home[o];
+      const hy = home[o + 1];
+      const hz = home[o + 2];
+      const nx = normal[o];
+      const ny = normal[o + 1];
+      const nz = normal[o + 2];
+      let show = 0;
+      let px = hx;
+      let py = hy;
+      let pz = hz;
+
+      if (locking) {
+        const delay = seed[i] * 0.34;
+        const local = Math.min(1, Math.max(0, (lock.t - delay) / 0.72));
+        const eased = lockEase(local);
+        const ox = origin[o];
+        const oy = origin[o + 1];
+        const oz = origin[o + 2];
+        px = ox + (hx - ox) * eased;
+        py = oy + (hy - oy) * eased;
+        pz = oz + (hz - oz) * eased;
+        pos[o] = px;
+        pos[o + 1] = py;
+        pos[o + 2] = pz;
+        vel[o] = 0;
+        vel[o + 1] = 0;
+        vel[o + 2] = 0;
+        show = 1 - smoothstep(0.84, 1, lock.t);
+      } else if (bursting && burstT < 2.2) {
+        swirl(hx, hy, hz, time + seed[i] * 2);
+        let tx = hx;
+        let ty = hy;
+        let tz = hz;
+        if (burstT < 0.6) {
+          const lift = 0.07 + seed[i] * 0.06;
+          tx = hx + nx * lift + _swirl.x * 0.08;
+          ty = hy + ny * lift + _swirl.y * 0.08;
+          tz = hz + nz * lift + _swirl.z * 0.08;
+        }
+        if (burstSnap) {
+          pos[o] = tx;
+          pos[o + 1] = ty;
+          pos[o + 2] = tz;
+          vel[o] = _swirl.x * 0.35;
+          vel[o + 1] = _swirl.y * 0.35;
+          vel[o + 2] = _swirl.z * 0.35;
+        }
+        springTo(i, tx, ty, tz, dt);
+        px = pos[o];
+        py = pos[o + 1];
+        pz = pos[o + 2];
+        show = burstT < 1.15 ? 1 : 1 - smoothstep(1.15, 1.7, burstT);
+      } else {
+        const dx = hx - _localCursor.x;
+        const dy = hy - _localCursor.y;
+        const dz = hz - _localCursor.z;
+        const dist = Math.hypot(dx, dy, dz);
+        const inside = hovering && localRadius > 0.03 && dist < localRadius + 0.08;
+        let tx = hx;
+        let ty = hy;
+        let tz = hz;
+        if (inside) {
+          swirl(hx, hy, hz, time + seed[i] * 3);
+          const influence = 1 - smoothstep(localRadius * 0.35, localRadius + 0.06, dist);
+          const lift = (0.1 + seed[i] * 0.1) * influence;
+          tx = hx + nx * lift + _swirl.x * 0.11 * influence;
+          ty = hy + ny * lift + _swirl.y * 0.11 * influence;
+          tz = hz + nz * lift + _swirl.z * 0.11 * influence;
+          const speed = Math.hypot(vel[o], vel[o + 1], vel[o + 2]);
+          if (speed < 0.08 && Math.hypot(pos[o] - hx, pos[o + 1] - hy, pos[o + 2] - hz) < 0.02) {
+            vel[o] += nx * 0.85;
+            vel[o + 1] += ny * 0.85;
+            vel[o + 2] += nz * 0.85;
+          }
+        }
+        if (rippleT >= 0) {
+          const rd = Math.hypot(hx - rippleAt.x, hy - rippleAt.y, hz - rippleAt.z);
+          const ring = rippleT * 1.5;
+          const band = Math.exp(-((rd - ring) * (rd - ring)) / 0.02);
+          tx += nx * band * 0.16;
+          ty += ny * band * 0.16;
+          tz += nz * band * 0.16;
+        }
+        springTo(i, tx, ty, tz, dt);
+        px = pos[o];
+        py = pos[o + 1];
+        pz = pos[o + 2];
+        const off = Math.hypot(px - hx, py - hy, pz - hz);
+        show = off > 0.008 || inside || rippleT >= 0 ? 1 : 0;
+      }
+
+      if (show > 0.02) {
+        writeBlade(shown, i, px, py, pz, show);
+        shown += 1;
+      }
+    }
+
+    burstSnap = false;
+    if (burstT > 2.2) burstT = -1;
+    blades.count = shown;
+    blades.instanceMatrix.needsUpdate = shown > 0;
+
+    const fade = locking ? smoothstep(0.58, 0.96, lock.t) : bursting && burstT >= 0 ? (burstT < 0.7 ? 0 : smoothstep(0.85, 1.45, burstT)) : 1;
+    uniforms.uFade.value = fade;
+    uniforms.uTime.value = time;
+    uniforms.uRadius.value = phase === "live" && burstT < 0 ? radius : 0;
+    uniforms.uCursor.value.copy(cursorWorld);
+    if (falcon) falcon.visible = fade > 0.02;
+  }
+
+  function tick(time: number, deltaMs: number) {
     const tickStart = performance.now();
-    if (!ready || !renderer || !gpu || !posVar || !velVar || !display || disposed) return;
+    if (!ready || !renderer || disposed) return;
     const dt = deltaMs > 0 ? Math.min(0.033, deltaMs / 1000) : 0.016;
     frames.push(deltaMs > 0 ? deltaMs : 16.7);
     if (frames.length > 240) frames.shift();
     const recent = frames.slice(-60);
     const avg = recent.reduce((sum, value) => sum + value, 0) / Math.max(1, recent.length);
     stats.fps = avg > 0 ? 1000 / avg : 0;
+    placeCamera(time);
+    _cursorDelta.subVectors(cursorWorld, cursorPrev).multiplyScalar(1 / dt);
+    const instant = _cursorDelta;
+    if (instant.length() > 8) instant.multiplyScalar(8 / instant.length());
+    cursorVel.lerp(instant, 0.45);
+    cursorPrev.copy(cursorWorld);
 
-    const scroll = Math.min(1, Math.max(0, scrollY / Math.max(1, window.innerHeight * 0.9)));
-    const eased = scroll * scroll * (3 - 2 * scroll);
-    const breathe = phase === "live" ? Math.sin(_time * 0.28) : 0;
-    const scale = frame.scale * (1 + breathe * 0.007);
-    group.position.set(frame.x, frame.y - eased * 0.42, 0);
-    group.rotation.set(eased * 0.03, frame.yaw + breathe * 0.006 + eased * 0.28, eased * -0.03);
-    group.scale.set(scale * (1 + eased * 0.05), scale * (1 + eased * 0.2), scale);
-    if (phase === "live") {
-      const fade = 1 - Math.min(1, Math.max(0, (eased - 0.62) / 0.38)) * 0.82;
-      options.canvas.style.opacity = String(fade);
-    }
-
-    const instant = cursor.clone().sub(cursorPrev).multiplyScalar(1 / dt);
-    if (instant.length() > 6) instant.multiplyScalar(6 / instant.length());
-    cursorVel.lerp(instant, 0.5);
-    cursorPrev.copy(cursor);
-
-    sim.uDt.value = dt;
-    sim.uTime.value = _time;
-    sim.uPointer.value = pointer;
-    sim.uCursorVel.value = cursorVel;
-    if (rippleT >= 0 && rippleT < 1.45) {
-      rippleT += dt;
-      sim.uRippleT.value = rippleT;
-    } else {
-      sim.uRippleT.value = -1;
-    }
-    if (pulseTime < 8) pulseTime += dt;
-    sim.uPulse.value = pulseTime;
-    stats.pulse = pulseTime;
-    if (burstArmed && pulseTime >= 0.25) {
-      pendingBurst = true;
-      burstArmed = false;
-      audio.hit();
-    }
-    sim.uBurst.value = pendingBurst ? 1 : 0;
-    pendingBurst = false;
-
-    if (phase === "lock") {
-      sim.uMode.value = 0;
-      sim.uLock.value = lock.t;
-    } else {
-      sim.uMode.value = 1;
-    }
+    const radiusTarget = phase === "live" && hovering && burstT < 0 ? 0.42 * (frame.scale / 0.74) : 0;
+    const rate = radiusTarget > radius ? 12 : 2.4;
+    radius += (radiusTarget - radius) * (1 - Math.exp(-dt * rate));
 
     const computeStart = performance.now();
-    gpu.compute();
+    simulate(dt, time);
     const renderStart = performance.now();
-    display.uniforms.uPosition.value = gpu.getCurrentRenderTarget(posVar).texture;
-    display.uniforms.uVelocity.value = gpu.getCurrentRenderTarget(velVar).texture;
     renderer.render(scene, camera);
     stats.computeMs = renderStart - computeStart;
     stats.renderMs = performance.now() - renderStart;
     stats.tickMs = performance.now() - tickStart;
+    stats.pulse = burstT >= 0 ? burstT : 100;
 
     if (phase === "lock" && lock.t >= 1) {
       phase = "live";
       stats.phase = "live";
+      if (uniforms) uniforms.uFade.value = 1;
+      if (falcon) falcon.visible = true;
       options.onLive();
     }
 
-    if (phase === "live" && pointer > 0 && cursorVel.length() > 0.45 && overCreature(cursor)) audio.grain();
+    if (phase === "live" && pointer > 0 && hovering && cursorVel.length() > 0.35) audio.grain();
   }
 
   function startLock(fast?: boolean) {
@@ -339,10 +481,7 @@ export function createEngine(options: Options): SwarmHandle {
     lockTween = gsap.to(lock, {
       t: 1,
       duration: fast ? 0.46 : 1.12,
-      ease: (t: number) => {
-        const s = t * t * (3 - 2 * t);
-        return s * s * (3 - 2 * s);
-      },
+      ease: "none",
       onUpdate: () => {
         if (!hitSent && lock.t >= 0.9) {
           hitSent = true;
@@ -352,6 +491,10 @@ export function createEngine(options: Options): SwarmHandle {
       },
     });
     options.onLockStart();
+  }
+
+  function onScroll() {
+    scrollY = window.scrollY;
   }
 
   function cleanup() {
@@ -365,114 +508,140 @@ export function createEngine(options: Options): SwarmHandle {
     options.canvas.removeEventListener("pointerleave", onPointerLeave);
     window.removeEventListener("resize", resize);
     audio.dispose();
-    gpu?.dispose();
     for (const item of disposables) item.dispose();
     renderer?.dispose();
     renderer = null;
   }
 
-  function onScroll() {
-    scrollY = window.scrollY;
+  function sampleBlades(geometry: THREE.BufferGeometry, count: number) {
+    const carrier = new THREE.Mesh(geometry);
+    const sampler = new MeshSurfaceSampler(carrier).setRandomGenerator(mulberry32(SWARM_SEED)).build();
+    home = new Float32Array(count * 3);
+    normal = new Float32Array(count * 3);
+    pos = new Float32Array(count * 3);
+    vel = new Float32Array(count * 3);
+    quat = new Float32Array(count * 4);
+    seed = new Float32Array(count);
+    origin = new Float32Array(count * 3);
+    scaleY = new Float32Array(count);
+    const rng = mulberry32(SWARM_SEED + 3);
+    for (let i = 0; i < count; i++) {
+      sampler.sample(_sample, _normal);
+      if (_normal.lengthSq() < 1e-8) _normal.set(0, 1, 0);
+      _normal.normalize();
+      _preferred.set(0, _sample.y, _sample.z);
+      if (_preferred.lengthSq() < 0.04) _preferred.set(0.65, _sample.y, _sample.z);
+      _preferred.addScaledVector(_normal, -_preferred.dot(_normal));
+      if (_preferred.lengthSq() < 1e-6) _preferred.crossVectors(_normal, UP);
+      _preferred.normalize();
+      _tangent.crossVectors(_normal, _preferred).multiplyScalar((rng() - 0.5) * 0.4);
+      _preferred.add(_tangent).normalize();
+      _quat.setFromUnitVectors(UP, _preferred);
+      const o = i * 3;
+      home[o] = _sample.x;
+      home[o + 1] = _sample.y;
+      home[o + 2] = _sample.z;
+      normal[o] = _normal.x;
+      normal[o + 1] = _normal.y;
+      normal[o + 2] = _normal.z;
+      pos[o] = _sample.x;
+      pos[o + 1] = _sample.y;
+      pos[o + 2] = _sample.z;
+      const q = i * 4;
+      quat[q] = _quat.x;
+      quat[q + 1] = _quat.y;
+      quat[q + 2] = _quat.z;
+      quat[q + 3] = _quat.w;
+      seed[i] = rng();
+      scaleY[i] = 0.08 + rng() * 0.045;
+      const fromRight = rng() < 0.72;
+      origin[o] = fromRight ? 3.4 + rng() * 2.4 : (rng() - 0.2) * 3.2;
+      origin[o + 1] = fromRight ? (rng() - 0.45) * 2.6 : 2.6 + rng() * 1.8;
+      origin[o + 2] = (rng() - 0.5) * 1.8;
+    }
+    bladeCount = count;
   }
 
   void (async () => {
     try {
       report(0.04);
-      const bakePromise = fetch("/lab/swarm/falcon.bin").then(async (response) => {
-        if (!response.ok) throw new Error("falcon-bake-missing");
-        return response.arrayBuffer();
-      });
+      const mobile = window.innerWidth < 768;
+      const url = modelUrlForWidth(window.innerWidth);
+      const draco = new DRACOLoader();
+      draco.setDecoderPath("/lab/swarm/draco/");
+      const hooked = draco as DRACOLoader & {
+        workerSourceURL: string;
+        decoderPending: Promise<void> | null;
+        _initDecoder: () => Promise<void>;
+      };
+      hooked._initDecoder = function () {
+        this.workerSourceURL = "/lab/swarm/draco/draco-worker.js";
+        this.decoderPending = Promise.resolve();
+        return this.decoderPending;
+      };
+      const loader = new GLTFLoader();
+      loader.setDRACOLoader(draco);
+      const maskTexture = new THREE.TextureLoader().load(maskUrlForWidth(window.innerWidth));
+      maskTexture.colorSpace = THREE.SRGBColorSpace;
+      maskTexture.flipY = false;
+      maskTexture.wrapS = THREE.ClampToEdgeWrapping;
+      maskTexture.wrapT = THREE.ClampToEdgeWrapping;
+      loader.register(() => ({
+        name: "FALCON_MASK",
+        loadTexture: () => Promise.resolve(maskTexture),
+      }));
+      const gltfPromise = loader.loadAsync(url);
       await document.fonts.load('400 12px "IBM Plex Mono"');
       await document.fonts.load('500 96px "General Sans"');
-      const bake = await bakePromise;
       if (disposed) return;
-      report(0.18);
 
       renderer = new THREE.WebGLRenderer({
         canvas: options.canvas,
-        antialias: window.innerWidth >= 760,
+        antialias: !mobile,
         alpha: false,
         powerPreference: "high-performance",
         failIfMajorPerformanceCaveat: false,
       });
       if (!renderer.capabilities.isWebGL2) throw new Error("webgl2-unavailable");
       renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.NoToneMapping;
+      renderer.toneMapping = THREE.NeutralToneMapping;
+      renderer.toneMappingExposure = 1.02;
       renderer.setClearColor(0x111315, 1);
-      renderer.autoClear = true;
       resize();
       const gl = renderer.getContext();
       const debug = gl.getExtension("WEBGL_debug_renderer_info");
       stats.renderer = debug ? String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)) : "webgl2";
+      report(0.16);
 
-      report(0.32);
+      const gltf = await gltfPromise;
       if (disposed) return;
-
-      const mobile = window.innerWidth < 760;
-      const grid = mobile ? MOBILE_GRID : DESKTOP_GRID;
-      const count = grid.x * grid.y;
-      stats.count = count;
-      stats.grid = `${grid.x}x${grid.y}`;
-      const t0 = performance.now();
-      const shards = shardsFromBake(bake, count, SWARM_SEED);
-      let minX = Infinity;
-      let maxX = -Infinity;
-      let minY = Infinity;
-      let maxY = -Infinity;
-      for (const shard of shards) {
-        minX = Math.min(minX, shard.home[0]);
-        maxX = Math.max(maxX, shard.home[0]);
-        minY = Math.min(minY, shard.home[1]);
-        maxY = Math.max(maxY, shard.home[1]);
-      }
-      bounds.minX = minX - 0.12;
-      bounds.maxX = maxX + 0.12;
-      bounds.minY = minY - 0.12;
-      bounds.maxY = maxY + 0.18;
-      stats.sampleMs = performance.now() - t0;
-      const textures = fillTextures(shards, grid.x, grid.y);
-      report(0.62);
-      await new Promise((resolve) => window.setTimeout(resolve, 0));
-      if (disposed) return;
-
-      const gpuCompute = new GPUComputationRenderer(grid.x, grid.y, renderer);
-      const floatOk = Boolean(gl.getExtension("EXT_color_buffer_float"));
-      if (!floatOk) gpuCompute.setDataType(THREE.HalfFloatType);
-      const positionVar = gpuCompute.addVariable("texturePosition", positionShader, textures.position.texture) as ComputeVariable;
-      const velocityVar = gpuCompute.addVariable("textureVelocity", velocityShader, textures.velocity.texture) as ComputeVariable;
-      gpuCompute.setVariableDependencies(positionVar, [positionVar, velocityVar]);
-      gpuCompute.setVariableDependencies(velocityVar, [positionVar, velocityVar]);
-      sim.uHome.value = textures.home.texture;
-      sim.uOrigin.value = textures.origin.texture;
-      sim.uSeam.value = textures.seam.texture;
-      sim.uShape.value = textures.shape.texture;
-      Object.assign(positionVar.material.uniforms, sim);
-      Object.assign(velocityVar.material.uniforms, sim);
-      const error = gpuCompute.init();
-      if (error) {
-        gpuCompute.dispose();
-        throw new Error(error);
-      }
-      gpu = gpuCompute;
-      posVar = positionVar;
-      velVar = velocityVar;
-      report(0.82);
-
-      const room = new RoomEnvironment();
-      const cubeTarget = new THREE.WebGLCubeRenderTarget(256, {
-        type: THREE.HalfFloatType,
-        generateMipmaps: true,
-        minFilter: THREE.LinearMipmapLinearFilter,
+      report(0.4);
+      gltf.scene.updateMatrixWorld(true);
+      const meshes: THREE.Mesh[] = [];
+      gltf.scene.traverse((node) => {
+        const mesh = node as THREE.Mesh;
+        if (mesh.isMesh) meshes.push(mesh);
       });
-      cubeTarget.texture.colorSpace = THREE.LinearSRGBColorSpace;
-      const cubeCamera = new THREE.CubeCamera(0.1, 80, cubeTarget);
-      const savedTone = renderer.toneMapping;
-      const savedExposure = renderer.toneMappingExposure;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 0.9;
-      cubeCamera.update(renderer, room);
-      renderer.toneMapping = savedTone;
-      renderer.toneMappingExposure = savedExposure;
+      const sourceMesh = meshes[0];
+      if (!sourceMesh) throw new Error("falcon-mesh-missing");
+      const geometry = sourceMesh.geometry.clone();
+      geometry.applyMatrix4(sourceMesh.matrixWorld);
+      if (!geometry.getAttribute("normal")) geometry.computeVertexNormals();
+      geometry.computeBoundingBox();
+      const sourceMaterial = Array.isArray(sourceMesh.material) ? sourceMesh.material[0] : sourceMesh.material;
+      const map = (sourceMaterial as THREE.MeshStandardMaterial).map ?? null;
+      if (map) {
+        map.colorSpace = THREE.SRGBColorSpace;
+        map.needsUpdate = true;
+      }
+      sourceMaterial.dispose();
+
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const room = new RoomEnvironment();
+      const envMap = pmrem.fromScene(room, 0.04).texture;
+      scene.environment = envMap;
+      scene.environmentIntensity = 1.05;
+      pmrem.dispose();
       room.traverse((node) => {
         const mesh = node as THREE.Mesh;
         mesh.geometry?.dispose();
@@ -480,61 +649,71 @@ export function createEngine(options: Options): SwarmHandle {
         if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
         else material?.dispose();
       });
-      disposables.push(cubeTarget);
+      disposables.push(envMap, draco);
+
+      const key = new THREE.DirectionalLight(0xfff7f0, 3.4);
+      key.position.set(-6, 8, 5);
+      const rim = new THREE.DirectionalLight(0xd5deea, 2.4);
+      rim.position.set(2.5, 3.5, -6);
+      const fill = new THREE.DirectionalLight(0xf4f7fb, 0.85);
+      fill.position.set(5, 1.5, 4);
+      scene.add(key, rim, fill);
+
+      const built = createFalconMaterial(map, envMap);
+      uniforms = built.uniforms;
+      falcon = new THREE.Mesh(geometry, built.material);
+      falcon.frustumCulled = false;
+      falcon.visible = false;
+      group.add(falcon);
+      disposables.push(geometry, built.material);
+      if (map) disposables.push(map);
+
+      const index = geometry.index;
+      stats.tris = index ? index.count / 3 : geometry.getAttribute("position").count / 3;
+      const count = shardCountForWidth(window.innerWidth);
+      stats.count = count;
+      stats.grid = mobile ? `mobile-${count}` : `web-${count}`;
+      const t0 = performance.now();
+      sampleBlades(geometry, count);
+      stats.sampleMs = performance.now() - t0;
+      report(0.72);
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+      if (disposed) return;
+
+      const bladeMaterial = createBladeMaterial(envMap);
+      blades = new THREE.InstancedMesh(createSliver(), bladeMaterial, count);
+      blades.count = 0;
+      blades.frustumCulled = false;
+      blades.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      group.add(blades);
+      disposables.push(blades.geometry, bladeMaterial);
 
       const background = new THREE.Mesh(
-        new THREE.PlaneGeometry(48, 28),
+        new THREE.PlaneGeometry(24, 24),
         new THREE.ShaderMaterial({
           uniforms: {
             uInk: { value: new THREE.Color("#111315") },
             uLift: { value: new THREE.Color("#191C1F") },
             uResolution: { value: new THREE.Vector2(renderer.domElement.width, renderer.domElement.height) },
-            uCenter: { value: new THREE.Vector2(0.7, 0.54) },
+            uCenter: { value: new THREE.Vector2(0.72, 0.52) },
           },
           vertexShader: backgroundVertex,
           fragmentShader: backgroundFragment,
           depthWrite: false,
+          depthTest: false,
         }),
       );
       backgroundMat = background.material as THREE.ShaderMaterial;
-      applyFrame(frame);
-      background.position.set(0, 0.2, -3);
+      background.position.set(0, 0, -8);
+      background.renderOrder = -1;
       background.frustumCulled = false;
-      scene.add(background);
+      camera.add(background);
       disposables.push(background.geometry, background.material);
+      applyFrame(frame);
+      report(0.88);
 
-      display = new THREE.ShaderMaterial({
-        uniforms: {
-          uPosition: { value: gpu.getCurrentRenderTarget(positionVar).texture },
-          uVelocity: { value: gpu.getCurrentRenderTarget(velocityVar).texture },
-          uHome: sim.uHome,
-          uTangent: { value: textures.tangent.texture },
-          uShape: sim.uShape,
-          uExtra: { value: textures.extra.texture },
-          uOrigin: sim.uOrigin,
-          uGrid: { value: new THREE.Vector2(grid.x, grid.y) },
-          uShard: { value: mobile ? 0.2 : 0.2 },
-          uGirth: { value: mobile ? 0.3 : 0.3 },
-          uTime: sim.uTime,
-          uMode: sim.uMode,
-          uPulse: sim.uPulse,
-          uOrange: { value: new THREE.Color("#D8643E") },
-          uMineral: { value: new THREE.Color("#F1EFE9") },
-          uSteel: { value: new THREE.Color("#C9CED2") },
-          uEnv: { value: cubeTarget.texture },
-        },
-        vertexShader: displayVertex,
-        fragmentShader: displayFragment,
-        side: THREE.DoubleSide,
-      });
-      const mesh = new THREE.InstancedMesh(createSliver(), display, count);
-      mesh.frustumCulled = false;
-      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-      group.add(mesh);
-      disposables.push(mesh.geometry, display);
-
-      gpu.compute();
       renderer.compile(scene, camera);
+      placeCamera(0);
       renderer.render(scene, camera);
       report(1);
       if (disposed) return;
