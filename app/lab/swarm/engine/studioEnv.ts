@@ -1,0 +1,68 @@
+import * as THREE from "three";
+
+/**
+ * High-contrast studio, as an equirectangular radiance map.
+ * The room is dark. Two narrow softboxes sit off the mean wing reflection so
+ * neighbouring feathers, whose normals differ, split between the lamp and the
+ * dark floor. A small lamp catches the beak.
+ * Values are linear radiance. ACES at exposure 1 maps the floor to about
+ * #2a2d31–#50555b and the softbox cores to white without a flat grey room.
+ */
+
+const SOFTBOXES: { dir: THREE.Vector3; color: THREE.Color; power: number }[] = [
+  // Raised wing. Narrow, and above the mean, so only feathers that tilt into it go white.
+  { dir: new THREE.Vector3(0.48, 0.78, -0.22), color: new THREE.Color().setRGB(1.55, 1.58, 1.66), power: 20 },
+  // Extended wing. A tight lamp beside the downward cluster. The rest of those feathers read the floor.
+  { dir: new THREE.Vector3(0.78, -0.42, -0.22), color: new THREE.Color().setRGB(1.35, 1.4, 1.48), power: 18 },
+  // A small lamp for the beak and the crown. The head itself stays in the dark base.
+  { dir: new THREE.Vector3(-0.55, 0.25, 0.55), color: new THREE.Color().setRGB(1.4, 1.25, 1.05), power: 22 },
+];
+
+for (const box of SOFTBOXES) box.dir.normalize();
+
+export function createStudioEnv(renderer: THREE.WebGLRenderer) {
+  const w = 1024;
+  const h = 512;
+  const data = new Float32Array(w * h * 4);
+  const dir = new THREE.Vector3();
+  // flipY is left on, so the first row is texture v = 1, which equirectUv maps to +Y.
+  for (let y = 0; y < h; y++) {
+    const v = 1 - y / (h - 1);
+    const dirY = Math.sin((v - 0.5) * Math.PI);
+    const cosLat = Math.cos((v - 0.5) * Math.PI);
+    for (let x = 0; x < w; x++) {
+      const u = x / (w - 1);
+      const lon = (u - 0.5) * Math.PI * 2;
+      dir.set(Math.cos(lon) * cosLat, dirY, Math.sin(lon) * cosLat);
+      // Dark room. The floor is deeper than the walls so feathers that miss a softbox land in the deep band.
+      const floor = Math.min(1, Math.max(0, (0.15 - dir.y) / 0.7));
+      let r = 0.128 - floor * 0.052;
+      let g = 0.132 - floor * 0.052;
+      let b = 0.14 - floor * 0.052;
+      for (const box of SOFTBOXES) {
+        const nd = Math.max(0, dir.dot(box.dir));
+        const lobe = Math.pow(nd, box.power);
+        r += box.color.r * lobe;
+        g += box.color.g * lobe;
+        b += box.color.b * lobe;
+      }
+      const o = (y * w + x) * 4;
+      data[o] = r;
+      data[o + 1] = g;
+      data[o + 2] = b;
+      data[o + 3] = 1;
+    }
+  }
+
+  const equirect = new THREE.DataTexture(data, w, h, THREE.RGBAFormat, THREE.FloatType);
+  equirect.mapping = THREE.EquirectangularReflectionMapping;
+  equirect.colorSpace = THREE.LinearSRGBColorSpace;
+  equirect.flipY = true;
+  equirect.needsUpdate = true;
+
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envMap = pmrem.fromEquirectangular(equirect).texture;
+  equirect.dispose();
+  pmrem.dispose();
+  return envMap;
+}
