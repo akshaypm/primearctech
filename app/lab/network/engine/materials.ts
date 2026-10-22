@@ -5,8 +5,8 @@ const hazeColor = new THREE.Color(PALETTE.horizon);
 
 export const hazeUniforms = {
   uHazeColor: { value: hazeColor },
-  uHazeDensity: { value: 0.018 },
-  uHazeStart: { value: 34 },
+  uHazeDensity: { value: 0.012 },
+  uHazeStart: { value: 46 },
 };
 
 function hash(x: number, y: number) {
@@ -52,15 +52,16 @@ export function createSandTextures() {
       heights[y * size + x] = n;
     }
   }
-  const sand = new THREE.Color(PALETTE.sand);
-  const deep = new THREE.Color("#D9CBB4");
-  const lift = new THREE.Color("#EBE1D0");
+  const sand = new THREE.Color("#E8DFD2");
+  const deep = new THREE.Color("#E5DACC");
+  const lift = new THREE.Color("#F3EBE0");
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = y * size + x;
       const h = heights[i];
       const grain = valueNoise(x / 2.2, y / 2.2);
-      const color = sand.clone().lerp(h > 0.55 ? lift : deep, Math.abs(h - 0.5) * 0.72 + grain * 0.1);
+      const color = sand.clone().lerp(h > 0.55 ? lift : deep, Math.abs(h - 0.5) * 0.08 + grain * 0.01);
+      color.lerp(lift, 0.22);
       const hex = color.getHex();
       const o = i * 4;
       albedo[o] = (hex >> 16) & 255;
@@ -71,8 +72,8 @@ export function createSandTextures() {
       const right = heights[y * size + ((x + 1) % size)];
       const up = heights[((y + size - 1) % size) * size + x];
       const down = heights[((y + 1) % size) * size + x];
-      const dx = (left - right) * 3.1;
-      const dy = (up - down) * 3.1;
+      const dx = (left - right) * 0.45;
+      const dy = (up - down) * 0.45;
       const nx = -dx;
       const ny = -dy;
       const nz = 1;
@@ -187,11 +188,11 @@ export function createGlazeMaterial() {
   // A mirror-flat body on this sand disappears; the coat is what reads as glaze.
   const material = new THREE.MeshPhysicalMaterial({
     color: PALETTE.glaze,
-    roughness: 0.28,
+    roughness: 0.2,
     metalness: 0,
     clearcoat: 1,
-    clearcoatRoughness: 0.14,
-    envMapIntensity: 0.7,
+    clearcoatRoughness: 0.035,
+    envMapIntensity: 1.35,
     reflectivity: 0.5,
     ior: 1.5,
   });
@@ -207,7 +208,7 @@ export function createGroundMaterial(textures: ReturnType<typeof createSandTextu
     roughness: 0.96,
     metalness: 0,
     envMapIntensity: 0.02,
-    normalScale: new THREE.Vector2(0.9, 0.9),
+    normalScale: new THREE.Vector2(0.08, 0.08),
   });
   applyHaze(material);
   return material;
@@ -271,10 +272,10 @@ export function createStudioEnv(renderer: THREE.WebGLRenderer) {
       let g = 0.24 + up * 0.72 - down * 0.1;
       let b = 0.18 + up * 0.6 - down * 0.08;
       const nd = Math.max(0, dir.dot(key));
-      const lobe = nd ** 5;
-      r += lobe * 3.4;
-      g += lobe * 3.15;
-      b += lobe * 2.85;
+      const lobe = nd ** 4;
+      r += lobe * 4.6;
+      g += lobe * 4.35;
+      b += lobe * 3.9;
       const o = (y * w + x) * 4;
       data[o] = r;
       data[o + 1] = g;
@@ -301,7 +302,7 @@ export function createContactTexture() {
     for (let x = 0; x < size; x++) {
       const d = Math.hypot(x - cx, y - cx) / cx;
       const a = Math.min(1, Math.max(0, 1 - d));
-      const alpha = Math.round(a * a * a * 90);
+      const alpha = Math.round(a * a * 120);
       const o = (y * size + x) * 4;
       data[o] = 92;
       data[o + 1] = 64;

@@ -157,9 +157,25 @@ export function dampPose(current: Pose, target: Pose, lambda: number, dt: number
   };
 }
 
+/**
+ * Scroll time. Linear through the flight, then a hold on the closing
+ * network (the book beat, t = 60) before the short return to the hero.
+ * Progress 1 is the hero again, so the epoch wrap does not cut.
+ */
 export function timeAtProgress(progress: number, duration = PATH_DURATION) {
   const wrapped = progress - Math.floor(progress);
-  return wrapped * duration;
+  if (wrapped === 0) return 0;
+  const book = 56 / duration;
+  const flightEnd = 0.925;
+  const holdEnd = 0.972;
+  if (wrapped <= book) return wrapped * duration;
+  if (wrapped < flightEnd) {
+    const u = (wrapped - book) / (flightEnd - book);
+    return 56 + u * 4;
+  }
+  if (wrapped < holdEnd) return 60;
+  const u = (wrapped - holdEnd) / (1 - holdEnd);
+  return 60 + u * (duration - 60);
 }
 
 export function beatAt(time: number): Beat {
@@ -186,8 +202,10 @@ export function verticalFovForAspect(vfovDeg: number, aspect: number, referenceA
   if (!Number.isFinite(aspect) || aspect >= referenceAspect * 0.98) return vfovDeg;
   const v = (vfovDeg * Math.PI) / 180;
   const h = 2 * Math.atan(Math.tan(v / 2) * referenceAspect);
-  const widened = 2 * Math.atan(Math.tan(h / 2) / Math.max(0.2, aspect));
-  return (widened * 180) / Math.PI;
+  const widened = (2 * Math.atan(Math.tan(h / 2) / Math.max(0.2, aspect)) * 180) / Math.PI;
+  // A phone is much taller than 16:10. Preserving the full horizontal frame
+  // shrinks the lattice to a speck. Keep it large, and leave the lower third for type.
+  return vfovDeg + (widened - vfovDeg) * 0.36;
 }
 
 export function parallaxRadians(pointerX: number, pointerY: number, enabled: boolean) {

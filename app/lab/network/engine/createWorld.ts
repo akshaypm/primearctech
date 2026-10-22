@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { buildBlockout } from "./blockout";
 import {
   createClayMaterial,
   createContactTexture,
@@ -10,6 +9,7 @@ import {
   createSkyMaterial,
   createStudioEnv,
 } from "./materials";
+import { loadWorldScene, type WorldScene } from "./worldScene";
 import { PALETTE } from "./palette";
 import {
   HERO_POSE,
@@ -59,25 +59,10 @@ export type WorldOptions = {
   onFallback: (reason: string) => void;
 };
 
-const SUN_DIR = new THREE.Vector3(0.46, 1.12, 0.32).normalize();
+const SUN_DIR = new THREE.Vector3(1.2, 0.34, 0.32).normalize();
 
 function clonePose(pose: Pose): Pose {
   return { ...pose };
-}
-
-function sandGround(material: THREE.Material) {
-  const geo = new THREE.PlaneGeometry(1600, 1600, 1, 1);
-  geo.rotateX(-Math.PI / 2);
-  const uv = geo.getAttribute("uv");
-  const pos = geo.getAttribute("position");
-  for (let i = 0; i < pos.count; i++) {
-    uv.setXY(i, pos.getX(i) * 0.16, pos.getZ(i) * 0.16);
-  }
-  const mesh = new THREE.Mesh(geo, material);
-  mesh.receiveShadow = true;
-  mesh.castShadow = false;
-  mesh.name = "sand";
-  return mesh;
 }
 
 export function createWorld(options: WorldOptions): WorldHandle {
@@ -135,7 +120,7 @@ export function createWorld(options: WorldOptions): WorldHandle {
   renderer.setClearColor(PALETTE.sand, 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 0.92;
+  renderer.toneMappingExposure = 1.52;
   renderer.shadowMap.enabled = true;
   // r186 folded the soft PCF kernel into PCFShadowMap. Radius is the softness.
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -145,31 +130,31 @@ export function createWorld(options: WorldOptions): WorldHandle {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(HERO_POSE.vfov, 1, 0.12, 900);
-  const hemi = new THREE.HemisphereLight(0xf3eee4, 0xcbbda8, 0.46);
-  const sun = new THREE.DirectionalLight(0xfff7ef, 1.35);
+  const hemi = new THREE.HemisphereLight(0xf6f0e6, 0xe4d6c4, 0.5);
+  const sun = new THREE.DirectionalLight(0xfffdfb, 2.35);
   sun.castShadow = true;
   sun.shadow.mapSize.set(shadowMapSize(tier) || 1024, shadowMapSize(tier) || 1024);
-  sun.shadow.radius = 5;
-  sun.shadow.blurSamples = 8;
+  sun.shadow.radius = 10;
+  sun.shadow.blurSamples = 10;
   sun.shadow.bias = -0.00022;
   sun.shadow.normalBias = 0.045;
   sun.shadow.camera.near = 1.5;
-  sun.shadow.camera.far = 80;
+  sun.shadow.camera.far = 120;
   scene.add(hemi, sun, sun.target);
 
   const roughness = createFingerprintRoughness();
   const sand = createSandTextures();
   const clay = createClayMaterial(PALETTE.terracotta, roughness);
-  const clayDeep = createClayMaterial(PALETTE.terracottaDeep, roughness);
   const dark = createClayMaterial(PALETTE.darkClay, roughness, 0.03);
   const rods = createClayMaterial(PALETTE.rods, roughness, 0.03);
   const glaze = createGlazeMaterial();
-  const ground = sandGround(createGroundMaterial(sand));
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(520, 28, 16), createSkyMaterial());
+  const bone = createClayMaterial(PALETTE.glaze, roughness, 0.08);
+  const groundMaterial = createGroundMaterial(sand);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(640, 28, 16), createSkyMaterial());
   sky.frustumCulled = false;
   sky.renderOrder = -1;
-  const blockout = buildBlockout({ clay, clayDeep, dark, rods, glaze, contact: createContactTexture() }, options.mobile);
-  scene.add(ground, sky, blockout.group, blockout.contact);
+  let world: WorldScene | null = null;
+  scene.add(sky);
 
   const envTarget = createStudioEnv(renderer);
   scene.environment = envTarget.texture;
@@ -182,8 +167,10 @@ export function createWorld(options: WorldOptions): WorldHandle {
     const shadows = size > 0;
     renderer.shadowMap.enabled = shadows;
     sun.castShadow = shadows;
-    blockout.contact.visible = shadows && assembly > 0.4;
-    blockout.castShadows(shadows);
+    if (world) {
+      world.contact.visible = shadows && assembly > 0.35;
+      world.castShadows(shadows);
+    }
     if (shadows && sun.shadow.mapSize.x !== size) {
       sun.shadow.mapSize.set(size, size);
       sun.shadow.map?.dispose();
@@ -211,12 +198,14 @@ export function createWorld(options: WorldOptions): WorldHandle {
     camera.position.set(orbited[0], orbited[1], orbited[2]);
     camera.up.set(0, 1, 0);
     camera.lookAt(pose.tx, pose.ty, pose.tz);
-    camera.setViewOffset(width, height, pose.shiftX * width, pose.shiftY * height, width, height);
+    const shiftX = options.mobile ? pose.shiftX * 0.2 : pose.shiftX;
+    const shiftY = pose.shiftY + (options.mobile ? 0.2 : 0);
+    camera.setViewOffset(width, height, shiftX * width, shiftY * height, width, height);
     const aim = sun.target.position;
     aim.set(pose.tx, pose.ty * 0.35, pose.tz);
     sun.position.copy(aim).addScaledVector(SUN_DIR, 36);
     const dist = camera.position.distanceTo(aim);
-    const extent = THREE.MathUtils.clamp(dist * 0.48, 7, 24);
+    const extent = THREE.MathUtils.clamp(dist * 1.05, 14, 40);
     const shadow = sun.shadow.camera;
     shadow.left = -extent;
     shadow.right = extent;
@@ -249,6 +238,9 @@ export function createWorld(options: WorldOptions): WorldHandle {
     }
 
     const time = path ? timeAtProgress(progress, path.duration) : 0;
+    // Rest pose is the unassembled start. After the loader, the hero hold stays assembled.
+    const animTime = !revealed ? assembly * 3.5 : time < 3.5 ? 3.5 : time;
+    world?.setTime(animTime);
     target = path && revealed ? samplePose(path, time) : clonePose(HERO_POSE);
     if (revealed && now > revealUntil) lambda = 6.4;
     pose.px = damp(pose.px, target.px, lambda, dt);
@@ -273,8 +265,7 @@ export function createWorld(options: WorldOptions): WorldHandle {
       }
     }
 
-    blockout.setIdle(now / 1000, options.motion && revealed);
-    blockout.contact.visible = tier < 2 && assembly > 0.4;
+    if (world) world.contact.visible = tier < 2 && assembly > 0.35;
     applyCamera();
     renderer.render(scene, camera);
     stats.progress = progress;
@@ -309,7 +300,7 @@ export function createWorld(options: WorldOptions): WorldHandle {
           if (part.value) {
             chunks.push(part.value);
             received += part.value.byteLength;
-            options.onProgress(0.12 + 0.7 * Math.min(1, received / total));
+            options.onProgress(0.04 + 0.16 * Math.min(1, received / total));
           }
         }
         const bytes = new Uint8Array(received);
@@ -321,11 +312,20 @@ export function createWorld(options: WorldOptions): WorldHandle {
         json = JSON.parse(new TextDecoder().decode(bytes));
       } else {
         json = await response.json();
-        options.onProgress(0.82);
+        options.onProgress(0.2);
       }
       if (disposed) return;
       path = parseCameraPath(json);
-      options.onProgress(0.9);
+      options.onProgress(0.22);
+      world = await loadWorldScene(
+        { clay, dark, rods, glaze, bone, ground: groundMaterial, contact: createContactTexture() },
+        (value) => options.onProgress(0.22 + value * 0.68),
+      );
+      if (disposed) return;
+      world.setAssembly(assembly);
+      world.castShadows(renderer.shadowMap.enabled);
+      scene.add(world.group, world.contact);
+      options.onProgress(0.94);
       renderer.compile(scene, camera);
       renderer.render(scene, camera);
       options.onProgress(1);
@@ -344,7 +344,7 @@ export function createWorld(options: WorldOptions): WorldHandle {
     },
     setAssembly(next) {
       assembly = Math.min(1, Math.max(0, next));
-      blockout.setAssembly(assembly);
+      world?.setAssembly(assembly);
     },
     setPointer(x, y, fine) {
       pointerFine = fine && !options.mobile;

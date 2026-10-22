@@ -321,9 +321,9 @@ html:has(.net)::-webkit-scrollbar {
   .net-hero-copy,
   .net-still-copy {
     top: auto;
-    bottom: 96px;
+    bottom: 88px;
     left: 20px;
-    width: calc(100% - 40px);
+    width: min(280px, calc(100% - 40px));
     transform: none;
   }
 

@@ -76,6 +76,7 @@ describe("network camera path", () => {
     expect(timeAtProgress(0)).toBe(0);
     expect(timeAtProgress(1)).toBe(0);
     expect(posesClose(samplePose(path, timeAtProgress(0.999)), start, 0.35)).toBe(true);
+    expect(posesClose(samplePose(path, timeAtProgress(0.99)), start, 0.4)).toBe(true);
   });
 
   it("keeps the beat proportions and the epoch return", () => {
@@ -92,6 +93,7 @@ describe("network camera path", () => {
     expect(indexLabel(beatAt(44))).toBe("05 / LOSS");
     const input = (10.5 - 0) / PATH_DURATION;
     expect(beatAt(timeAtProgress(input)).label).toBe("INPUT");
+    expect(timeAtProgress(0.95)).toBe(60);
   });
 
   it("damps without crossing the target and caps pointer parallax at 1.5 degrees", () => {
@@ -107,7 +109,9 @@ describe("network camera path", () => {
     expect(Math.abs(parallaxRadians(2, -2, true).yaw)).toBeLessThanOrEqual(max + 1e-9);
     expect(parallaxRadians(1, 0, false)).toEqual({ yaw: 0, pitch: 0 });
     expect(verticalFovForAspect(29.323, 1.6)).toBeCloseTo(29.323, 5);
-    expect(verticalFovForAspect(29.323, 390 / 844)).toBeGreaterThan(70);
+    const phone = verticalFovForAspect(29.323, 390 / 844);
+    expect(phone).toBeGreaterThan(40);
+    expect(phone).toBeLessThan(58);
   });
 });
 
@@ -184,7 +188,7 @@ describe("network route copy and assets", () => {
     }
     const page = readFileSync("app/lab/network/NetworkExperience.tsx", "utf8");
     const css = readFileSync("app/lab/network/network.css", "utf8");
-    const blockout = readFileSync("app/lab/network/engine/blockout.ts", "utf8");
+    const blockout = readFileSync("app/lab/network/engine/worldScene.ts", "utf8");
     expect(page).toContain("{HERO_H1}");
     expect(page).toContain("{CTA_LABEL}");
     expect(page).toContain('href={CTA_HREF}');
@@ -195,6 +199,9 @@ describe("network route copy and assets", () => {
     expect(css).not.toContain("box-shadow");
     expect(`${page}\n${css}`).not.toMatch(/Unlock|Elevate|Seamless/);
     expect(blockout).toContain("BLOCKOUT");
+    expect(blockout).toContain("world-blockout.glb");
+    expect(blockout).toContain("BoneGlaze");
+    expect(statSync("public/lab/network/world-blockout.glb").size).toBeGreaterThan(1_000_000);
     expect(readFileSync("app/page.tsx", "utf8")).not.toContain("/lab/network");
     expect(readFileSync("app/lab/network/page.tsx", "utf8")).toContain("index: false");
     for (const still of STILLS) {
