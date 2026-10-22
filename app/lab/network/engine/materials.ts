@@ -1,10 +1,14 @@
 import * as THREE from "three";
 import { PALETTE } from "./palette";
 
-const hazeColor = new THREE.Color(PALETTE.horizon);
+/** Output sRGB. AgX would pull these creams toward grey, so they are mixed after the tone map. */
+const HAZE_SRGB = new THREE.Vector3(239 / 255, 230 / 255, 214 / 255);
+// #E4D8C4 is 228,216,196 (s 0.37). This is the same cream pulled into s 0.30.
+const SAND_SRGB = new THREE.Vector3(225 / 255, 215 / 255, 199 / 255);
 
 export const hazeUniforms = {
-  uHazeColor: { value: hazeColor },
+  uHazeSrgb: { value: HAZE_SRGB },
+  uSandSrgb: { value: SAND_SRGB },
   uHazeDensity: { value: 0.012 },
   uHazeStart: { value: 46 },
 };
@@ -139,11 +143,17 @@ vNetWorld = (modelMatrix * netWorld).xyz;
 #include <project_vertex>
 `;
 
-const HAZE_MIX = `
+const HAZE_FACTOR = `
   float netDist = distance(vNetWorld, cameraPosition);
   float netLift = exp(-0.085 * max(vNetWorld.y, 0.0));
-  float netHaze = clamp(1.0 - exp(-uHazeDensity * max(netDist - uHazeStart, 0.0) * netLift), 0.0, 1.0);
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, uHazeColor, netHaze);
+  netHaze = clamp(1.0 - exp(-uHazeDensity * max(netDist - uHazeStart, 0.0) * netLift), 0.0, 1.0);
+`;
+
+/** Applied after the sRGB encode, so the cream is the output pixel, not an AgX input. */
+const OUTPUT_GRADE = `
+  gl_FragColor.rgb = clamp(gl_FragColor.rgb * uSandGain, 0.0, 1.0);
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, uSandSrgb, netGround);
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, uHazeSrgb, netHaze);
 `;
 
 /**
@@ -169,8 +179,7 @@ const CONTOUR = `
   float netUp = netNl > 1e-5 ? abs(netN.y) / netNl : 1.0;
   float netSteep = 1.0 - smoothstep(0.2, 0.5, netUp);
   float netCliff = netSteep * smoothstep(16.0, 23.0, netRange);
-  vec3 netSand = vec3(0.66, 0.58, 0.46);
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, netSand, clamp(max(netFar, netCliff), 0.0, 1.0));
+  netGround = clamp(max(netFar, netCliff), 0.0, 1.0);
 `;
 
 /** Darker clay deeper in the shaft. The rim and the opening stay bright. */
@@ -190,7 +199,9 @@ const SURFACE_EXTRA: Record<SurfaceFx, string> = {
 function bindSurface(material: THREE.Material, fx: SurfaceFx) {
   const extra = SURFACE_EXTRA[fx];
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uHazeColor = hazeUniforms.uHazeColor;
+    shader.uniforms.uHazeSrgb = hazeUniforms.uHazeSrgb;
+    shader.uniforms.uSandSrgb = hazeUniforms.uSandSrgb;
+    shader.uniforms.uSandGain = { value: material.userData.sandGain ?? new THREE.Vector3(1, 1, 1) };
     shader.uniforms.uHazeDensity = hazeUniforms.uHazeDensity;
     shader.uniforms.uHazeStart = hazeUniforms.uHazeStart;
     shader.vertexShader = shader.vertexShader
@@ -199,11 +210,15 @@ function bindSurface(material: THREE.Material, fx: SurfaceFx) {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
-        "#include <common>\nvarying vec3 vNetWorld;\nuniform vec3 uHazeColor;\nuniform float uHazeDensity;\nuniform float uHazeStart;",
+        "#include <common>\nvarying vec3 vNetWorld;\nuniform vec3 uHazeSrgb;\nuniform vec3 uSandSrgb;\nuniform vec3 uSandGain;\nuniform float uHazeDensity;\nuniform float uHazeStart;\nfloat netHaze;\nfloat netGround;",
       )
-      .replace("#include <tonemapping_fragment>", `{\n${extra}\n${HAZE_MIX}\n}\n#include <tonemapping_fragment>`);
+      .replace(
+        "#include <tonemapping_fragment>",
+        `{\nnetHaze = 0.0;\nnetGround = 0.0;\n${extra}\n${HAZE_FACTOR}\n}\n#include <tonemapping_fragment>`,
+      )
+      .replace("#include <colorspace_fragment>", `#include <colorspace_fragment>\n${OUTPUT_GRADE}`);
   };
-  material.customProgramCacheKey = () => `net-surface-${fx}`;
+  material.customProgramCacheKey = () => `net-surface-${fx}-srgb-grade`;
 }
 
 export function applyHaze(material: THREE.Material) {
@@ -269,18 +284,22 @@ export function createGroundMaterial(textures: ReturnType<typeof createSandTextu
     metalness: 0,
     envMapIntensity: 0.02,
     normalScale: new THREE.Vector2(0.08, 0.08),
+    // AgX leaves this cream grey. The clay stays on AgX; the sand does not.
+    toneMapped: false,
   });
+  // Ungraded sand sat near 0.19. These gains land the lit pixels on warm cream.
+  material.userData.sandGain = new THREE.Vector3(1.27, 1.32, 1.43);
   applyHaze(material);
   return material;
 }
 
 export function createSkyMaterial() {
-  const horizon = new THREE.Color(PALETTE.horizon);
+  const horizon = new THREE.Color(PALETTE.surface);
   const zenith = new THREE.Color(PALETTE.surface);
   return new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
-    toneMapped: true,
+    toneMapped: false,
     uniforms: {
       uHorizon: { value: horizon },
       uZenith: { value: zenith },
