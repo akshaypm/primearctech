@@ -239,8 +239,9 @@ export function createWorld(options: WorldOptions): WorldHandle {
       const avg = frameTimes.reduce((sum, value) => sum + value, 0) / frameTimes.length;
       stats.frameMs = avg;
       stats.fps = avg > 0 ? 1000 / avg : 0;
-      // Frames slower than 48ms are stalls (compile, a software GL). They are not a laptop tier signal.
-      if (frame > 45 && frameMs < 48) {
+      // Frames slower than 80ms are stalls (compile, a software GL readback).
+      // A laptop sitting between 20ms and 80ms still steps the tier down.
+      if (frame > 45 && frameMs < 80) {
         const stepped = stepQuality(tier, frameMs, slow);
         slow = stepped.slow;
         if (stepped.tier !== tier) applyTier(stepped.tier);
