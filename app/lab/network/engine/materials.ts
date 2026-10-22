@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { PALETTE, claySheen } from "./palette";
+import { PALETTE } from "./palette";
 
 const hazeColor = new THREE.Color(PALETTE.horizon);
 
@@ -52,16 +52,16 @@ export function createSandTextures() {
       heights[y * size + x] = n;
     }
   }
-  const sand = new THREE.Color("#E8DFD2");
-  const deep = new THREE.Color("#E5DACC");
-  const lift = new THREE.Color("#F3EBE0");
+  const sand = new THREE.Color(PALETTE.sand);
+  const deep = new THREE.Color("#DDD0BC");
+  const lift = new THREE.Color(PALETTE.surface);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = y * size + x;
       const h = heights[i];
       const grain = valueNoise(x / 2.2, y / 2.2);
-      const color = sand.clone().lerp(h > 0.55 ? lift : deep, Math.abs(h - 0.5) * 0.08 + grain * 0.01);
-      color.lerp(lift, 0.22);
+      const color = sand.clone().lerp(h > 0.55 ? lift : deep, Math.abs(h - 0.5) * 0.12 + grain * 0.02);
+      color.lerp(lift, 0.4);
       const hex = color.getHex();
       const o = i * 4;
       albedo[o] = (hex >> 16) & 255;
@@ -139,17 +139,56 @@ vNetWorld = (modelMatrix * netWorld).xyz;
 #include <project_vertex>
 `;
 
-const HAZE_FRAGMENT = `
-{
+const HAZE_MIX = `
   float netDist = distance(vNetWorld, cameraPosition);
   float netLift = exp(-0.085 * max(vNetWorld.y, 0.0));
   float netHaze = clamp(1.0 - exp(-uHazeDensity * max(netDist - uHazeStart, 0.0) * netLift), 0.0, 1.0);
   gl_FragColor.rgb = mix(gl_FragColor.rgb, uHazeColor, netHaze);
-}
-#include <tonemapping_fragment>
 `;
 
-export function applyHaze(material: THREE.Material) {
+/**
+ * Contours every 0.15 m of world height. fwidth anti-aliases a groove a few pixels wide.
+ * Farther than the loss bowl, the sculpt fades into the sand so the embedding
+ * horizon is not a red slab. The bowl itself stays inside that distance.
+ */
+const CONTOUR = `
+  float netBands = vNetWorld.y / 0.15;
+  float netFw = max(fwidth(netBands), 1e-3);
+  // A few pixels wide, still anti-aliased. A 1px groove vanishes in the still.
+  float netWidth = netFw * 3.6;
+  float netFrac = fract(netBands);
+  float netDistLine = min(netFrac, 1.0 - netFrac);
+  float netGroove = 1.0 - smoothstep(0.0, netWidth, netDistLine);
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.045, 0.014, 0.008), netGroove * 0.82);
+  float netRange = distance(vNetWorld, cameraPosition);
+  float netFar = smoothstep(12.0, 21.0, netRange);
+  vec3 netDx = dFdx(vNetWorld);
+  vec3 netDy = dFdy(vNetWorld);
+  vec3 netN = cross(netDx, netDy);
+  float netNl = length(netN);
+  float netUp = netNl > 1e-5 ? abs(netN.y) / netNl : 1.0;
+  float netSteep = 1.0 - smoothstep(0.2, 0.5, netUp);
+  float netCliff = netSteep * smoothstep(16.0, 23.0, netRange);
+  vec3 netSand = vec3(0.66, 0.58, 0.46);
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, netSand, clamp(max(netFar, netCliff), 0.0, 1.0));
+`;
+
+/** Darker clay deeper in the shaft. The rim and the opening stay bright. */
+const SHAFT = `
+  float netOpen = clamp((vNetWorld.y - 1.5) / 14.0, 0.0, 1.0);
+  gl_FragColor.rgb *= mix(0.34, 0.58, netOpen);
+`;
+
+type SurfaceFx = "haze" | "contour" | "shaft";
+
+const SURFACE_EXTRA: Record<SurfaceFx, string> = {
+  haze: "",
+  contour: CONTOUR,
+  shaft: SHAFT,
+};
+
+function bindSurface(material: THREE.Material, fx: SurfaceFx) {
+  const extra = SURFACE_EXTRA[fx];
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uHazeColor = hazeUniforms.uHazeColor;
     shader.uniforms.uHazeDensity = hazeUniforms.uHazeDensity;
@@ -162,10 +201,33 @@ export function applyHaze(material: THREE.Material) {
         "#include <common>",
         "#include <common>\nvarying vec3 vNetWorld;\nuniform vec3 uHazeColor;\nuniform float uHazeDensity;\nuniform float uHazeStart;",
       )
-      .replace("#include <tonemapping_fragment>", HAZE_FRAGMENT);
+      .replace("#include <tonemapping_fragment>", `{\n${extra}\n${HAZE_MIX}\n}\n#include <tonemapping_fragment>`);
   };
-  const previous = material.customProgramCacheKey?.bind(material);
-  material.customProgramCacheKey = () => `net-haze-v1-${previous ? previous() : ""}`;
+  material.customProgramCacheKey = () => `net-surface-${fx}`;
+}
+
+export function applyHaze(material: THREE.Material) {
+  bindSurface(material, "haze");
+}
+
+/** Loss sculpt: brick clay plus the contour lines the Blender export did not keep. */
+export function createTerrainMaterial(roughnessMap: THREE.Texture) {
+  const material = new THREE.MeshPhysicalMaterial({
+    color: PALETTE.terracotta,
+    roughness: 0.94,
+    metalness: 0,
+    sheen: 0,
+    roughnessMap,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
+  bindSurface(material, "contour");
+  return material;
+}
+
+export function applyShaftFalloff(material: THREE.Material) {
+  bindSurface(material, "shaft");
 }
 
 export function createClayMaterial(color: string, roughnessMap: THREE.Texture, envMapIntensity = 0.045) {
@@ -173,9 +235,7 @@ export function createClayMaterial(color: string, roughnessMap: THREE.Texture, e
     color,
     roughness: 0.92,
     metalness: 0,
-    sheen: 0.16,
-    sheenRoughness: 0.78,
-    sheenColor: new THREE.Color(claySheen(color)),
+    sheen: 0,
     envMapIntensity,
     roughnessMap,
   });
@@ -292,6 +352,39 @@ export function createStudioEnv(renderer: THREE.WebGLRenderer) {
   pmrem.dispose();
   equirect.dispose();
   return target;
+}
+
+/** One soft cast under the hero lattice. The shadow map on this GPU does not resolve the rods. */
+export function createLatticeShadow(cast: THREE.Vector3) {
+  const size = 256;
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = (x / (size - 1)) * 2 - 1;
+      const v = (y / (size - 1)) * 2 - 1;
+      const d = Math.hypot(u / 0.48, (v - 0.05) / 0.95);
+      const alpha = Math.exp(-d * d * 1.2);
+      const o = (y * size + x) * 4;
+      data[o] = 36;
+      data[o + 1] = 24;
+      data[o + 2] = 18;
+      data[o + 3] = Math.round(Math.min(1, alpha) * 175);
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(7.5, 12),
+    new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }),
+  );
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0));
+  mesh.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.atan2(-cast.x, -cast.z));
+  mesh.position.set(4.4, 0.28, -0.15).addScaledVector(cast, -3.4);
+  mesh.renderOrder = 2;
+  mesh.name = "lattice-shadow";
+  mesh.frustumCulled = false;
+  return mesh;
 }
 
 export function createContactTexture() {

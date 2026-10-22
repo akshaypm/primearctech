@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { applyShaftFalloff } from "./materials";
 
 /**
  * BLOCKOUT for milestone 1 is the exported animatic world.
@@ -17,6 +18,7 @@ export type WorldMaterials = {
   glaze: THREE.Material;
   bone: THREE.Material;
   ground: THREE.Material;
+  terrain: THREE.Material;
   contact: THREE.Texture;
 };
 
@@ -28,17 +30,21 @@ export type WorldScene = {
   castShadows: (on: boolean) => void;
 };
 
-const CLAY = new Set(["terracotta", "shell_in", "shell_rim", "heat0", "heat2", "heat5", "tablet", "ground"]);
+const CLAY = new Set(["terracotta", "shell_in", "shell_rim", "heat0", "heat2", "heat5", "tablet"]);
 const RODS = new Set(["clayrod"]);
 const DARK = new Set(["darkclay", "screen", "engrave2"]);
 const GLAZE = new Set(["BoneGlaze", "BoneStone"]);
 const GROUND = new Set(["sand"]);
+const TERRAIN = new Set(["ground"]);
+/** The exported signal is a 16 cm rod. The still reads closer to twice that. */
+const SIGNAL_RADIUS_SCALE = 2.15;
 
 function materialFor(name: string, materials: WorldMaterials) {
   if (GLAZE.has(name)) return materials.glaze;
   if (RODS.has(name)) return materials.rods;
   if (DARK.has(name)) return materials.dark;
   if (GROUND.has(name)) return materials.ground;
+  if (TERRAIN.has(name)) return materials.terrain;
   if (name === "engrave") return materials.bone;
   if (CLAY.has(name) || name === "") return materials.clay;
   return materials.clay;
@@ -234,22 +240,31 @@ function adopt(root: THREE.Group, animations: THREE.AnimationClip[], materials: 
       return materialFor(entry.name || "", materials);
     });
     mesh.material = next.length === 1 ? next[0] : next;
-    const inside = /^LAYERS_(shaft|band)/.test(mesh.name);
-    if (inside) {
+    const own = mesh.name || "";
+    const parentName = mesh.parent?.name || "";
+    const label = /^LAYERS_/.test(own) ? own : parentName;
+    const shaftClay = /^LAYERS_/.test(label) && !/signal|collar|pulse|courier/.test(`${own} ${parentName}`);
+    if (shaftClay) {
       const current = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const sided = current.map((entry) => {
         const clone = entry.clone();
         clone.side = THREE.DoubleSide;
+        applyShaftFalloff(clone);
         return clone;
       });
       mesh.material = sided.length === 1 ? sided[0] : sided;
     }
+    if (mesh.name === "LAYERS_signal") {
+      mesh.scale.x *= SIGNAL_RADIUS_SCALE;
+      mesh.scale.z *= SIGNAL_RADIUS_SCALE;
+    }
     mesh.castShadow = !isGroundMesh(mesh) && triangleCount(mesh) < 20000;
     mesh.receiveShadow = true;
+    if (mesh.castShadow) mesh.frustumCulled = false;
     const names = list.map((entry) => entry.name || "");
     const bone = names.some((name) => name === "BoneGlaze" || name === "BoneStone");
-    const sphere = /^ATTN_out|^HERO_n3_/.test(mesh.name);
-    if (bone || sphere) contactCandidates.push(mesh);
+    const grounded = bone || /^ATTN_out/.test(mesh.name);
+    if (grounded && !mesh.name.startsWith("HERO_")) contactCandidates.push(mesh);
   });
 
   let ground: THREE.Object3D | null = null;
@@ -260,7 +275,15 @@ function adopt(root: THREE.Group, animations: THREE.AnimationClip[], materials: 
   if (ground) reshapeGround(ground);
 
   for (const material of replaced) {
-    if (material === materials.clay || material === materials.dark || material === materials.rods || material === materials.glaze || material === materials.bone || material === materials.ground) continue;
+    if (
+      material === materials.clay ||
+      material === materials.dark ||
+      material === materials.rods ||
+      material === materials.glaze ||
+      material === materials.bone ||
+      material === materials.ground ||
+      material === materials.terrain
+    ) continue;
     material.dispose();
   }
 
@@ -290,8 +313,8 @@ function adopt(root: THREE.Group, animations: THREE.AnimationClip[], materials: 
       box.getSize(size);
       box.getCenter(center);
       const span = Math.max(size.x, size.z);
-      if (span < 0.28 || box.min.y > 4) continue;
-      const plane = contactPlane(materials.contact, center.x, center.z, Math.min(6.5, span * 2.1));
+      if (span < 0.28 || box.min.y > 1.1 || box.max.y > 3.2) continue;
+      const plane = contactPlane(materials.contact, center.x, center.z, Math.min(4.2, span * 1.7));
       contact.add(plane);
       anchors.push({ mesh, plane });
     }
@@ -312,6 +335,7 @@ function adopt(root: THREE.Group, animations: THREE.AnimationClip[], materials: 
         box.getCenter(center);
         anchor.plane.position.x = center.x;
         anchor.plane.position.z = center.z;
+        anchor.plane.visible = box.min.y < 0.9 && box.max.y < 3.2;
       }
     },
     setAssembly(next) {

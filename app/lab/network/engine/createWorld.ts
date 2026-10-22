@@ -5,9 +5,11 @@ import {
   createFingerprintRoughness,
   createGlazeMaterial,
   createGroundMaterial,
+  createLatticeShadow,
   createSandTextures,
   createSkyMaterial,
   createStudioEnv,
+  createTerrainMaterial,
 } from "./materials";
 import { loadWorldScene, type WorldScene } from "./worldScene";
 import { PALETTE } from "./palette";
@@ -59,7 +61,9 @@ export type WorldOptions = {
   onFallback: (reason: string) => void;
 };
 
-const SUN_DIR = new THREE.Vector3(1.2, 0.34, 0.32).normalize();
+// From the far side of the hero camera, so the cast falls across the foreground sand.
+const SUN_DIR = new THREE.Vector3(-1.05, 0.32, -0.28).normalize();
+const CAST_FLAT = new THREE.Vector3(-SUN_DIR.x, 0, -SUN_DIR.z).normalize();
 
 function clonePose(pose: Pose): Pose {
   return { ...pose };
@@ -118,9 +122,11 @@ export function createWorld(options: WorldOptions): WorldHandle {
   }
 
   renderer.setClearColor(PALETTE.sand, 1);
+  THREE.ColorManagement.enabled = true;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.52;
+  // AgX keeps the brick from clipping toward orange. Neutral left these reds too saturated.
+  renderer.toneMapping = THREE.AgXToneMapping;
+  renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
   // r186 folded the soft PCF kernel into PCFShadowMap. Radius is the softness.
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -130,14 +136,14 @@ export function createWorld(options: WorldOptions): WorldHandle {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(HERO_POSE.vfov, 1, 0.12, 900);
-  const hemi = new THREE.HemisphereLight(0xf6f0e6, 0xe4d6c4, 0.5);
-  const sun = new THREE.DirectionalLight(0xfffdfb, 2.35);
+  const hemi = new THREE.HemisphereLight(0xf6f1e8, 0xa8988c, 0.62);
+  const sun = new THREE.DirectionalLight(0xfffbf8, 1.15);
   sun.castShadow = true;
   sun.shadow.mapSize.set(shadowMapSize(tier) || 1024, shadowMapSize(tier) || 1024);
-  sun.shadow.radius = 10;
-  sun.shadow.blurSamples = 10;
-  sun.shadow.bias = -0.00022;
-  sun.shadow.normalBias = 0.045;
+  sun.shadow.radius = 12;
+  sun.shadow.blurSamples = 8;
+  sun.shadow.bias = -0.00028;
+  sun.shadow.normalBias = 0.012;
   sun.shadow.camera.near = 1.5;
   sun.shadow.camera.far = 120;
   scene.add(hemi, sun, sun.target);
@@ -150,6 +156,7 @@ export function createWorld(options: WorldOptions): WorldHandle {
   const glaze = createGlazeMaterial();
   const bone = createClayMaterial(PALETTE.glaze, roughness, 0.08);
   const groundMaterial = createGroundMaterial(sand);
+  const terrain = createTerrainMaterial(roughness);
   const sky = new THREE.Mesh(new THREE.SphereGeometry(640, 28, 16), createSkyMaterial());
   sky.frustumCulled = false;
   sky.renderOrder = -1;
@@ -193,24 +200,64 @@ export function createWorld(options: WorldOptions): WorldHandle {
   function applyCamera() {
     const width = Math.max(1, options.canvas.clientWidth || window.innerWidth);
     const height = Math.max(1, options.canvas.clientHeight || window.innerHeight);
-    camera.fov = verticalFovForAspect(pose.vfov, width / height);
+    let fov = verticalFovForAspect(pose.vfov, width / height);
     const orbited = orbitAround([pose.px, pose.py, pose.pz], [pose.tx, pose.ty, pose.tz], yaw, pitch);
     camera.position.set(orbited[0], orbited[1], orbited[2]);
     camera.up.set(0, 1, 0);
     camera.lookAt(pose.tx, pose.ty, pose.tz);
+    if (options.mobile && beat === "LAYERS") {
+      // The phone fov looks into the near wall. Step toward the shaft axis and down.
+      fov = Math.min(fov, 58);
+      camera.position.x += (20 - camera.position.x) * 0.55;
+      camera.position.z += (-28 - camera.position.z) * 0.55;
+      camera.position.y -= 2.6;
+      camera.lookAt(pose.tx, pose.ty, pose.tz);
+    } else if (options.mobile && beat === "LOSS") {
+      fov = Math.min(fov, 48);
+      const dx = camera.position.x - pose.tx;
+      const dy = camera.position.y - pose.ty;
+      const dz = camera.position.z - pose.tz;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      const back = 11;
+      camera.position.x += (dx / len) * back;
+      camera.position.y += (dy / len) * back + 1.8;
+      camera.position.z += (dz / len) * back;
+    }
     const shiftX = options.mobile ? pose.shiftX * 0.2 : pose.shiftX;
-    const shiftY = pose.shiftY + (options.mobile ? 0.2 : 0);
+    const shiftY = pose.shiftY + (options.mobile && (beat === "HERO" || beat === "BOOK") ? 0.2 : 0);
+    camera.fov = fov;
     camera.setViewOffset(width, height, shiftX * width, shiftY * height, width, height);
     const aim = sun.target.position;
-    aim.set(pose.tx, pose.ty * 0.35, pose.tz);
-    sun.position.copy(aim).addScaledVector(SUN_DIR, 36);
-    const dist = camera.position.distanceTo(aim);
-    const extent = THREE.MathUtils.clamp(dist * 1.05, 14, 40);
     const shadow = sun.shadow.camera;
-    shadow.left = -extent;
-    shadow.right = extent;
-    shadow.top = extent;
-    shadow.bottom = -extent;
+    const longShadow = beat === "HERO" || beat === "BOOK";
+    if (longShadow) {
+      // Centre the map down-shadow of the lattice so the cast reaches the sand.
+      aim.set(pose.tx, 0.5, pose.tz).addScaledVector(CAST_FLAT, 8);
+      sun.position.copy(aim).addScaledVector(SUN_DIR, 32);
+      const extent = 22;
+      shadow.left = -extent;
+      shadow.right = extent;
+      shadow.top = extent;
+      shadow.bottom = -extent;
+      shadow.near = 1;
+      shadow.far = 120;
+      sun.shadow.normalBias = 0.01;
+      sun.shadow.bias = -0.0002;
+      sun.shadow.radius = 10;
+    } else {
+      aim.set(pose.tx, Math.max(0.3, pose.ty * 0.35), pose.tz);
+      sun.position.copy(aim).addScaledVector(SUN_DIR, 34);
+      const dist = camera.position.distanceTo(aim);
+      const extent = THREE.MathUtils.clamp(dist * 0.9, 10, 28);
+      shadow.left = -extent;
+      shadow.right = extent;
+      shadow.top = extent;
+      shadow.bottom = -extent;
+      shadow.near = 1.2;
+      shadow.far = 110;
+      sun.shadow.normalBias = 0.02;
+      sun.shadow.radius = 8;
+    }
     shadow.updateProjectionMatrix();
     sky.position.copy(camera.position);
   }
@@ -318,10 +365,11 @@ export function createWorld(options: WorldOptions): WorldHandle {
       path = parseCameraPath(json);
       options.onProgress(0.22);
       world = await loadWorldScene(
-        { clay, dark, rods, glaze, bone, ground: groundMaterial, contact: createContactTexture() },
+        { clay, dark, rods, glaze, bone, ground: groundMaterial, terrain, contact: createContactTexture() },
         (value) => options.onProgress(0.22 + value * 0.68),
       );
       if (disposed) return;
+      world.contact.add(createLatticeShadow(CAST_FLAT));
       world.setAssembly(assembly);
       world.castShadows(renderer.shadowMap.enabled);
       scene.add(world.group, world.contact);
