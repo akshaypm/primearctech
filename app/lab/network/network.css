@@ -1,0 +1,372 @@
+.net {
+  min-height: 100vh;
+  background: #e4d8c4;
+  color: #222222;
+  color-scheme: light;
+}
+
+html:has(.net) {
+  background: #e4d8c4;
+  scroll-behavior: auto;
+  scrollbar-width: none;
+}
+
+html:has(.net.is-boot) {
+  overflow: hidden;
+}
+
+html:has(.net)::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.net-canvas,
+.net-poster {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.net-poster {
+  z-index: 0;
+  object-fit: cover;
+  background: #e4d8c4;
+}
+
+.net-canvas {
+  z-index: 1;
+  display: block;
+  background: #e4d8c4;
+  touch-action: pan-y;
+}
+
+.net-scroll {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.net-loader {
+  position: fixed;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(228, 216, 196, 0.94) 0%, rgba(228, 216, 196, 0.72) 24%, rgba(228, 216, 196, 0.16) 52%, rgba(228, 216, 196, 0) 72%);
+  transition: opacity 0.8s ease;
+}
+
+.net.is-live .net-loader,
+.net.is-still .net-loader {
+  opacity: 0;
+}
+
+.net-readout {
+  position: absolute;
+  left: 32px;
+  bottom: 78px;
+  margin: 0;
+  color: #222222;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+}
+
+.net-hairline {
+  position: absolute;
+  left: 32px;
+  bottom: 64px;
+  width: min(240px, 46vw);
+  height: 1px;
+  background: rgba(34, 34, 34, 0.28);
+}
+
+.net-hairline span {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: #222222;
+  transform: scaleX(0);
+  transform-origin: 0 0;
+}
+
+.net-hero-copy,
+.net-note,
+.net-index {
+  position: fixed;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.net-hero-copy {
+  left: 6vw;
+  top: 46%;
+  width: min(34vw, 520px);
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+
+.net.is-live.is-hero .net-hero-copy {
+  opacity: 1;
+}
+
+.net-hero-copy h1,
+.net-still-copy h1 {
+  margin: 0;
+  color: #222222;
+  font-family: "General Sans", "Avenir Next", "Segoe UI", sans-serif;
+  font-size: clamp(44px, 4.8vw, 84px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 0.96;
+  text-wrap: balance;
+}
+
+.net-note {
+  left: 32px;
+  bottom: 64px;
+  max-width: min(360px, 70vw);
+  margin: 0;
+  color: #3d2c24;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.net.is-live:not(.is-hero) .net-note {
+  opacity: 1;
+}
+
+.net-index {
+  left: 32px;
+  bottom: 28px;
+  color: #222222;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+.net-cta,
+.net-sound {
+  position: fixed;
+  z-index: 6;
+  color: #222222;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid #222222;
+  border-radius: 0;
+  text-decoration: none;
+}
+
+.net-cta {
+  top: 28px;
+  right: 32px;
+  padding: 0 0 5px;
+  font-family: "General Sans", "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.011em;
+  line-height: 1;
+}
+
+.net-sound {
+  right: 32px;
+  bottom: 28px;
+  padding: 0 0 4px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.net a:focus-visible,
+.net button:focus-visible {
+  outline: 1px solid #222222;
+  outline-offset: 4px;
+}
+
+.net-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 7;
+  display: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  pointer-events: none;
+  transform: translate3d(-40px, -40px, 0);
+}
+
+.net-cursor.is-on {
+  display: block;
+}
+
+.net-cursor i {
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  background: #843829;
+  border-radius: 50%;
+}
+
+.net-cursor span {
+  position: absolute;
+  left: 16px;
+  top: -7px;
+  color: #222222;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+}
+
+.net-cursor.is-flip span {
+  left: auto;
+  right: 16px;
+}
+
+.net-pulse {
+  position: fixed;
+  z-index: 7;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #f3ede1;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: net-pulse 300ms ease-out forwards;
+}
+
+@keyframes net-pulse {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.95;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(3.1);
+    opacity: 0;
+  }
+}
+
+@media (pointer: fine) {
+  .net,
+  .net * {
+    cursor: none;
+  }
+
+  .net-sound,
+  .net-cta {
+    cursor: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .net-cursor,
+  .net-pulse {
+    display: none !important;
+  }
+}
+
+.net-stills {
+  position: relative;
+  z-index: 1;
+}
+
+.net-still {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+.net-still img {
+  display: block;
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+  object-fit: cover;
+  background: #e4d8c4;
+}
+
+.net-still-copy,
+.net-still p {
+  position: absolute;
+  left: 32px;
+  z-index: 2;
+}
+
+.net-still-copy {
+  top: 46%;
+  width: min(34vw, 520px);
+  transform: translateY(-50%);
+}
+
+.net-still p {
+  bottom: 64px;
+  max-width: min(360px, 78vw);
+  margin: 0;
+  color: #3d2c24;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 700px) {
+  .net-hero-copy,
+  .net-still-copy {
+    top: auto;
+    bottom: 96px;
+    left: 20px;
+    width: calc(100% - 40px);
+    transform: none;
+  }
+
+  .net-hero-copy h1,
+  .net-still-copy h1 {
+    font-size: 36px;
+  }
+
+  .net-cta {
+    top: 18px;
+    right: 20px;
+    font-size: 14px;
+  }
+
+  .net-sound,
+  .net-index {
+    bottom: 18px;
+  }
+
+  .net-index,
+  .net-readout,
+  .net-hairline,
+  .net-note,
+  .net-still p {
+    left: 20px;
+  }
+
+  .net-sound {
+    right: 20px;
+  }
+
+  .net-readout {
+    bottom: 64px;
+    max-width: 70vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .net-loader,
+  .net-hero-copy,
+  .net-note,
+  .net-pulse {
+    transition: none;
+    animation: none;
+  }
+}
