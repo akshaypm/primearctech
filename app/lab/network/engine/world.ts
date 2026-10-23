@@ -5,7 +5,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { createAnim, type AnimApi, type AnimPack } from "./anim";
 import { smootherstep } from "./animatic";
-import { applyCamera, sampleCamera, type CamSample, type ExplodeFile, type StackParams } from "./camera";
+import { applyCamera, sampleCamera, type CamSample, type ExplodeFile, type RideFit, type StackParams } from "./camera";
 import { fragmentShader, fragmentShaderMobile, skyFragmentShader, skyVertexShader, vertexShader } from "./shader";
 
 const SPEC: Record<string, [number, number]> = {
@@ -20,7 +20,7 @@ const SPECK: Record<string, number> = { clay: 1.3, misc: 1.3, glaze: 0.5, stone:
 const NSTR: Record<string, number> = { clay: 2, misc: 2, glaze: 1, stone: 1, sand: 1, loss: 1 };
 const ROUGHK: Record<string, number> = { clay: 4, misc: 4 };
 const SUN = new THREE.Vector3(-0.07785, 0.7785, 0.6228).normalize();
-const SCENES = ["loader", "hero", "input", "layers", "attn", "loss", "emb"] as const;
+const SCENES = ["loader", "hero", "input", "layers", "attn", "loss", "emb", "signal"] as const;
 /** Story order ±1. A scene stays resident while it is current or a neighbour. */
 const WINDOWS: Record<string, [number, number][]> = {
   loader: [[0, 12]],
@@ -30,6 +30,7 @@ const WINDOWS: Record<string, [number, number][]> = {
   attn: [[18, 50]],
   loss: [[30, 58]],
   emb: [[40, 62.6]],
+  signal: [[0, 62.6]],
 };
 
 type TexRef = { index: number; LMAX?: number };
@@ -55,6 +56,10 @@ type MatExtra = {
   ambientDown?: number[];
   ambientDir?: { a: number[]; x: number[]; y: number[]; z: number[] };
   colorFactor?: number[];
+  rideLightMap?: TexRef & { LMAX?: number };
+  rideGlow?: TexRef & { GMAX?: number };
+  rideAux?: TexRef;
+  tintLumRef?: number;
 };
 type MatDef = {
   name?: string;
@@ -83,6 +88,7 @@ export type PoseOptions = {
   loaderMix: number;
   dive: { node: string; u: number } | null;
   fullResidency: boolean;
+  reduced?: boolean;
 };
 
 export type MemoryReport = {
@@ -171,6 +177,7 @@ export type NetworkWorld = {
   lossBounds: () => { minX: number; maxX: number; minZ: number; maxZ: number } | null;
   screen: (prefix: string) => { name: string; x: number; y: number; wx: number; wy: number; wz: number; visible: boolean; box: ScreenRect | null }[];
   attach: (object: THREE.Object3D) => void;
+  syncBall: (reduced?: boolean) => void;
   groundPoint: (x: number, y: number) => THREE.Vector3 | null;
   rayPoint: (x: number, y: number, plane: THREE.Plane) => THREE.Vector3 | null;
   dispose: () => void;
@@ -378,7 +385,7 @@ export async function loadWorld(
   });
   const [world, samples, exj, params, heroBuf] = await Promise.all([
     fetch("/network/world.json").then((r) => r.json() as Promise<{ scenes: string[] }>),
-    fetch("/network/camera-path-stack.json").then((r) => r.json() as Promise<{ samples: CamSample[] }>),
+    fetch("/network/camera-path-stack.json").then((r) => r.json() as Promise<{ samples: CamSample[]; ride?: RideFit }>),
     fetch("/network/stack-explode.json").then((r) => r.json() as Promise<ExplodeFile>),
     fetch("/network/stack_v7_params.json").then((r) => r.json() as Promise<StackParams>),
     heroBufP,
@@ -388,6 +395,20 @@ export async function loadWorld(
 
   const white = solid(255, true);
   const linearWhite = solid(255, false);
+  const nearLoader = new THREE.TextureLoader();
+  const loadNear = (url: string, srgb: boolean) => {
+    const tex = nearLoader.load(url);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = 8;
+    tex.flipY = false;
+    tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    return tex;
+  };
+  const nearN = loadNear("/network/textures/clay_normal.webp", false);
+  const nearO = loadNear("/network/textures/clay_orm.webp", false);
+  const nearA = loadNear("/network/textures/clay_neutral_albedo.webp", true);
+  const BALL_TINT = new THREE.Vector3(0.1559, 0.0273, 0.016);
   const fogCol = new THREE.Vector3(new THREE.Color("#EFE6D6").r, new THREE.Color("#EFE6D6").g, new THREE.Color("#EFE6D6").b);
   const fragment = mobileShader ? fragmentShaderMobile : fragmentShader;
   const nodeObj: Record<string, Named[]> = {};
@@ -578,6 +599,7 @@ export async function loadWorld(
           envCol: { value: new THREE.Vector3(0.86, 0.82, 0.76) },
           f0fm: { value: new THREE.Vector2(...(SPEC[kind] || SPEC.clay)) },
           isLoss: { value: loss ? 1 : 0 },
+          lossFlat: { value: 0 },
           clayMap: { value: loss ? await take(loss.clayAlbedo, true, true) : white },
           clayNormal: { value: loss ? await take(loss.clayNormal, false, true) : linearWhite },
           clayOrm: { value: loss ? await take(loss.clayOrm, false, true) : linearWhite },
@@ -606,6 +628,34 @@ export async function loadWorld(
           fogCol: { value: fogCol },
           fogNear: { value: 8 },
           fogFar: { value: 63 },
+          nearOn: { value: dyn && !(def.name || "").toLowerCase().includes("signal") ? 1 : 0 },
+          nearN: { value: nearN },
+          nearO: { value: nearO },
+          nearA: { value: nearA },
+          nearScale: { value: 1.6 },
+          nearStr: { value: 0.9 },
+          nearD0: { value: 4 },
+          nearD1: { value: 14 },
+          ballAlbRef: { value: ex.tintLumRef || 0.079 },
+          ballOn: { value: (def.name || "").toLowerCase().includes("signal") ? 1 : 0 },
+          ballLo: { value: 0.8 },
+          ballHi: { value: 0.6 },
+          ballSpec: { value: 0.7 },
+          ballRim: { value: 0.18 },
+          ballEnv: { value: 0.3 },
+          ballTintOn: { value: (def.name || "").toLowerCase().includes("signal") ? 1 : 0 },
+          ballK: { value: (def.name || "").toLowerCase().includes("signal") ? 1 : 0 },
+          ballGlow: { value: 0.75 },
+          ballPulse: { value: 1 },
+          ballTint: { value: BALL_TINT.clone() },
+          rideLm: { value: ex.rideLightMap ? await take(ex.rideLightMap.index, true, false, true) : white },
+          rideGlow: { value: ex.rideGlow ? await take(ex.rideGlow.index, true, false, true) : white },
+          rideAux: { value: ex.rideAux ? await take(ex.rideAux.index, false, false, true) : linearWhite },
+          rideOn: { value: ex.rideLightMap ? 1 : 0 },
+          rideMix: { value: 0 },
+          glowK: { value: 0 },
+          rideLmax: { value: ex.rideLightMap?.LMAX ?? 2 },
+          glowMax: { value: ex.rideGlow?.GMAX ?? 2 },
         };
         material = makeMaterial(uniforms, hasColor);
         material.userData.baseGroove = loss ? loss.grooveBump : 0;
@@ -667,13 +717,17 @@ export async function loadWorld(
 
   const heroReadyBuf = heroBuf;
   await loadScene("hero", heroReadyBuf);
-  const queue = order.filter((name) => name !== "hero");
+  if (order.includes("signal")) await loadScene("signal");
+  const queue: string[] = order.filter((name) => name !== "hero" && name !== "signal");
   let prefer: string | null = null;
   let pumping = false;
   let queueStarted = false;
   let resolveLoaded = () => {};
   const loaded = new Promise<void>((resolve) => {
-    resolveLoaded = resolve;
+    resolveLoaded = () => {
+      (window as Window & { __scenesReady?: boolean }).__scenesReady = true;
+      resolve();
+    };
   });
   const pump = () => {
     if (!queueStarted || pumping) return;
@@ -1187,8 +1241,9 @@ export async function loadWorld(
   }
 
   function spinRotors(t: number) {
-    const names = ["LAYERS_rotor_3La", "LAYERS_rotor_3Lb", "LAYERS_rotor_3Ra", "LAYERS_rotor_3Rb", "LAYERS_rotor_3Rc"];
-    names.forEach((name, index) => {
+    const rotors = exj.spin?.rotors;
+    if (!rotors) return;
+    for (const [name, deg] of Object.entries(rotors)) {
       for (const e of nodeObj[name] || []) {
         if (e.scene !== "layers") continue;
         let rest = rotorRest.get(e.o);
@@ -1196,11 +1251,11 @@ export async function loadWorld(
           rest = e.o.quaternion.clone();
           rotorRest.set(e.o, rest);
         }
-        const spin = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (index % 2 === 0 ? 1 : -1) * 0.6 * t);
-        e.o.quaternion.copy(rest).multiply(spin);
+        e.o.quaternion.copy(rest);
+        e.o.rotateOnAxis(new THREE.Vector3(0, 1, 0), ((deg * Math.PI) / 180) * t);
         e.o.updateMatrixWorld(true);
       }
-    });
+    }
   }
 
   function pose(t: number, opts: PoseOptions) {
@@ -1252,7 +1307,7 @@ export async function loadWorld(
     explodeStack(t);
     spinRotors(t);
     applyRules(t, mix);
-    applyCamera(camera, sampleCamera(samples.samples, t, opts.smoothCamera), t, cssW, cssH, opts.mobile, exj, params);
+    applyCamera(camera, sampleCamera(samples.samples, t, opts.smoothCamera), t, cssW, cssH, opts.mobile, exj, params, samples.ride ?? null);
     if (opts.mobile && cssW < cssH && t < 16.5) fitPortrait(t < 10.5 ? "hero" : "input");
     if (opts.dive && opts.dive.u > 0) blendDive(opts.dive.node, opts.dive.u);
     const mist = mistAt(t);
@@ -1264,6 +1319,7 @@ export async function loadWorld(
     updateShadows(t, opts.mobile, mix);
     sky.position.copy(camera.position);
     sky.updateMatrixWorld(true);
+    syncBall(Boolean(opts.reduced));
   }
 
   function blendDive(name: string, amount: number) {
@@ -1313,7 +1369,8 @@ export async function loadWorld(
     const OJ = [0, 1, 2, 3].map((j) => smootherstep((t - EX.t0[j]) / EX.dur[j]) * (1 - smootherstep((t - EX.close_t0 - (3 - j) * 0.25) / EX.close_dur)));
     const bdz = (k: number) => EX.block_rise * OJ.slice(0, k).reduce((a, b) => a + b, 0);
     const ldz = (k: number) => bdz(k) + EX.lid_lift * OJ[k];
-    const capx = (k: number) => k * Math.sin(((EX.lid_tilt_deg * Math.PI) / 180) * OJ[3]) + EX.cap_clear * OJ[3];
+    const tiltOf = (k: number) => EX.lid_tilt_deg_k?.[k] ?? EX.lid_tilt_deg;
+    const capx = (k: number) => k * Math.sin(((tiltOf(3) * Math.PI) / 180) * OJ[3]) + EX.cap_clear * OJ[3];
     const jobs: [THREE.Object3D, THREE.Matrix4 | null, number?][] = [];
     for (const nd of exj.nodes) {
       const hit = (nodeObj[nd.node] || []).find((e) => e.scene === "layers");
@@ -1324,7 +1381,7 @@ export async function loadWorld(
       else if (nd.kind === "lid" && nd.pivot_threejs && nd.hinge_axis_threejs) {
         const pv = new THREE.Vector3().fromArray(nd.pivot_threejs);
         const axis = new THREE.Vector3().fromArray(nd.hinge_axis_threejs).normalize();
-        const R = new THREE.Matrix4().makeRotationAxis(axis, ((-EX.lid_tilt_deg * Math.PI) / 180) * OJ[nd.block ?? 0]);
+        const R = new THREE.Matrix4().makeRotationAxis(axis, ((-tiltOf(nd.block ?? 0) * Math.PI) / 180) * OJ[nd.block ?? 0]);
         const M = Tz(ldz(nd.block ?? 0))
           .multiply(new THREE.Matrix4().makeTranslation(pv.x, pv.y, pv.z))
           .multiply(R)
@@ -1359,6 +1416,10 @@ export async function loadWorld(
       if (b !== undefined) blockOf[nd.node] = b;
     }
     const mean = OJ.reduce((a, b) => a + b, 0) / 4;
+    const glow = exj.ride?.glow;
+    const closeOf = (j: number) => smootherstep((t - EX.close_t0 - (3 - j) * 0.25) / EX.close_dur);
+    const glowK = [0, 1, 2, 3].map((j) => (glow ? glow.peak * smootherstep((t - glow.t_on[j]) / glow.ramp) * (1 - closeOf(j)) : 0));
+    const glowMean = glowK.reduce((a, b) => a + b, 0) / 4;
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -1375,9 +1436,13 @@ export async function loadWorld(
       }
       const open = block === -1 ? mean : block === undefined ? 0 : OJ[block];
       const next = vary(material, `ao:${block ?? "x"}`);
+      const rideOn = Number(material.uniforms.rideOn?.value) > 0.5;
+      const chamber = block === -1 ? glowMean : block === undefined ? 0 : glowK[block];
       next.uniforms.aoMix.value = open;
       next.uniforms.aoFloor.value = block === -1 ? 0.55 : 0;
-      next.uniforms.fillK.value = block !== undefined && block >= 0 ? 0.22 : 0;
+      next.uniforms.rideMix.value = rideOn ? open : 0;
+      next.uniforms.glowK.value = rideOn ? chamber : 0;
+      next.uniforms.fillK.value = block !== undefined && block >= 0 && !rideOn ? 0.22 : 0;
       mesh.material = next;
     });
   }
@@ -1417,6 +1482,7 @@ export async function loadWorld(
         const m = vary(material, gl ? "loss-ground" : "loss-pad");
         m.uniforms.layersClay.value = 1 - w;
         m.uniforms.grooveBump.value = Number(material.userData.baseGroove || m.userData.baseGroove || 0) * (1 - w);
+        m.uniforms.lossFlat.value = gl ? WG : 0;
         mesh.material = m;
       }
     });
@@ -1680,6 +1746,166 @@ export async function loadWorld(
     }
   }
 
+  const poolCanvas = document.createElement("canvas");
+  poolCanvas.width = 128;
+  poolCanvas.height = 128;
+  const poolCtx = poolCanvas.getContext("2d");
+  if (poolCtx) {
+    const gradient = poolCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gradient.addColorStop(0, "rgba(229,138,74,1)");
+    gradient.addColorStop(0.25, "rgba(229,138,74,0.55)");
+    gradient.addColorStop(0.55, "rgba(229,138,74,0.15)");
+    gradient.addColorStop(1, "rgba(229,138,74,0)");
+    poolCtx.fillStyle = gradient;
+    poolCtx.fillRect(0, 0, 128, 128);
+  }
+  const poolTex = new THREE.CanvasTexture(poolCanvas);
+  poolTex.colorSpace = THREE.SRGBColorSpace;
+  const poolMat = new THREE.MeshBasicMaterial({
+    map: poolTex,
+    transparent: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    blending: THREE.AdditiveBlending,
+  });
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), poolMat);
+  pool.name = "kiln-pool";
+  pool.visible = false;
+  pool.renderOrder = 5;
+  pool.frustumCulled = false;
+  scene.add(pool);
+  let kilnSwapped = false;
+  const poolRay = new THREE.Raycaster();
+  const down = new THREE.Vector3(0, -1, 0);
+
+  function chainOn(object: THREE.Object3D | undefined) {
+    if (!object) return false;
+    let visible = object.visible;
+    for (let node = object.parent; node; node = node.parent) visible = visible && node.visible;
+    return visible;
+  }
+
+  function ballSphere(root: THREE.Object3D) {
+    const meshes: THREE.Mesh[] = [];
+    root.traverse((object) => {
+      const next = object as THREE.Mesh;
+      if (next.isMesh) meshes.push(next);
+    });
+    const mesh = meshes[0];
+    if (!mesh) return null;
+    const geometry = mesh.geometry;
+    if (!geometry.userData.tightSphere) {
+      geometry.boundingSphere = null;
+      geometry.computeBoundingSphere();
+      geometry.userData.tightSphere = geometry.boundingSphere?.clone() ?? null;
+    }
+    const sphere = geometry.userData.tightSphere as THREE.Sphere | null;
+    if (!sphere) return null;
+    mesh.updateWorldMatrix(true, false);
+    const center = sphere.center.clone().applyMatrix4(mesh.matrixWorld);
+    const scale = new THREE.Vector3();
+    mesh.getWorldScale(scale);
+    return { center, radius: sphere.radius * Math.max(scale.x, scale.y, scale.z), mesh };
+  }
+
+  function coarseGround() {
+    const meshes: THREE.Mesh[] = [];
+    for (const [name, list] of Object.entries(nodeObj)) {
+      if (!/^(ground_|LAYERS_tray|INPUT_feed)/.test(name)) continue;
+      for (const entry of list) {
+        entry.o.traverse((object) => {
+          const mesh = object as THREE.Mesh;
+          if (mesh.isMesh) meshes.push(mesh);
+        });
+      }
+    }
+    return meshes;
+  }
+
+  function syncBall(reducedMotion = false) {
+    const signal = (nodeObj.SIGNAL_ball || []).find((entry) => entry.scene === "signal")?.o;
+    const loss = (nodeObj.LOSS_ball || []).find((entry) => entry.scene === "loss")?.o;
+    if (!kilnSwapped && signal && loss) {
+      const found: THREE.Material[] = [];
+      signal.traverse((object) => {
+        const mesh = object as THREE.Mesh;
+        if (mesh.isMesh && found.length === 0) {
+          const material = mesh.material;
+          if (!Array.isArray(material)) found.push(material);
+        }
+      });
+      const shared = found[0];
+      if (shared) {
+        loss.traverse((object) => {
+          const mesh = object as THREE.Mesh;
+          if (mesh.isMesh) mesh.material = shared;
+        });
+        kilnSwapped = true;
+      }
+    }
+    const signalOn = chainOn(signal);
+    if (loss) {
+      if (signalOn) {
+        loss.visible = false;
+        loss.userData.kilnHidden = true;
+      } else if (loss.userData.kilnHidden) {
+        loss.visible = !loss.userData.animHidden;
+        loss.userData.kilnHidden = false;
+      }
+    }
+    const host = signalOn ? signal : chainOn(loss) ? loss : undefined;
+    const pulse = reducedMotion ? 1 : 1 + 0.1 * Math.sin((2 * Math.PI * performance.now()) / 2600);
+    let kd = 1;
+    const sphere = host ? ballSphere(host) : null;
+    if (sphere && sphere.radius > 0.02) {
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(sphere.radius).add(sphere.center);
+      const pc = sphere.center.clone().project(camera);
+      const pr = right.clone().project(camera);
+      const width = renderer.domElement.width || cssW;
+      const height = renderer.domElement.height || cssH;
+      const dRef = 2 * Math.hypot(((pr.x - pc.x) / 2) * width, ((pr.y - pc.y) / 2) * height) * (900 / Math.max(1, height));
+      const x = Math.min(1, Math.max(0, (dRef - 60) / 90));
+      kd = x * x * (3 - 2 * x);
+    }
+    const glow = 0.75 * (0.55 + 0.45 * kd);
+    const paint = (root?: THREE.Object3D) => {
+      root?.traverse((object) => {
+        const mesh = object as THREE.Mesh;
+        const material = mesh.material as THREE.ShaderMaterial | undefined;
+        if (!mesh.isMesh || !material?.uniforms?.ballGlow) return;
+        material.uniforms.ballGlow.value = glow;
+        material.uniforms.ballPulse.value = pulse;
+      });
+    };
+    paint(signal);
+    paint(loss);
+    pool.visible = false;
+    if (host && sphere && sphere.radius > 0.02) {
+      poolRay.set(sphere.center.clone().addScaledVector(down, sphere.radius * 0.98), down);
+      poolRay.near = 0;
+      poolRay.far = 3;
+      const hit = poolRay.intersectObjects(coarseGround(), false).find((item) => item.object !== sphere.mesh);
+      if (hit) {
+        const normal = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
+        const strength = (0.18 + 0.1 * kd) * pulse * Math.max(0, 1 - hit.distance / (3 * sphere.radius));
+        pool.position.copy(hit.point).addScaledVector(normal, 0.01);
+        pool.lookAt(hit.point.clone().add(normal));
+        const size = (4 + 2 * kd) * sphere.radius;
+        pool.scale.set(size, size, 1);
+        poolMat.opacity = strength;
+        pool.visible = strength > 0.02;
+      }
+    }
+    (window as Window & { __kiln?: unknown }).__kiln = {
+      signal: signalOn,
+      loss: chainOn(loss),
+      kd: Number(kd.toFixed(3)),
+      radius: sphere ? Number(sphere.radius.toFixed(3)) : 0,
+      pool: pool.visible,
+    };
+  }
+
   function render() {
     renderer.setRenderTarget(null);
     renderer.render(scene, camera);
@@ -1758,6 +1984,7 @@ export async function loadWorld(
     lossBounds,
     screen,
     attach,
+    syncBall,
     groundPoint,
     rayPoint,
     upgrade,

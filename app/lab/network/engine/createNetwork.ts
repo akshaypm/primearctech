@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { createNetworkAudio, type NetworkAudio } from "./audio";
-import { LAYER_CALLOUTS, PRODUCTS, beatAt, beatScenes, nextScene, productFocus, type BeatId, type CueName } from "./copy";
+import { LAYER_CALLOUTS, PRODUCTS, beatAt, beatScenes, nextScene, productFocus, type BeatId } from "./copy";
 import { createHands } from "./hands";
 import { SCROLL_OMEGA, STORY_END, buildTau, createSpring, pxPerSecond, springTo, tauAt, timeAtTau } from "./scroll";
 import { loadWorld, type MemoryReport, type NetworkWorld, type Obstacle } from "./world";
@@ -260,7 +260,6 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   let sand = 0;
   let sandTarget = 0;
   let held = beatAt(shot ? clock : 0).hold;
-  let lastBeat: BeatId | null = null;
   let idleFor = 0;
   let lastScroll = window.scrollY;
   let scrollAt = performance.now();
@@ -293,7 +292,9 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   };
   const hands = createHands(world, {
     dive: diveTo,
-    cue: (name) => audio.cue(name),
+    cue: (name, opts) => audio.cue(name, opts),
+    loop: (name, level, rate) => audio.loop(name, level, rate),
+    stop: (name) => audio.stop(name),
   });
   let shownT = shot ? clock : 0;
 
@@ -310,6 +311,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     smoothCamera: !shot && !reduced,
     loaderMix: shot ? loaderMixAt(t) : mix,
     dive: dive && dive.u > 0 ? { node: productNode.get(dive.id) || dive.id, u: dive.u } : null,
+    reduced,
     fullResidency: (shot && !stream) || params.get("full") === "1",
   });
 
@@ -517,6 +519,35 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   let scrollArmed = phase !== "loader";
   let queued = shot;
 
+  const glide = new THREE.Vector3();
+  let glideT = -1;
+  let glideHot = false;
+  const rollAnim = (time: number) => {
+    if (hands.proof().ball) return;
+    const sample = world.sample("LOSS_ball", time) || world.sample("SIGNAL_ball", time);
+    if (!sample || time < 39 || time > 49) {
+      if (glideT >= 0) audio.loop("roll-loop", 0);
+      glideT = -1;
+      glideHot = false;
+      return;
+    }
+    const next = new THREE.Vector3().fromArray(sample.p);
+    if (glideT < 0) {
+      glide.copy(next);
+      glideT = time;
+      return;
+    }
+    const speed = next.distanceTo(glide) / Math.max(0.016, Math.abs(time - glideT));
+    glide.copy(next);
+    glideT = time;
+    audio.loop("roll-loop", Math.min(1, speed / 1.6), 0.9 + 0.2 * Math.min(1, speed / 2.5));
+    if (speed > 0.35) glideHot = true;
+    if (glideHot && speed < 0.08) {
+      glideHot = false;
+      audio.cue("tock", { gain: 0.55 });
+    }
+  };
+
   let last = performance.now();
   const frame = (now: number) => {
     if (!running) return;
@@ -526,7 +557,10 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       lastScroll = window.scrollY;
       scrollAt = now;
       if (!intro && !shot) targetTau = window.scrollY / px;
-      if (dive && dive.u > 0.02) dive.dir = -1;
+      if (dive && dive.u > 0.02 && dive.dir > 0) {
+        dive.dir = -1;
+        audio.cue("dive", { gain: 0.7 });
+      }
     }
     idleFor = (now - scrollAt) / 1000;
 
@@ -539,6 +573,10 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       world.pose(shotT, poseOpts(shotT));
       shownT = shotT;
       const handFrame = hands.step(dt, beatAt(shotT).id, false);
+      world.syncBall(false);
+      audio.setReduced(false);
+      audio.sync(shotT, "story");
+      rollAnim(shotT);
       world.render();
       if (frameLit()) {
         revealed = true;
@@ -628,7 +666,6 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       spring.v = 0;
       targetTau = 0;
       t = 0;
-      audio.cue("epoch");
     }
     sand += (sandTarget - sand) * Math.min(1, dt * 8);
 
@@ -641,6 +678,10 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     world.pose(t, poseOpts(t));
     const handBeat = beatAt(phase === "loader" ? t : intro ? 6 : t).id;
     const handFrame = hands.step(dt, phase === "loader" ? "loader" : handBeat, reduced);
+    world.syncBall(reduced);
+    audio.setReduced(reduced);
+    audio.sync(phase === "loader" ? clock : t, phase);
+    if (phase !== "loader") rollAnim(t);
     if (!shot && phase !== "wait") {
       const beatNow = beatAt(intro ? clock : t);
       const span = beatNow.t1 - beatNow.t0;
@@ -676,11 +717,6 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     }
 
     const beat = beatAt(phase === "loader" ? t : intro ? 6 : t);
-    if (!intro && beat.id !== lastBeat) {
-      lastBeat = beat.id;
-      const cue = (beat.id === "book" ? "book" : beat.id) as CueName;
-      audio.cue(cue);
-    }
 
     const frameMs = dt * 1000;
     if (frameMs > 22) hotFrames += 1;
@@ -757,12 +793,16 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   host.__points = (prefix: string) => world.screen(prefix);
   host.__bend = () => world.bendPeak;
   host.__proof = () => hands.proof();
+  const audioHost = window as Window & { __audio?: { fired: () => string[]; sync: (time: number, phase: string) => void }; __seek?: (time: number) => void };
+  audioHost.__audio = { fired: () => audio.fired(), sync: (time, phase) => audio.sync(time, phase) };
+  if (!shot) audioHost.__seek = (time) => scrollToTime(time);
 
   return {
     audio,
     scrollToTime,
     dive: diveTo,
     cancelDive() {
+      if (dive && dive.u > 0.02 && dive.dir > 0) audio.cue("dive", { gain: 0.7 });
       if (dive) dive.dir = -1;
     },
     skipDive() {

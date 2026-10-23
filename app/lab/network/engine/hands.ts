@@ -1,9 +1,15 @@
 import * as THREE from "three";
-import type { BeatId } from "./copy";
+import type { BeatId, CueName } from "./copy";
 import { clampScreenPull, hopWeight, resolveStack, stepUnder, stepVec, vecSpring } from "./clay";
 
 type Hit = { name: string; object: THREE.Object3D; point: THREE.Vector3 };
-type Cue = "click" | "hover" | "dive";
+type CueOpts = { gain?: number };
+type HandHooks = {
+  dive: (id: string) => void;
+  cue: (name: CueName, opts?: CueOpts) => void;
+  loop?: (name: CueName, level: number, rate?: number) => void;
+  stop?: (name: CueName) => void;
+};
 
 export type HandWorld = {
   camera: THREE.Camera;
@@ -29,6 +35,7 @@ export type HandProof = {
   squash: string[];
   spread: number;
   bead: { x: number; y: number } | null;
+  beadOpacity: number;
   jobs: number;
   age: number;
   home: number;
@@ -77,6 +84,8 @@ type Ball = {
   radius: number;
   spin: THREE.Quaternion;
   trail: { x: number; z: number; born: number }[];
+  releaseAge: number;
+  impact: number;
 };
 
 function edgeEnds(name: string) {
@@ -131,7 +140,7 @@ function estimateRadius(rest: Float32Array) {
   return Math.min(0.05, Math.max(0.012, median));
 }
 
-export function createHands(world: HandWorld, hooks: { dive: (id: string) => void; cue: (name: Cue) => void }) {
+export function createHands(world: HandWorld, hooks: HandHooks) {
   const bodies = new Map<THREE.Object3D, Body>();
   const plane = new THREE.Plane();
   const normal = new THREE.Vector3();
@@ -157,6 +166,13 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
   const used = new Set<string>();
   let ball: Ball | null = null;
   let pit: THREE.Vector3 | null = null;
+  const pitCam = new THREE.Vector3();
+  const camPos = new THREE.Vector3();
+  const sphereCenter = new THREE.Vector3();
+  const worldQuat = new THREE.Quaternion();
+  const localUp = new THREE.Vector3();
+  let dragLevel = 0;
+  let stackApart = false;
   let clock = 0;
   let edges: EdgeRec[] | null = null;
   let neighbors = new Map<string, string[]>();
@@ -166,10 +182,9 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
   const pulseJobs: PulseJob[] = [];
   const squash = new Map<string, number>();
   const beadGeo = new THREE.SphereGeometry(1, 14, 10);
-  const beadMat = new THREE.MeshBasicMaterial({ color: 0xf3ede1 });
   const beads: THREE.Mesh[] = [];
   for (let i = 0; i < 40; i += 1) {
-    const bead = new THREE.Mesh(beadGeo, beadMat);
+    const bead = new THREE.Mesh(beadGeo, new THREE.MeshBasicMaterial({ color: 0xf3ede1, transparent: true, opacity: 1, depthWrite: false }));
     bead.name = "clay-bead";
     bead.visible = false;
     bead.frustumCulled = false;
@@ -178,7 +193,7 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
     beads.push(bead);
   }
   const heightCache = new Map<string, number | null>();
-  const proof: HandProof = { pull: 0, bend: 0, pulse: 0, rod: ROD_FALLBACK, squash: [], spread: 0, bead: null, jobs: 0, age: 0, home: 0, ball: null };
+  const proof: HandProof = { pull: 0, bend: 0, pulse: 0, rod: ROD_FALLBACK, squash: [], spread: 0, bead: null, beadOpacity: 0, jobs: 0, age: 0, home: 0, ball: null };
 
   function bodyOf(object: THREE.Object3D) {
     let item = bodies.get(object);
@@ -468,7 +483,12 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
         pulseJobs.push({ edge, delay: hop * PULSE_HOP, u: 0, hop });
       }
     }
-    hooks.cue("click");
+    hooks.cue("pulse");
+  }
+
+  function fadeBead(bead: THREE.Mesh, opacity: number) {
+    const material = bead.material as THREE.MeshBasicMaterial;
+    material.opacity = opacity;
   }
 
   function stepPulse(dt: number, reduced: boolean) {
@@ -482,9 +502,11 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
       proof.pulse = 0;
       proof.age = 0;
       proof.bead = null;
+      proof.beadOpacity = 0;
       return;
     }
     let slot = 0;
+    let peakOpacity = 0;
     for (const job of pulseJobs) {
       job.u += dt / PULSE_TRAVEL;
       const age = job.u * PULSE_TRAVEL;
@@ -493,8 +515,9 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
       const u = THREE.MathUtils.clamp((age - job.delay) / PULSE_TRAVEL, 0, 1);
       const output = job.edge.to.startsWith("HERO_n3");
       if (u >= 1 && output && !squash.has(job.edge.to)) squash.set(job.edge.to, 0.28);
-      const hold = output && (squash.get(job.edge.to) || 0) > 0;
-      if (u >= 1 && !hold) continue;
+      if (u >= 1) continue;
+      const opacity = output ? 1 - THREE.MathUtils.smoothstep(u, 0.62, 0.98) : u < 0.9 ? 1 : 1 - (u - 0.9) / 0.1;
+      if (opacity < 0.04) continue;
       const from = world.named((name) => name === job.edge.from)[0];
       const to = world.named((name) => name === job.edge.to)[0];
       if (!from || !to) continue;
@@ -506,7 +529,7 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
       const beadR = 2.5 * (job.edge.radius || rodNow);
       const t0 = Math.min(0.4, ((nodeRadius.get(job.edge.from) || 0.11) + beadR) / len);
       const t1 = 1 - Math.min(0.45, ((nodeRadius.get(job.edge.to) || 0.11) + beadR) / len);
-      const along = t0 + Math.max(0.05, t1 - t0) * (hold ? 1 : u);
+      const along = t0 + Math.max(0.02, t1 - t0) * u;
       const sample = sampleEdge(job.edge, along);
       const outward = new THREE.Vector3();
       let center: THREE.Vector3;
@@ -523,7 +546,9 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
       if (!bead) continue;
       putWorld(bead, center);
       bead.scale.setScalar(beadR);
+      fadeBead(bead, opacity);
       bead.visible = true;
+      if (opacity > peakOpacity) peakOpacity = opacity;
       live += 1;
       if (job.hop >= shownHop) {
         shown = bead;
@@ -553,6 +578,7 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
       const screen = project(at);
       proof.bead = { x: Math.round(screen.x), y: Math.round(screen.y) };
     } else proof.bead = null;
+    proof.beadOpacity = Number(peakOpacity.toFixed(3));
   }
 
   function driveHero(dt: number, reduced: boolean) {
@@ -633,9 +659,50 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
     stackBounce = pushed ? Math.max(stackBounce, 0.06) : Math.max(0, stackBounce - dt * 0.35);
     indices.forEach((index, i) => {
       const extra = resolved.off[i] + (i > 0 ? stackBounce : 0);
-      for (const part of groups.get(index) || []) part.position.y += extra;
+      const parts = groups.get(index) || [];
+      for (const part of parts) part.position.y += extra;
+      const allowed = clearOfCamera(parts, extra);
+      if (allowed < extra - 1e-4) {
+        const back = extra - allowed;
+        for (const part of parts) part.position.y -= back;
+      }
     });
     proof.spread = resolved.off[resolved.off.length - 1] || 0;
+  }
+
+  function cameraNear() {
+    const cam = world.camera as THREE.PerspectiveCamera;
+    return typeof cam.near === "number" ? cam.near : 0.05;
+  }
+
+  function clearOfCamera(parts: THREE.Object3D[], extra: number) {
+    if (extra <= 0) return extra;
+    const clearance = cameraNear() + 0.22;
+    world.camera.getWorldPosition(camPos);
+    let keep = extra;
+    for (const part of parts) {
+      part.updateMatrixWorld(true);
+      part.getWorldQuaternion(worldQuat);
+      localUp.set(0, 1, 0).applyQuaternion(worldQuat);
+      part.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh || !mesh.geometry) return;
+        if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+        const sphere = mesh.geometry.boundingSphere;
+        if (!sphere) return;
+        sphereCenter.copy(sphere.center).applyMatrix4(mesh.matrixWorld);
+        const radius = sphere.radius * mesh.matrixWorld.getMaxScaleOnAxis();
+        const dist = sphereCenter.distanceTo(camPos);
+        const gap = dist - radius - clearance;
+        if (gap >= 0) return;
+        const toward = camPos.clone().sub(sphereCenter).dot(localUp);
+        if (toward <= 0.02) return;
+        const deriv = toward / Math.max(dist, 1e-3);
+        if (deriv < 0.08) return;
+        keep = Math.min(keep, Math.max(0, extra + gap / deriv - 0.01));
+      });
+    }
+    return keep;
   }
 
   function cachedHeight(x: number, z: number) {
@@ -714,20 +781,23 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
     });
   }
 
+  function inBand(x: number, y: number, z: number, x0: number, x1: number, y0: number, y1: number) {
+    const width = window.innerWidth || 1;
+    const height = window.innerHeight || 1;
+    const ndc = new THREE.Vector3(x, y, z).project(world.camera);
+    if (ndc.z < -1 || ndc.z > 1) return false;
+    const sx = (ndc.x * 0.5 + 0.5) * width;
+    const sy = (-ndc.y * 0.5 + 0.5) * height;
+    return sx / width >= x0 && sx / width <= x1 && sy / height >= y0 && sy / height <= y1;
+  }
+
   function pitPoint() {
+    world.camera.getWorldPosition(camPos);
+    if (pit && pitCam.distanceTo(camPos) > 0.25) pit = null;
     if (pit) return pit;
     const bounds = world.lossBounds();
     if (!bounds) return world.basin();
-    const width = window.innerWidth || 1;
-    const height = window.innerHeight || 1;
-    const margin = Math.min(width, height) * 0.16;
-    const framed = (x: number, y: number, z: number) => {
-      const ndc = new THREE.Vector3(x, y, z).project(world.camera);
-      if (ndc.z < -1 || ndc.z > 1) return false;
-      const sx = (ndc.x * 0.5 + 0.5) * width;
-      const sy = (-ndc.y * 0.5 + 0.5) * height;
-      return sx > margin && sy > margin && sx < width - margin && sy < height - margin;
-    };
+    const framed = (x: number, y: number, z: number) => inBand(x, y, z, 0.28, 0.72, 0.48, 0.78);
     let bestX = 0;
     let bestZ = 0;
     let bestY = Infinity;
@@ -757,6 +827,7 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
       }
     }
     pit = new THREE.Vector3(bestX, bestY, bestZ);
+    pitCam.copy(camPos);
     return pit;
   }
 
@@ -766,6 +837,8 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
     const dragging = holding === ball.obj && pointer.down;
     const step = Math.min(Math.max(dt, 0.001), 0.05);
     if (dragging) {
+      ball.releaseAge = 0;
+      hooks.loop?.("roll-loop", 0);
       const hit = world.groundPoint(pointer.x, pointer.y);
       let nx = ball.x;
       let nz = ball.z;
@@ -785,33 +858,39 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
       ball.x = clamped.x;
       ball.z = clamped.z;
     } else if (!reduced) {
+      ball.releaseAge += step;
       const slope = support(ball.x, ball.z);
       const g = 9.8;
-      if (slope) {
-        ball.vx += g * slope.n.x * slope.n.y * step;
-        ball.vz += g * slope.n.z * slope.n.y * step;
-      }
-      const speed = Math.hypot(ball.vx, ball.vz);
-      const drop = Math.min(speed, 0.05 * g * step);
-      if (speed > 1e-4) {
-        ball.vx -= (ball.vx / speed) * drop;
-        ball.vz -= (ball.vz / speed) * drop;
+      const age = ball.releaseAge;
+      const braking = age < 1 ? 0.4 : 0.4 + (age - 1) * 2.2;
+      if (slope && age < 1.8) {
+        const push = Math.max(0, 1 - age / 1.8);
+        ball.vx += g * slope.n.x * slope.n.y * step * push;
+        ball.vz += g * slope.n.z * slope.n.y * step * push;
       }
       const low = pitPoint();
-      const slowed = Math.hypot(ball.vx, ball.vz);
+      let pitDist = Infinity;
       if (low) {
         const dx = low.x - ball.x;
         const dz = low.z - ball.z;
-        const dist = Math.hypot(dx, dz);
+        pitDist = Math.hypot(dx, dz);
         const here = world.heightAt(ball.x, ball.z);
-        if (dist > 0.4) {
-          const higher = here !== null && here > low.y + 0.015;
-          const urge = slowed < 0.3 ? 2.8 : higher ? (slowed < 0.8 ? 3.2 : 1.2) : 0;
-          if (urge > 0) {
-            ball.vx += (dx / dist) * urge * step;
-            ball.vz += (dz / dist) * urge * step;
-          }
+        const higher = here !== null && here > low.y + 0.02;
+        if (age < 2.2 && pitDist > 0.5 && higher) {
+          ball.vx += (dx / pitDist) * 2.6 * step;
+          ball.vz += (dz / pitDist) * 2.6 * step;
         }
+      }
+      ball.vx *= Math.exp(-braking * step);
+      ball.vz *= Math.exp(-braking * step);
+      if (pitDist < 0.45 || age > 2.4) {
+        const kill = Math.exp(-7 * step);
+        ball.vx *= kill;
+        ball.vz *= kill;
+      }
+      if (Math.hypot(ball.vx, ball.vz) < 0.05 && (pitDist < 0.55 || age > 2.45)) {
+        ball.vx = 0;
+        ball.vz = 0;
       }
       const capped = Math.hypot(ball.vx, ball.vz);
       if (capped > 4.2) {
@@ -833,20 +912,28 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
         const height = window.innerHeight || 1;
         const sx = (ndc.x * 0.5 + 0.5) * width;
         const sy = (-ndc.y * 0.5 + 0.5) * height;
-        const margin = Math.min(width, height) * 0.06;
-        const inside = ndc.z >= -1 && ndc.z <= 1 && sx > margin && sy > margin && sx < width - margin && sy < height - margin;
+        const inside = ndc.z >= -1 && ndc.z <= 1 && sx / width >= 0.28 && sx / width <= 0.72 && sy / height >= 0.48 && sy / height <= 0.78;
         if (!inside) {
           const dx = lowNow.x - ball.x;
           const dz = lowNow.z - ball.z;
           const dist = Math.hypot(dx, dz) || 1;
-          const stepBack = Math.min(0.2, dist);
+          const stepBack = Math.min(0.12, dist);
           ball.x += (dx / dist) * stepBack;
           ball.z += (dz / dist) * stepBack;
-          ball.vx = (dx / dist) * 0.6;
-          ball.vz = (dz / dist) * 0.6;
+          if (Math.hypot(ball.vx, ball.vz) > 0.2) {
+            ball.vx *= 0.82;
+            ball.vz *= 0.82;
+          }
         }
       }
       const rolling = Math.hypot(ball.vx, ball.vz);
+      if (rolling > ball.impact) ball.impact = rolling;
+      if (ball.impact > 0.45 && rolling < 0.06) {
+        hooks.cue("tock", { gain: Math.min(1, ball.impact / 2.4) });
+        ball.impact = 0;
+      }
+      const rate = 0.9 + 0.2 * Math.min(1, rolling / 2.8);
+      hooks.loop?.("roll-loop", reduced ? 0 : Math.min(1, rolling / 1.8), rate);
       if (rolling > 0.05 && slope) {
         const vel = new THREE.Vector3(ball.vx, 0, ball.vz);
         const axis = new THREE.Vector3().crossVectors(slope.n, vel);
@@ -965,7 +1052,7 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
           if (node) {
             const at = new THREE.Vector3();
             node.getWorldPosition(at);
-            ball = { obj: node, x: at.x, z: at.z, vx: 2.2, vz: 0.4, radius: objectRadius(node) || 0.17, spin: new THREE.Quaternion(), trail: [{ x: at.x, z: at.z, born: clock }] };
+            ball = { obj: node, x: at.x, z: at.z, vx: 2.2, vz: 0.4, radius: objectRadius(node) || 0.17, spin: new THREE.Quaternion(), trail: [{ x: at.x, z: at.z, born: clock }], releaseAge: 0, impact: 0 };
           }
         }
         if (script.age > 1.6 && script.kind !== "hero") script = null;
@@ -990,6 +1077,10 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
         lastHover = hover;
         pointer.moved = false;
       }
+      const draggingNow = pointer.down && (holding !== null || layerDrag);
+      if (draggingNow && !reduced) hooks.loop?.("drag-loop", Math.min(1, dragLevel));
+      else hooks.stop?.("drag-loop");
+      dragLevel *= 0.82;
       return {
         cursor: holding && pointer.down ? "grabbing" : hover && signature(beat) ? "grab" : "default",
         hint: seen(beat) || !signature(beat) ? null : "drag",
@@ -1047,6 +1138,8 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
           radius: objectRadius(hit.object) || 0.17,
           spin: new THREE.Quaternion(),
           trail: [{ x: at.x, z: at.z, born: clock }],
+          releaseAge: 0,
+          impact: 0,
         };
         return true;
       }
@@ -1054,16 +1147,37 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
     },
     move(x: number, y: number, beat: BeatId) {
       const prev = pointer.y;
+      const dx = x - pointer.x;
+      const dy = y - pointer.y;
+      dragLevel = Math.min(1, Math.max(dragLevel * 0.5, Math.hypot(dx, dy) / 28));
       pointer.x = x;
       pointer.y = y;
       pointer.moved = true;
-      if (pointer.down && layerDrag && beat === "layers") spreadGoal = Math.min(1, Math.max(0, spreadGoal + (prev - y) * 0.0045));
+      if (pointer.down && layerDrag && beat === "layers") {
+        const delta = prev - y;
+        spreadGoal = Math.min(1, Math.max(0, spreadGoal + delta * 0.0045));
+        if (delta > 6 && !stackApart) {
+          stackApart = true;
+          hooks.cue("shatter");
+        }
+        if (delta < -6 && stackApart) {
+          stackApart = false;
+          hooks.cue("reassemble");
+        }
+      }
     },
     up(beat: BeatId) {
       const dragged = pointer.moved && (holding !== null || layerDrag);
+      const wasLayer = layerDrag;
       pointer.down = false;
       layerDrag = false;
+      dragLevel = 0;
+      hooks.stop?.("drag-loop");
       if (holding && (beat === "hero" || beat === "book")) releaseHero();
+      if (wasLayer && stackApart) {
+        stackApart = false;
+        hooks.cue("reassemble");
+      }
       if (!dragged && !grabbedAt) hooks.cue("click");
       grabbedAt = false;
       holding = null;
@@ -1077,10 +1191,18 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
       }
       if (key === "ArrowUp" && beat === "layers") {
         spreadGoal = Math.min(1, spreadGoal + 0.25);
+        if (!stackApart) {
+          stackApart = true;
+          hooks.cue("shatter");
+        }
         handled = true;
       }
       if (key === "ArrowDown" && beat === "layers") {
         spreadGoal = Math.max(0, spreadGoal - 0.25);
+        if (stackApart && spreadGoal < 0.2) {
+          stackApart = false;
+          hooks.cue("reassemble");
+        }
         handled = true;
       }
       if ((key === "ArrowRight" || key === "ArrowLeft") && (beat === "hero" || beat === "book")) {
@@ -1100,7 +1222,7 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
         if (node) {
           const at = new THREE.Vector3();
           node.getWorldPosition(at);
-          ball = { obj: node, x: at.x, z: at.z, vx: 2.4, vz: 0.3, radius: objectRadius(node) || 0.17, spin: new THREE.Quaternion(), trail: [{ x: at.x, z: at.z, born: clock }] };
+          ball = { obj: node, x: at.x, z: at.z, vx: 2.4, vz: 0.3, radius: objectRadius(node) || 0.17, spin: new THREE.Quaternion(), trail: [{ x: at.x, z: at.z, born: clock }], releaseAge: 0, impact: 0 };
           handled = true;
         }
       }

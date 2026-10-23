@@ -6,6 +6,7 @@
   "attn",
   "loss",
   "emb",
+  "signal",
   "loader"
  ]
 }

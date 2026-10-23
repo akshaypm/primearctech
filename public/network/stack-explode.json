@@ -1,30 +1,36 @@
 {
- "about": "LAYERS stack v7 live explode (three.js). o_j(t) = ease(clamp((t - t0[j]) / dur[j], 0, 1)) for j = 0..3 (AUDIT..RUN), ease = smootherstep u^3(6u^2-15u+10); close (scroll-forward only, camera already in the attention scene): o_j *= 1 - ease((t - close_t0 - (3-j)*0.25)/close_dur). Scrolling back reverses exactly (pure function of t). Blender Z-up world metres; *_threejs = (x, z, -y). Rest = the closed stack exactly as modelled (all nodes identity at rest). Live extras: glaze pulse travels up LAYERS_spine (existing LAYERS_pulse*/courier* animation, recentred on the new spine via delta_location); LAYERS_rotor_* spin about their local Z (0.6 rad/s, alternate direction). LAYERS_trayfill_* (children of the lid nodes) = soft RectAreaLights, intensity w_open * o_k(t).",
+ "about": "RIDE-V1: explode retimed to the inside-ride camera (each block opens as the camera reaches its chamber); block_rise/lid_lift/tilt reduced so the open stack is 24.3 m tall. LAYERS stack v7 live explode (three.js). o_j(t) = ease(clamp((t - t0[j]) / dur[j], 0, 1)) for j = 0..3 (AUDIT..RUN), ease = smootherstep u^3(6u^2-15u+10); close (scroll-forward only, camera already in the attention scene): o_j *= 1 - ease((t - close_t0 - (3-j)*0.25)/close_dur). Scrolling back reverses exactly (pure function of t). Blender Z-up world metres; *_threejs = (x, z, -y). Rest = the closed stack exactly as modelled (all nodes identity at rest). Live extras: glaze pulse travels up LAYERS_spine (existing LAYERS_pulse*/courier* animation, recentred on the new spine via delta_location); LAYERS_rotor_* spin about their local Z (0.6 rad/s, alternate direction). LAYERS_trayfill_* (children of the lid nodes) = soft RectAreaLights, intensity w_open * o_k(t).",
  "trayfill": {
   "w_per_half": 150.0,
   "color": "#FFF7EE",
   "note": "area light under each lid half, energy * o_k (live: RectAreaLight intensity * o_k); v6: 260->150 W and a more neutral colour so the terracotta keeps the ref darkness (no flat/pink)"
  },
  "explode": {
-  "block_rise": 4.1,
-  "lid_lift": 2.2,
-  "lid_tilt_deg": 9.0,
+  "block_rise": 1.9,
+  "lid_lift": 1.5,
+  "lid_tilt_deg": 8.0,
   "t0": [
-   20.5,
-   22.4,
-   24.3,
-   26.2
+   23.35,
+   25.48,
+   27.05,
+   28.61
   ],
   "dur": [
-   2.2,
-   2.2,
-   2.2,
-   2.2
+   1.4,
+   1.4,
+   1.4,
+   1.4
   ],
   "close_t0": 37.0,
   "close_dur": 2.0,
   "ease": "smootherstep",
-  "cap_clear": 0.3
+  "cap_clear": 0.3,
+  "lid_tilt_deg_k": [
+   8.0,
+   8.0,
+   8.0,
+   35.0
+  ]
  },
  "spine_axis_xy": [
   17.6807,
@@ -55,7 +61,12 @@
     "LAYERS_trayacc_audit_0L",
     "LAYERS_trayacc_audit_0R",
     "LAYERS_trayfloor_0L",
-    "LAYERS_trayfloor_0R"
+    "LAYERS_trayfloor_0R",
+    "LAYERS_slotcells_0L",
+    "LAYERS_slotcells_0R",
+    "LAYERS_audit_ledger_0R",
+    "LAYERS_audit_magnifier_0R",
+    "LAYERS_callout_01_audit"
    ],
    "dz_exploded": "block_rise * sum_{j<k} o_j(t)"
   },
@@ -75,7 +86,8 @@
    ],
    "children": [
     "LAYERS_lid_0L",
-    "LAYERS_trayfill_0L"
+    "LAYERS_trayfill_0L",
+    "LAYERS_lidjoist_0L"
    ],
    "dz_exploded": "box_dz(k) + lid_lift * o_k(t)",
    "tilt": "rotate about the hinge axis (through the pivot) by -lid_tilt_deg * o_k(t) (right-hand rule; front edge rises)",
@@ -106,7 +118,8 @@
    ],
    "children": [
     "LAYERS_lid_0R",
-    "LAYERS_trayfill_0R"
+    "LAYERS_trayfill_0R",
+    "LAYERS_lidjoist_0R"
    ],
    "dz_exploded": "box_dz(k) + lid_lift * o_k(t)",
    "tilt": "rotate about the hinge axis (through the pivot) by -lid_tilt_deg * o_k(t) (right-hand rule; front edge rises)",
@@ -147,7 +160,10 @@
     "LAYERS_trayacc_design_1L",
     "LAYERS_trayacc_design_1R",
     "LAYERS_trayfloor_1L",
-    "LAYERS_trayfloor_1R"
+    "LAYERS_trayfloor_1R",
+    "LAYERS_slotcells_1L",
+    "LAYERS_slotcells_1R",
+    "LAYERS_callout_02_design"
    ],
    "dz_exploded": "block_rise * sum_{j<k} o_j(t)"
   },
@@ -167,7 +183,8 @@
    ],
    "children": [
     "LAYERS_lid_1L",
-    "LAYERS_trayfill_1L"
+    "LAYERS_trayfill_1L",
+    "LAYERS_lidjoist_1L"
    ],
    "dz_exploded": "box_dz(k) + lid_lift * o_k(t)",
    "tilt": "rotate about the hinge axis (through the pivot) by -lid_tilt_deg * o_k(t) (right-hand rule; front edge rises)",
@@ -198,7 +215,8 @@
    ],
    "children": [
     "LAYERS_lid_1R",
-    "LAYERS_trayfill_1R"
+    "LAYERS_trayfill_1R",
+    "LAYERS_lidjoist_1R"
    ],
    "dz_exploded": "box_dz(k) + lid_lift * o_k(t)",
    "tilt": "rotate about the hinge axis (through the pivot) by -lid_tilt_deg * o_k(t) (right-hand rule; front edge rises)",
@@ -234,12 +252,13 @@
     "LAYERS_cells_2R",
     "LAYERS_posts_1L",
     "LAYERS_posts_1R",
-    "LAYERS_tray_build_2L",
-    "LAYERS_tray_build_2R",
-    "LAYERS_trayacc_build_2L",
-    "LAYERS_trayacc_build_2R",
     "LAYERS_trayfloor_2L",
-    "LAYERS_trayfloor_2R"
+    "LAYERS_trayfloor_2R",
+    "LAYERS_slotcells_2L",
+    "LAYERS_slotcells_2R",
+    "LAYERS_build_arch_2L",
+    "LAYERS_build_tower_2R",
+    "LAYERS_callout_03_build"
    ],
    "dz_exploded": "block_rise * sum_{j<k} o_j(t)"
   },
@@ -259,7 +278,8 @@
    ],
    "children": [
     "LAYERS_lid_2L",
-    "LAYERS_trayfill_2L"
+    "LAYERS_trayfill_2L",
+    "LAYERS_lidjoist_2L"
    ],
    "dz_exploded": "box_dz(k) + lid_lift * o_k(t)",
    "tilt": "rotate about the hinge axis (through the pivot) by -lid_tilt_deg * o_k(t) (right-hand rule; front edge rises)",
@@ -290,7 +310,8 @@
    ],
    "children": [
     "LAYERS_lid_2R",
-    "LAYERS_trayfill_2R"
+    "LAYERS_trayfill_2R",
+    "LAYERS_lidjoist_2R"
    ],
    "dz_exploded": "box_dz(k) + lid_lift * o_k(t)",
    "tilt": "rotate about the hinge axis (through the pivot) by -lid_tilt_deg * o_k(t) (right-hand rule; front edge rises)",
@@ -332,7 +353,10 @@
     "LAYERS_rotor_3Rb",
     "LAYERS_rotor_3Rc",
     "LAYERS_trayfloor_3L",
-    "LAYERS_trayfloor_3R"
+    "LAYERS_trayfloor_3R",
+    "LAYERS_slotcells_3L",
+    "LAYERS_slotcells_3R",
+    "LAYERS_callout_04_run"
    ],
    "dz_exploded": "block_rise * sum_{j<k} o_j(t)"
   },
@@ -341,30 +365,31 @@
    "kind": "lid",
    "block": 3,
    "pivot": [
-    22.5739,
-    30.5739,
+    14.5058,
+    28.8556,
     13.06
    ],
    "pivot_threejs": [
-    22.5739,
+    14.5058,
     13.06,
-    -30.5739
+    -28.8556
    ],
    "children": [
     "LAYERS_lid_3L",
-    "LAYERS_trayfill_3L"
+    "LAYERS_trayfill_3L",
+    "LAYERS_lidjoist_3L"
    ],
    "dz_exploded": "box_dz(k) + lid_lift * o_k(t)",
-   "tilt": "rotate about the hinge axis (through the pivot) by -lid_tilt_deg * o_k(t) (right-hand rule; front edge rises)",
+   "tilt": "r4 RUN gate: the RUN lid halves are side-hinged doors: rotate about the OUTER bottom edge (axis along the slot) by -lid_tilt_deg_k[3]*o_3 -> inner edges rise, the stack top opens",
    "hinge_axis": [
-    0.7071,
-    -0.7071,
+    0.70711,
+    0.70711,
     0.0
    ],
    "hinge_axis_threejs": [
-    0.7071,
+    0.70711,
     0.0,
-    0.7071
+    -0.70711
    ]
   },
   {
@@ -372,30 +397,31 @@
    "kind": "lid",
    "block": 3,
    "pivot": [
-    22.3617,
-    30.3617,
+    20.5728,
+    22.7886,
     13.06
    ],
    "pivot_threejs": [
-    22.3617,
+    20.5728,
     13.06,
-    -30.3617
+    -22.7886
    ],
    "children": [
     "LAYERS_lid_3R",
-    "LAYERS_trayfill_3R"
+    "LAYERS_trayfill_3R",
+    "LAYERS_lidjoist_3R"
    ],
    "dz_exploded": "box_dz(k) + lid_lift * o_k(t)",
-   "tilt": "rotate about the hinge axis (through the pivot) by -lid_tilt_deg * o_k(t) (right-hand rule; front edge rises)",
+   "tilt": "r4 RUN gate: the RUN lid halves are side-hinged doors: rotate about the OUTER bottom edge (axis along the slot) by -lid_tilt_deg_k[3]*o_3 -> inner edges rise, the stack top opens",
    "hinge_axis": [
-    0.7071,
-    -0.7071,
+    -0.70711,
+    -0.70711,
     0.0
    ],
    "hinge_axis_threejs": [
-    0.7071,
+    -0.70711,
     0.0,
-    0.7071
+    0.70711
    ]
   },
   {
@@ -414,7 +440,7 @@
    "children": [
     "LAYERS_cap"
    ],
-   "extra_k": 6.68,
+   "extra_k": 3.4,
    "dz_exploded": "lid_dz(3) + extra_k * sin(lid_tilt_deg * o_3) + cap_clear * o_3  (cap rides above the RUN lid's raised front edge; no tilt)"
   },
   {
@@ -431,8 +457,9 @@
     -25.6807
    ],
    "rest_length": 15.32,
-   "extra_k": 6.68,
-   "scale_z": "(rest_length + cap_dz) / rest_length about the base (telescoping; base + axis fixed; cap_dz = the LAYERS_cap_pivot dz)"
+   "extra_k": 3.4,
+   "scale_z": "(rest_length + cap_dz) / rest_length about the base (telescoping; base + axis fixed; cap_dz = the LAYERS_cap_pivot dz)",
+   "children": []
   }
  ],
  "rest": {
@@ -517,10 +544,11 @@
    }
   ],
   "fade_in_ground": [
-   33.5,
-   35.5
+   36.3,
+   38.6
   ],
-  "about_v8": "v8: fade_in_ground [33.5, 35.5] = a later fade-in used ONLY for the clay/crack weight of ground_loss (the loss basin): w_ground(t) = same formula with fade_in_ground instead of fade_in. ATTN opacity, the attention-pad clay (ground_attn) and the basin raise keep fade_in 29-31 (a late raise leaves a visible seam at the basin edge). So the v8 exit, which sees the basin edge 29.5-33.5 s, never shows the clay bowl as a dark blotch; the basin is out of frame from ~34 s and fully restored by 35.5 (attn t33/t36 three.js frames pixel-identical to before)."
+  "about_v8": "v8: fade_in_ground [33.5, 35.5] = a later fade-in used ONLY for the clay/crack weight of ground_loss (the loss basin): w_ground(t) = same formula with fade_in_ground instead of fade_in. ATTN opacity, the attention-pad clay (ground_attn) and the basin raise keep fade_in 29-31 (a late raise leaves a visible seam at the basin edge). So the v8 exit, which sees the basin edge 29.5-33.5 s, never shows the clay bowl as a dark blotch; the basin is out of frame from ~34 s and fully restored by 35.5 (attn t33/t36 three.js frames pixel-identical to before).",
+  "about_r5": "r5: fade_in_ground moved 33.5-35.5 -> 36.3-38.6 and now also flattens the ground_loss baked lightmap relief (view.html uniform lossFlat = w_ground: light = mix(light, LM(corner flat sand), w)). The r5 exit/attention path sees the basin 32-37 s at 25-38 m, where the dune shading read as a grey smudge."
  },
  "fog_threejs": {
   "layers": {
@@ -530,5 +558,29 @@
    "color": "#EFE6D6",
    "note": "per-scene fog for the LAYERS beat (19.5-30 s): the stack (22-38 m from the camera) stays essentially unfogged; the far plain (loss basin, attention cluster at 45-65 m) fades 25-75%. Blend to the global animatic fog (8..63 m) over 31-36 s (exit)."
   }
+ },
+ "spin": {
+  "about": "r4 RUN gears: rotate each rotor about its LOCAL +Z (origin = gear centre) by deg_s * t (meshing pairs counter-rotate, rate ~ 1/radius)",
+  "rotors": {
+   "LAYERS_rotor_3La": 50,
+   "LAYERS_rotor_3Lb": -73,
+   "LAYERS_rotor_3Ra": -50,
+   "LAYERS_rotor_3Rb": 73,
+   "LAYERS_rotor_3Rc": 100
+  }
+ },
+ "ride": {
+  "glow": {
+   "t_on": [
+    23.95,
+    26.08,
+    27.65,
+    29.21
+   ],
+   "ramp": 0.8,
+   "peak": 1.0,
+   "note": "g_k = peak*ease((t-t_on_k)/ramp)*(1-close_k); multiplies lm_layers_glow on block k (spine: mean)"
+  },
+  "lightmaps": "layers-baked.glb material extras rideLightMap / rideGlow / rideAux (see INTEGRATION.md)"
  }
 }

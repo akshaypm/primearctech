@@ -198,14 +198,14 @@
    "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
   },
   {
-   "material": "darkclay__layers_dyn",
+   "material": "sand__layers_dyn",
    "index": 3,
-   "surface": "darkclay",
-   "kind": "clay",
-   "baseColor": "clay_darkclay_albedo",
-   "normal": "clay_normal",
-   "orm": "clay_orm",
-   "uv0": "tiling, metric / 0.3 m",
+   "surface": "sand",
+   "kind": "sand",
+   "baseColor": "sand_albedo",
+   "normal": "sand_normal",
+   "orm": "sand_orm",
+   "uv0": "tiling, metric / 3.2 m",
    "glossy": false,
    "lightmap": null,
    "ao": "lightmaps/lm_layers_dyn_aux.webp (G)",
@@ -379,14 +379,14 @@
   },
   "LAYERS_trayfloor_0L": {
    "materials": [
-    "darkclay__layers_dyn"
+    "sand__layers_dyn"
    ],
    "role": "dynamic",
    "lightmap": "none (dynamic: live light + baked AO)"
   },
   "LAYERS_trayfloor_0R": {
    "materials": [
-    "darkclay__layers_dyn"
+    "sand__layers_dyn"
    ],
    "role": "dynamic",
    "lightmap": "none (dynamic: live light + baked AO)"
@@ -477,14 +477,14 @@
   },
   "LAYERS_trayfloor_1L": {
    "materials": [
-    "darkclay__layers_dyn"
+    "sand__layers_dyn"
    ],
    "role": "dynamic",
    "lightmap": "none (dynamic: live light + baked AO)"
   },
   "LAYERS_trayfloor_1R": {
    "materials": [
-    "darkclay__layers_dyn"
+    "sand__layers_dyn"
    ],
    "role": "dynamic",
    "lightmap": "none (dynamic: live light + baked AO)"
@@ -575,14 +575,14 @@
   },
   "LAYERS_trayfloor_2L": {
    "materials": [
-    "darkclay__layers_dyn"
+    "sand__layers_dyn"
    ],
    "role": "dynamic",
    "lightmap": "none (dynamic: live light + baked AO)"
   },
   "LAYERS_trayfloor_2R": {
    "materials": [
-    "darkclay__layers_dyn"
+    "sand__layers_dyn"
    ],
    "role": "dynamic",
    "lightmap": "none (dynamic: live light + baked AO)"
@@ -715,14 +715,14 @@
   },
   "LAYERS_trayfloor_3L": {
    "materials": [
-    "darkclay__layers_dyn"
+    "sand__layers_dyn"
    ],
    "role": "dynamic",
    "lightmap": "none (dynamic: live light + baked AO)"
   },
   "LAYERS_trayfloor_3R": {
    "materials": [
-    "darkclay__layers_dyn"
+    "sand__layers_dyn"
    ],
    "role": "dynamic",
    "lightmap": "none (dynamic: live light + baked AO)"
@@ -774,7 +774,7 @@
   "LAYERS_courier3",
   "LAYERS_courier4"
  ],
- "glb_bytes": 4443264,
+ "glb_bytes": 5534660,
  "textures": [
   {
    "name": "sand_normal",
@@ -849,20 +849,20 @@
    "bytes": 41136
   },
   {
-   "name": "clay_darkclay_albedo",
-   "size": [
-    1024,
-    1024
-   ],
-   "bytes": 52750
-  },
-  {
    "name": "clay_rod_albedo",
    "size": [
     1024,
     1024
    ],
    "bytes": 69672
+  },
+  {
+   "name": "clay_darkclay_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 52750
   },
   {
    "name": "lm_layers.webp",
@@ -902,7 +902,7 @@
     2048,
     2048
    ],
-   "bytes": 1664888
+   "bytes": 1788662
   },
   {
    "name": "lm_ground_attn_empty.webp",
@@ -971,6 +971,227 @@
     0.0,
     0.03156166523694992
    ]
+  }
+ },
+ "ride_lighting": {
+  "materials": 4,
+  "files": [
+   "lightmaps/lm_layers_ride.webp",
+   "lightmaps/lm_layers_glow.webp",
+   "lightmaps/lm_layers_ride_aux.webp"
+  ],
+  "shading": "dyn: light = mix(live, rideLm*LMAX + sunIrr*rideAux.r*(dot(Nd,L)-dot(Nd,Ng)*max(dot(Ng,L),0))*detail, o_k); occ = mix(occ, rideAux.g, o_k); light += rideGlow*GMAX*g_k(t); fillK = 0 on ride materials. o_k = per-block explode, g_k = stack-explode.json ride.glow. Spine/cap: mean.",
+  "bake": {
+   "explode": {
+    "block_rise": 1.9,
+    "lid_lift": 1.5,
+    "lid_tilt_deg": 8.0,
+    "t0": [
+     23.5,
+     25.5,
+     27.5,
+     29.1
+    ],
+    "dur": [
+     1.4,
+     1.4,
+     1.4,
+     1.4
+    ],
+    "close_t0": 37.0,
+    "close_dur": 2.0,
+    "ease": "smootherstep",
+    "cap_clear": 0.3
+   },
+   "open_t": 34.0,
+   "glow_w_per_half": 110.0,
+   "glow_up_w": 45.0,
+   "glow_up_dz": 0.3,
+   "glow_slot_w": 50.0,
+   "glow_color": [
+    1.0,
+    0.86,
+    0.7
+   ],
+   "spp": 64,
+   "res": 2048,
+   "objects": [
+    "LAYERS_pulse0",
+    "LAYERS_pulse0_head",
+    "LAYERS_pulse1",
+    "LAYERS_pulse1_head",
+    "LAYERS_courier0",
+    "LAYERS_courier1",
+    "LAYERS_courier2",
+    "LAYERS_courier3",
+    "LAYERS_courier4",
+    "LAYERS_lid_0L",
+    "LAYERS_box_0L",
+    "LAYERS_cells_0L",
+    "LAYERS_trayfloor_0L",
+    "LAYERS_tray_audit_0L",
+    "LAYERS_trayacc_audit_0L",
+    "LAYERS_posts_0L",
+    "LAYERS_lid_0R",
+    "LAYERS_box_0R",
+    "LAYERS_cells_0R",
+    "LAYERS_trayfloor_0R",
+    "LAYERS_tray_audit_0R",
+    "LAYERS_trayacc_audit_0R",
+    "LAYERS_posts_0R",
+    "LAYERS_lid_1L",
+    "LAYERS_box_1L",
+    "LAYERS_cells_1L",
+    "LAYERS_trayfloor_1L",
+    "LAYERS_tray_design_1L",
+    "LAYERS_trayacc_design_1L",
+    "LAYERS_posts_1L",
+    "LAYERS_lid_1R",
+    "LAYERS_box_1R",
+    "LAYERS_cells_1R",
+    "LAYERS_trayfloor_1R",
+    "LAYERS_tray_design_1R",
+    "LAYERS_trayacc_design_1R",
+    "LAYERS_posts_1R",
+    "LAYERS_lid_2L",
+    "LAYERS_box_2L",
+    "LAYERS_cells_2L",
+    "LAYERS_trayfloor_2L",
+    "LAYERS_tray_build_2L",
+    "LAYERS_trayacc_build_2L",
+    "LAYERS_posts_2L",
+    "LAYERS_lid_2R",
+    "LAYERS_box_2R",
+    "LAYERS_cells_2R",
+    "LAYERS_trayfloor_2R",
+    "LAYERS_tray_build_2R",
+    "LAYERS_trayacc_build_2R",
+    "LAYERS_posts_2R",
+    "LAYERS_lid_3L",
+    "LAYERS_box_3L",
+    "LAYERS_cells_3L",
+    "LAYERS_trayfloor_3L",
+    "LAYERS_rotor_3La",
+    "LAYERS_rotorhub_3La",
+    "LAYERS_rotor_3Lb",
+    "LAYERS_rotorhub_3Lb",
+    "LAYERS_lid_3R",
+    "LAYERS_box_3R",
+    "LAYERS_cells_3R",
+    "LAYERS_trayfloor_3R",
+    "LAYERS_rotor_3Ra",
+    "LAYERS_rotorhub_3Ra",
+    "LAYERS_rotor_3Rb",
+    "LAYERS_rotorhub_3Rb",
+    "LAYERS_rotor_3Rc",
+    "LAYERS_rotorhub_3Rc",
+    "LAYERS_spine",
+    "LAYERS_cap"
+   ],
+   "targets": [
+    "LAYERS_pulse0",
+    "LAYERS_pulse0_head",
+    "LAYERS_pulse1",
+    "LAYERS_pulse1_head",
+    "LAYERS_courier0",
+    "LAYERS_courier1",
+    "LAYERS_courier2",
+    "LAYERS_courier3",
+    "LAYERS_courier4",
+    "LAYERS_lid_0L",
+    "LAYERS_box_0L",
+    "LAYERS_cells_0L",
+    "LAYERS_trayfloor_0L",
+    "LAYERS_tray_audit_0L",
+    "LAYERS_trayacc_audit_0L",
+    "LAYERS_posts_0L",
+    "LAYERS_lid_0R",
+    "LAYERS_box_0R",
+    "LAYERS_cells_0R",
+    "LAYERS_trayfloor_0R",
+    "LAYERS_tray_audit_0R",
+    "LAYERS_trayacc_audit_0R",
+    "LAYERS_posts_0R",
+    "LAYERS_lid_1L",
+    "LAYERS_box_1L",
+    "LAYERS_cells_1L",
+    "LAYERS_trayfloor_1L",
+    "LAYERS_tray_design_1L",
+    "LAYERS_trayacc_design_1L",
+    "LAYERS_posts_1L",
+    "LAYERS_lid_1R",
+    "LAYERS_box_1R",
+    "LAYERS_cells_1R",
+    "LAYERS_trayfloor_1R",
+    "LAYERS_tray_design_1R",
+    "LAYERS_trayacc_design_1R",
+    "LAYERS_posts_1R",
+    "LAYERS_lid_2L",
+    "LAYERS_box_2L",
+    "LAYERS_cells_2L",
+    "LAYERS_trayfloor_2L",
+    "LAYERS_tray_build_2L",
+    "LAYERS_trayacc_build_2L",
+    "LAYERS_posts_2L",
+    "LAYERS_lid_2R",
+    "LAYERS_box_2R",
+    "LAYERS_cells_2R",
+    "LAYERS_trayfloor_2R",
+    "LAYERS_tray_build_2R",
+    "LAYERS_trayacc_build_2R",
+    "LAYERS_posts_2R",
+    "LAYERS_lid_3L",
+    "LAYERS_box_3L",
+    "LAYERS_cells_3L",
+    "LAYERS_trayfloor_3L",
+    "LAYERS_rotor_3La",
+    "LAYERS_rotorhub_3La",
+    "LAYERS_rotor_3Lb",
+    "LAYERS_rotorhub_3Lb",
+    "LAYERS_lid_3R",
+    "LAYERS_box_3R",
+    "LAYERS_cells_3R",
+    "LAYERS_trayfloor_3R",
+    "LAYERS_rotor_3Ra",
+    "LAYERS_rotorhub_3Ra",
+    "LAYERS_rotor_3Rb",
+    "LAYERS_rotorhub_3Rb",
+    "LAYERS_rotor_3Rc",
+    "LAYERS_rotorhub_3Rc",
+    "LAYERS_spine",
+    "LAYERS_cap"
+   ],
+   "sun_dir_blender": [
+    -0.07784990221261978,
+    -0.6227992177009583,
+    0.7784988880157471
+   ],
+   "sun_strength": 3.200000047683716,
+   "sun_color": [
+    1.0,
+    0.9750000238418579,
+    0.9399999976158142
+   ]
+  },
+  "stats": {
+   "LMAX": 2.0,
+   "GMAX": 2.0,
+   "ride_bytes": 407372,
+   "glow_bytes": 113070,
+   "ride_aux_bytes": 444892,
+   "dyn_aux_bytes": 1788662,
+   "ride_p1_p50_p99": [
+    0.005,
+    0.167,
+    10.668
+   ],
+   "glow_p1_p50_p99": [
+    0.0,
+    0.022,
+    1.143
+   ],
+   "clipped_ride": 0.04630976537988249,
+   "clipped_glow": 0.00023276613777310548
   }
  }
 }

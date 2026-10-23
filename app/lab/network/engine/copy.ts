@@ -203,5 +203,29 @@ export const NAV = [
   { id: "book" as const, label: "Book", t: 60 },
 ];
 
-export const CUE_NAMES = ["boot", "hero", "input", "layers", "attention", "loss", "embedding", "book", "epoch", "hover", "click", "dive", "ambient"] as const;
+export const CUE_NAMES = [
+  "boot-stinger",
+  "ambient-loop",
+  "hover",
+  "shatter",
+  "reassemble",
+  "click",
+  "tock",
+  "drag-loop",
+  "roll-loop",
+  "pulse",
+  "dive",
+  "pebbles",
+  "book-close",
+  "boot",
+  "ambient",
+  "hero",
+  "input",
+  "layers",
+  "attention",
+  "loss",
+  "embedding",
+  "book",
+  "epoch",
+] as const;
 export type CueName = (typeof CUE_NAMES)[number];

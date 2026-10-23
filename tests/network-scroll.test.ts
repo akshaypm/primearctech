@@ -196,6 +196,12 @@ describe("network scroll map", () => {
     const missing = cueFile(null, "ambient");
     assert.deepEqual(missing.urls, ["/network/audio/ambient.webm", "/network/audio/ambient.ogg", "/network/audio/ambient.mp3"]);
     assert.equal(missing.gain, 0.35);
+    const packed = cueFile(
+      { cues: { pulse: { files: { webm: "pulse.webm", ogg: "pulse.ogg", mp3: "pulse.mp3" }, gain: 0.8, loop: false } } },
+      "pulse",
+    );
+    assert.deepEqual(packed.urls, ["/network/audio/pulse.webm", "/network/audio/pulse.ogg", "/network/audio/pulse.mp3"]);
+    assert.equal(packed.gain, 0.8);
   });
 
   it("accepts an animation track whose node is not in the scene yet", () => {

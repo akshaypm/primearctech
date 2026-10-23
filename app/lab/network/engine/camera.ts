@@ -31,12 +31,15 @@ export type ExplodeFile = {
     block_rise: number;
     lid_lift: number;
     lid_tilt_deg: number;
+    lid_tilt_deg_k?: number[];
     t0: number[];
     dur: number[];
     close_t0: number;
     close_dur: number;
     cap_clear: number;
   };
+  spin?: { rotors: Record<string, number> };
+  ride?: { glow: { t_on: number[]; ramp: number; peak: number } };
   nodes: {
     node: string;
     kind: string;
@@ -53,6 +56,10 @@ export type ExplodeFile = {
     fade_in_ground?: [number, number];
   };
   fog_threejs: { layers: { near: number; far: number } };
+};
+
+export type RideFit = {
+  mobile: { fit_out: [number, number]; ride_out: [number, number]; vfov_tan_scale: number };
 };
 
 export function sampleCamera(samples: CamSample[], t: number, smooth: boolean): CamSample {
@@ -110,6 +117,7 @@ export function applyCamera(
   mobile: boolean,
   exj: ExplodeFile,
   params: StackParams,
+  ride: RideFit | null = null,
 ) {
   const W = width;
   const H = height;
@@ -150,10 +158,17 @@ export function applyCamera(
     const xs = xs0.concat(plp.map(xx));
     const top = Math.max(tt(Wp(0, 0, exj.rest.cap_top)), ...pts.map(tt));
     const fpx = Math.min((0.84 * W) / (Math.max(...xs0) - Math.min(...xs0)), (0.92 * W) / (Math.max(...xs) - Math.min(...xs)));
-    const BX = Math.min(smootherstep((t - 16.5) / 3), 1 - smootherstep((t - 27.4) / 3));
-    const XZ = 1 + 0.35 * (t >= 27.4 ? 1 - BX : 0) * (1 - smootherstep((t - 34.3) / 2));
+    const fit = ride?.mobile;
+    const span = (pair: [number, number]) => pair[1] - pair[0] || 1;
+    const BX = fit
+      ? Math.min(smootherstep((t - 16.5) / 3), 1 - smootherstep((t - fit.fit_out[0]) / span(fit.fit_out)))
+      : Math.min(smootherstep((t - 16.5) / 3), 1 - smootherstep((t - 27.4) / 3));
+    const BR = fit ? smootherstep((t - fit.fit_out[0]) / span(fit.fit_out)) * (1 - smootherstep((t - fit.ride_out[0]) / span(fit.ride_out))) : 0;
+    const fpr = H / 2 / Math.min(Math.tan((s.vfov_deg * Math.PI) / 360) * (fit?.vfov_tan_scale ?? 1), Math.tan((85 * Math.PI) / 360));
+    const exitAt = fit?.ride_out[0] ?? 27.4;
+    const XZ = 1 + 0.35 * (t >= exitAt ? 1 - BX - BR : 0) * (1 - smootherstep((t - 34.3) / 2));
     const fpm = (XZ * (W / 2)) / (18 / (s.lens_mm * 0.82));
-    const fpb = 1 / (BX / fpx + (1 - BX) / fpm);
+    const fpb = 1 / (BX / fpx + BR / Math.max(fpr, 1e-4) + Math.max(0, 1 - BX - BR) / fpm);
     cam.fov = ((2 * Math.atan(H / 2 / fpb)) * 180) / Math.PI;
     cam.aspect = W / H;
     look(cam, s);
