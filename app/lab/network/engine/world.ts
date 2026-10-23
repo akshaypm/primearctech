@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
-import { loadAnim, type AnimApi } from "./anim";
+import { createAnim, type AnimApi, type AnimPack } from "./anim";
 import { smootherstep } from "./animatic";
 import { applyCamera, sampleCamera, type CamSample, type ExplodeFile, type StackParams } from "./camera";
 import { fragmentShader, fragmentShaderMobile, skyFragmentShader, skyVertexShader, vertexShader } from "./shader";
@@ -93,6 +93,48 @@ export type MemoryReport = {
 };
 
 export type ScreenPoint = { x: number; y: number; visible: boolean };
+export type ScreenRect = { x0: number; y0: number; x1: number; y1: number };
+export type Obstacle = ScreenRect & { name: string };
+
+const HERO_BOOT = [
+  "2d09530f296c3c4b",
+  "790e6688a4e512a5",
+  "2ae72f1e80fbfe1f",
+  "d4656313769030f1",
+  "870b703fa0ab1f32",
+  "419522e4ec2f0b6f",
+  "dbd15f2da7f154d3",
+  "5aff43b117889ac5",
+  "ba0acc59bd0974c0",
+  "9be4acf44ecf1e0c",
+  "eab03195b9cff1ff",
+  "2903df03f4a93132",
+  "f623b12969dff916",
+  "9d40a4a7d2e5ee34",
+  "d9a46f4e366bd09c",
+  "87b1a7ed509d0d8a",
+  "70e4d8d07018853a",
+  "c79af46b834dfc2e",
+];
+
+function retargetGlb(buf: ArrayBuffer, from: string, to: string) {
+  const view = new DataView(buf);
+  const jsonLen = view.getUint32(12, true);
+  const text = new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen));
+  const payload = new TextEncoder().encode(text.replaceAll(from, to));
+  const paddedLen = Math.ceil(payload.length / 4) * 4;
+  const bin = new Uint8Array(buf, 20 + jsonLen);
+  const out = new Uint8Array(12 + 8 + paddedLen + bin.length);
+  out.set(new Uint8Array(buf, 0, 12), 0);
+  const header = new DataView(out.buffer);
+  header.setUint32(8, out.length, true);
+  header.setUint32(12, paddedLen, true);
+  header.setUint32(16, 0x4e4f534a, true);
+  out.set(payload, 20);
+  for (let i = payload.length; i < paddedLen; i += 1) out[20 + i] = 0x20;
+  out.set(bin, 20 + paddedLen);
+  return out.buffer;
+}
 
 export type NetworkWorld = {
   pose: (t: number, opts: PoseOptions) => void;
@@ -107,6 +149,12 @@ export type NetworkWorld = {
   readonly animReady: Promise<void>;
   sceneReady: (name: string) => Promise<void>;
   resident: () => string[];
+  hasScene: (name: string) => boolean;
+  projectBox: (name: string) => ScreenRect | null;
+  obstacles: (scenes: string[]) => Obstacle[];
+  prefetch: (name: string) => void;
+  startQueue: () => void;
+  upgrade: () => void;
   dispose: () => void;
 };
 
@@ -204,6 +252,7 @@ export async function loadWorld(
   mobileShader: boolean,
   source: "ktx" | "original",
   onProgress: (ratio: number, label: string) => void,
+  quality: "boot" | "full" = "full",
 ): Promise<NetworkWorld> {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
@@ -240,26 +289,81 @@ export async function loadWorld(
   const ktx2 = new KTX2Loader();
   ktx2.setTranscoderPath("/network/basis/");
   ktx2.detectSupport(renderer);
+  const textureFetches = new Map<string, Promise<ArrayBuffer>>();
+  const textureKey = (url: string) => {
+    try {
+      return new URL(url, "http://localhost").pathname;
+    } catch {
+      return url.split("?")[0];
+    }
+  };
+  const fetchTexture = (url: string) => {
+    const key = textureKey(url);
+    let pending = textureFetches.get(key);
+    if (!pending) {
+      pending = fetch(key, { priority: "high" } as RequestInit).then((response) => {
+        if (!response.ok) throw new Error(`missing ${key} (${response.status})`);
+        return response.arrayBuffer();
+      });
+      textureFetches.set(key, pending);
+    }
+    return pending;
+  };
+  ktx2.load = (url, onLoad, _onProgress, onError) => {
+    fetchTexture(url).then(
+      (buffer) => {
+        ktx2.parse(buffer, onLoad, onError);
+      },
+      (error: unknown) => {
+        onError?.(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  };
   const loader = new GLTFLoader();
   loader.setDRACOLoader(draco);
   loader.setKTX2Loader(ktx2);
 
-  const loaderBufP = fetch(`/network/${source}/loader-baked.glb`).then((r) => {
-    if (!r.ok) throw new Error(`missing loader glb (${r.status})`);
+  const anim = createAnim();
+  const packLoaded = new Map<string, Promise<void>>();
+  const high = { priority: "high" } as RequestInit;
+  if (quality === "boot") {
+    for (const id of HERO_BOOT) void fetchTexture(`/network/boot/${id}.ktx2`);
+  }
+  void fetch("/network/anim/scenes/hero.json", high);
+  void fetch("/network/anim/scenes/hero.bin", high);
+  const loadPack = (scene: string) => {
+    const file = scene === "loader" ? "hero" : scene;
+    let pending = packLoaded.get(file);
+    if (!pending) {
+      pending = (async () => {
+        const pack = (await fetch(`/network/anim/scenes/${file}.json`).then((r) => {
+          if (!r.ok) throw new Error(`missing ${file} anim (${r.status})`);
+          return r.json();
+        })) as AnimPack;
+        const bin = await fetch(`/network/anim/scenes/${pack.bin}`).then((r) => {
+          if (!r.ok) throw new Error(`missing ${pack.bin} (${r.status})`);
+          return r.arrayBuffer();
+        });
+        anim.addPack(pack, bin);
+      })();
+      packLoaded.set(file, pending);
+    }
+    return pending;
+  };
+  const animReady = loadPack("hero");
+  const heroBufP = fetch(`/network/${source}/hero-baked.glb`, high).then((r) => {
+    if (!r.ok) throw new Error(`missing hero glb (${r.status})`);
     return r.arrayBuffer();
   });
-  let anim: AnimApi | null = null;
-  const animReady = loadAnim("/network/anim/").then((value) => {
-    anim = value;
-  });
-  const [world, samples, exj, params, loaderBuf] = await Promise.all([
+  const [world, samples, exj, params, heroBuf] = await Promise.all([
     fetch("/network/world.json").then((r) => r.json() as Promise<{ scenes: string[] }>),
     fetch("/network/camera-path-stack.json").then((r) => r.json() as Promise<{ samples: CamSample[] }>),
     fetch("/network/stack-explode.json").then((r) => r.json() as Promise<ExplodeFile>),
     fetch("/network/stack_v7_params.json").then((r) => r.json() as Promise<StackParams>),
-    loaderBufP,
+    heroBufP,
+    animReady,
   ]);
-  onProgress(0.08, "loader");
+  onProgress(0.08, "hero");
 
   const white = solid(255, true);
   const linearWhite = solid(255, false);
@@ -321,7 +425,8 @@ export async function loadWorld(
 
   let groundOverride: { lm: THREE.Texture; aux: THREE.Texture; object: string } | null = null;
   const layersGround: { lm: THREE.Texture; aux: THREE.Texture; object: string }[] = [];
-  const order = ["loader", ...SCENES.filter((name) => name !== "loader" && world.scenes.includes(name))];
+  const order = SCENES.filter((name) => world.scenes.includes(name));
+  const upgrades: { tex: THREE.Texture; url: string }[] = [];
   let loadedCount = 0;
   const restWorld = new Map<THREE.Object3D, THREE.Matrix4>();
   const lossScale = new Map<THREE.Object3D, number>();
@@ -336,10 +441,12 @@ export async function loadWorld(
   );
 
   async function loadScene(name: string, preset?: ArrayBuffer) {
-    const buf = preset ?? await fetch(`/network/${source}/${name}-baked.glb`).then((r) => {
+    await loadPack(name);
+    let buf = preset ?? await fetch(`/network/${source}/${name}-baked.glb`).then((r) => {
       if (!r.ok) throw new Error(`missing ${name} glb (${r.status})`);
       return r.arrayBuffer();
     });
+    if (name === "hero" && quality === "boot" && source === "ktx") buf = retargetGlb(buf, "../tex/", "../boot/");
     const header = new DataView(buf);
     const jsonLen = header.getUint32(12, true);
     const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen))) as Parser["json"];
@@ -355,7 +462,9 @@ export async function loadWorld(
       const raw = await parser.getDependency("texture", index);
       const image = imageIndex(json, index);
       const key = keys.get(image) || `tex:${name}:${index}`;
-      const tex = adopt(raw, key, srgb, light);
+      const canonical = key.startsWith("uri:../boot/") ? `uri:../tex/${key.slice("uri:../boot/".length)}` : key;
+      const tex = adopt(raw, canonical, srgb, light);
+      if (key.startsWith("uri:../boot/")) upgrades.push({ tex, url: `/network/tex/${key.slice("uri:../boot/".length)}` });
       if (repeat) {
         tex.wrapS = THREE.RepeatWrapping;
         tex.wrapT = THREE.RepeatWrapping;
@@ -504,8 +613,7 @@ export async function loadWorld(
     for (const [node, list] of Object.entries(nodeObj)) byName[node] = list.map((e) => e.o);
     if (name === "attn" && !threadsStarted) {
       threadsStarted = true;
-      await animReady;
-      threadCount = await anim!.initThreads(byName);
+      threadCount = await anim.initThreads(byName);
       for (const list of Object.values(nodeObj)) {
         for (const e of list) {
           if (!nodeName(e.o).startsWith("ATTN_th")) continue;
@@ -520,16 +628,48 @@ export async function loadWorld(
       if (![...canon.values()].includes(tex)) tex.dispose();
     }
     dupes.length = 0;
+    anim.invalidate();
     loadedCount += 1;
     onProgress(0.08 + (0.84 * loadedCount) / order.length, name);
     readyResolve.get(name)?.();
   }
 
-  await loadScene("loader", loaderBuf);
-  const loaded = (async () => {
-    for (const name of order.slice(1)) await loadScene(name);
-  })();
-  void loaded.catch((error) => console.error(error));
+  const heroReadyBuf = heroBuf;
+  await loadScene("hero", heroReadyBuf);
+  const queue = order.filter((name) => name !== "hero");
+  let prefer: string | null = null;
+  let pumping = false;
+  let queueStarted = false;
+  let resolveLoaded = () => {};
+  let rejectLoaded: (error: unknown) => void = () => {};
+  const loaded = new Promise<void>((resolve, reject) => {
+    resolveLoaded = resolve;
+    rejectLoaded = reject;
+  });
+  const pump = () => {
+    if (!queueStarted || pumping) return;
+    if (!queue.length) {
+      resolveLoaded();
+      return;
+    }
+    let index = 0;
+    if (prefer) {
+      const at = queue.indexOf(prefer);
+      if (at >= 0) index = at;
+    }
+    const name = queue.splice(index, 1)[0];
+    prefer = null;
+    pumping = true;
+    void loadScene(name)
+      .then(() => {
+        pumping = false;
+        pump();
+      })
+      .catch((error) => {
+        pumping = false;
+        rejectLoaded(error);
+      });
+  };
 
   const variant = new Map<string, THREE.ShaderMaterial>();
   function vary(material: THREE.ShaderMaterial, key: string) {
@@ -565,6 +705,39 @@ export async function loadWorld(
     camera.aspect = cssW / cssH;
   }
 
+  const boxA = new THREE.Box3();
+  const boxB = new THREE.Box3();
+  const corner = new THREE.Vector3();
+  function boxToScreen(box: THREE.Box3): ScreenRect | null {
+    if (box.isEmpty()) return null;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    let any = false;
+    const min = box.min;
+    const max = box.max;
+    for (let i = 0; i < 8; i += 1) {
+      corner.set(i & 1 ? max.x : min.x, i & 2 ? max.y : min.y, i & 4 ? max.z : min.z);
+      corner.project(camera);
+      if (corner.z < -1 || corner.z > 1) continue;
+      any = true;
+      const x = (corner.x * 0.5 + 0.5) * cssW;
+      const y = (-corner.y * 0.5 + 0.5) * cssH;
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    }
+    if (!any) return null;
+    return { x0, y0, x1, y1 };
+  }
+  function meshBox(mesh: THREE.Mesh) {
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    const bounds = mesh.geometry.boundingBox;
+    if (!bounds) return null;
+    return boxB.copy(bounds).applyMatrix4(mesh.matrixWorld);
+  }
   function project(name: string): ScreenPoint | null {
     const list = nodeObj[name];
     if (!list?.length) return null;
@@ -573,6 +746,71 @@ export async function loadWorld(
     entry.o.getWorldPosition(v);
     v.project(camera);
     return { x: (v.x * 0.5 + 0.5) * cssW, y: (-v.y * 0.5 + 0.5) * cssH, visible: v.z >= -1 && v.z <= 1 };
+  }
+  function projectBox(name: string): ScreenRect | null {
+    const list = nodeObj[name];
+    if (!list?.length) return null;
+    const entry = list.find((e) => e.o.visible);
+    if (!entry) return null;
+    boxA.makeEmpty();
+    entry.o.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      const next = meshBox(mesh);
+      if (next) boxA.union(next);
+    });
+    return boxToScreen(boxA);
+  }
+  function obstacles(scenes: string[]): Obstacle[] {
+    const want = new Set(scenes);
+    const out: Obstacle[] = [];
+    const seen = new Set<THREE.Object3D>();
+    for (const [name, list] of Object.entries(nodeObj)) {
+      if (name.startsWith("ground")) continue;
+      for (const entry of list) {
+        if (!want.has(entry.scene)) continue;
+        const mesh = entry.o as THREE.Mesh;
+        if (!mesh.isMesh || !mesh.visible || seen.has(mesh)) continue;
+        seen.add(mesh);
+        const next = meshBox(mesh);
+        if (!next) continue;
+        const rect = boxToScreen(next);
+        if (!rect) continue;
+        const w = rect.x1 - rect.x0;
+        const h = rect.y1 - rect.y0;
+        if (w < 8 || h < 8 || (w > cssW * 0.92 && h > cssH * 0.92)) continue;
+        out.push({ name, x0: rect.x0 - 10, y0: rect.y0 - 10, x1: rect.x1 + 10, y1: rect.y1 + 10 });
+      }
+    }
+    return out;
+  }
+  let upgraded = false;
+  function upgrade() {
+    if (upgraded || !upgrades.length) return;
+    upgraded = true;
+    const seen = new Set<string>();
+    const batch = upgrades.splice(0).filter((item) => {
+      if (seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
+    });
+    void (async () => {
+      for (const item of batch) {
+        try {
+          const full = await ktx2.loadAsync(item.url);
+          item.tex.dispose();
+          item.tex.mipmaps = full.mipmaps;
+          item.tex.image = full.image;
+          item.tex.format = full.format;
+          item.tex.generateMipmaps = false;
+          item.tex.needsUpdate = true;
+          const rec = records.get(item.tex);
+          if (rec) rec.bytes = textureBytes(item.tex);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    })();
   }
 
   function liveScenes(t: number, full: boolean) {
@@ -1099,6 +1337,20 @@ export async function loadWorld(
     resident() {
       return lastLive;
     },
+    hasScene(name: string) {
+      return roots.has(name);
+    },
+    projectBox,
+    obstacles,
+    prefetch(name: string) {
+      if (queue.includes(name)) prefer = name;
+      pump();
+    },
+    startQueue() {
+      queueStarted = true;
+      pump();
+    },
+    upgrade,
     dispose() {
       shadow?.target.dispose();
       draco.dispose();

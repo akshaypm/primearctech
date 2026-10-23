@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { copyMotion } from "../app/lab/network/engine/copy";
+import { copyMotion, productFocus } from "../app/lab/network/engine/copy";
+import { largestEmptyRect } from "../app/lab/network/engine/safe";
 import { buildTau, createSpring, plateau, pxPerSecond, RATE_A, springTo, tauAt, timeAtTau } from "../app/lab/network/engine/scroll";
 
 describe("network scroll map", () => {
@@ -45,6 +46,19 @@ describe("network scroll map", () => {
     const input = copyMotion(12);
     assert.equal(input.beat.id, "input");
     assert.equal(input.opacity, 1);
+  });
+
+  it("focuses one product at a time across the attention beat", () => {
+    assert.equal(productFocus(31), "fieldrelay");
+    assert.equal(productFocus(34), "counter");
+    assert.equal(productFocus(37), "roster");
+    assert.equal(productFocus(29.9), null);
+  });
+
+  it("places copy in the largest gap beside clay", () => {
+    const empty = largestEmptyRect(1440, 900, [{ x0: 80, y0: 200, x1: 700, y1: 760 }], 64, 16);
+    assert.ok(empty.x0 > 680, `x0 ${empty.x0}`);
+    assert.ok(empty.x1 - empty.x0 > 500, `width ${empty.x1 - empty.x0}`);
   });
 
   it("critically damped follow settles without a long tail", () => {

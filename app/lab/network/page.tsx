@@ -8,5 +8,12 @@ export const metadata: Metadata = {
 };
 
 export default function NetworkRoute() {
-  return <NetworkExperience />;
+  return (
+    <>
+      <link rel="preload" as="image" href="/network/poster/hero-1920.avif" type="image/avif" media="(min-width: 761px)" />
+      <link rel="preload" as="image" href="/network/poster/hero-828.avif" type="image/avif" media="(max-width: 760px)" />
+      <script dangerouslySetInnerHTML={{ __html: "window.__boot=window.__boot||{firstPaint:performance.now()}" }} />
+      <NetworkExperience />
+    </>
+  );
 }

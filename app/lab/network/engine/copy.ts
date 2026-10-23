@@ -42,9 +42,10 @@ export const BEATS: Beat[] = [
     t0: 19.5,
     t1: 30,
     hold: 24,
-    kicker: "03 — How we work",
-    title: "How we work",
-    body: "It passes through PrimeArc's layers.",
+    kicker: "03 — Layers",
+    title: "Four layers. One signal through every one of them.",
+    body: "Audit, design, build, run: every engagement passes through the same stack.",
+    placeholder: true,
     side: "right",
   },
   {
@@ -109,37 +110,85 @@ export const LAYER_CALLOUTS = [
   { id: "run", node: "LAYERS_blk3_box", index: "04", label: "Run" },
 ] as const;
 
-export const INPUT_CHIPS = ["Tickets", "Calls", "Invoices", "Spreadsheets", "Approvals"] as const;
-
 export const PRODUCTS = [
   {
     id: "fieldrelay",
     node: "ATTN_chain",
+    anchors: ["ATTN_relaybead0.5", "ATTN_out1"],
     name: "FieldRelay",
     href: "/fieldrelay",
     line: "The lattice reforms into a relay chain, field to office.",
-    proof: "Hours back to the people on the tools.",
-    proofPlaceholder: true,
   },
   {
     id: "counter",
     node: "ATTN_coil",
+    anchors: ["ATTN_out2"],
     name: "Counter",
     href: "/build-brief",
     line: "A stacked counting column.",
-    proof: "The count the team actually trusts.",
-    proofPlaceholder: true,
   },
   {
     id: "roster",
-    node: "ATTN_tile0",
+    node: "ATTN_tile22",
+    anchors: ["ATTN_tile53", "ATTN_out1"],
     name: "Roster",
     href: "/build-brief",
     line: "A grid of scheduled slots.",
-    proof: "The week, filled without the scramble.",
-    proofPlaceholder: true,
   },
 ] as const;
+
+/** Attention 30–39s is three scroll focuses: FieldRelay, Counter, Roster. */
+export function productFocus(t: number): (typeof PRODUCTS)[number]["id"] | null {
+  if (t < 30 || t >= 39) return null;
+  const index = Math.min(PRODUCTS.length - 1, Math.floor((t - 30) / 3));
+  return PRODUCTS[index].id;
+}
+
+export function beatScenes(id: BeatId): string[] {
+  switch (id) {
+    case "loader":
+      return ["loader", "hero"];
+    case "hero":
+      return ["hero", "input"];
+    case "input":
+      return ["input", "hero", "layers"];
+    case "layers":
+      return ["layers", "input", "attn"];
+    case "attention":
+      return ["attn", "layers", "loss"];
+    case "loss":
+      return ["loss", "attn", "emb"];
+    case "embedding":
+      return ["emb", "loss", "hero"];
+    case "book":
+      return ["hero", "emb"];
+  }
+}
+
+export function nextScene(id: BeatId): string | null {
+  switch (id) {
+    case "hero":
+      return "input";
+    case "input":
+      return "layers";
+    case "layers":
+      return "attn";
+    case "attention":
+      return "loss";
+    case "loss":
+      return "emb";
+    default:
+      return null;
+  }
+}
+
+export type CopyBias = "start" | "end" | "bottom";
+
+export function beatBias(id: BeatId): CopyBias {
+  if (id === "layers" || id === "attention") return "end";
+  if (id === "hero" || id === "book" || id === "loader") return "bottom";
+  return "start";
+}
 
 export const LOSS_STATS = [
   { label: "Hours saved", value: "—", placeholder: true },

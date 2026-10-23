@@ -1,10 +1,20 @@
 import * as THREE from "three";
 import { createNetworkAudio, type NetworkAudio } from "./audio";
-import { LAYER_CALLOUTS, PRODUCTS, beatAt, type BeatId, type CueName } from "./copy";
+import { LAYER_CALLOUTS, PRODUCTS, beatAt, beatScenes, nextScene, productFocus, type BeatId, type CueName } from "./copy";
 import { SCROLL_OMEGA, STORY_END, buildTau, createSpring, pxPerSecond, springTo, tauAt, timeAtTau } from "./scroll";
-import { loadWorld, type MemoryReport, type NetworkWorld } from "./world";
+import { loadWorld, type MemoryReport, type NetworkWorld, type Obstacle } from "./world";
 
-export type AnchorPoint = { id: string; x: number; y: number; visible: boolean };
+export type AnchorPoint = {
+  id: string;
+  x: number;
+  y: number;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  visible: boolean;
+  focus: boolean;
+};
 
 export type FrameState = {
   t: number;
@@ -19,6 +29,9 @@ export type FrameState = {
   fallback: boolean;
   dive: string | null;
   anchors: AnchorPoint[];
+  poster: number;
+  obstacles: Obstacle[];
+  focus: string | null;
 };
 
 export type NetworkHandle = {
@@ -38,7 +51,6 @@ type Options = {
 type DiveState = { id: string; node: string; u: number; dir: 1 | -1 };
 
 const INTRO_END = 3.5;
-const INTRO_LOOP_A = 2.2;
 const CROSSFADE = 0.4;
 const DIVE_SECONDS = 0.9;
 
@@ -96,6 +108,9 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       fallback: forceFallback,
       dive: null,
       anchors: [],
+      poster: shot ? 0 : 1,
+      obstacles: [],
+      focus: null,
       ...partial,
     });
   };
@@ -135,16 +150,28 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   let loadProgress = 0;
   const source = params.get("src") === "original" ? "original" : "ktx";
   const stream = params.get("stream") === "1";
+  const quality = shot || source === "original" ? "full" : "boot";
   let world: NetworkWorld;
-  const boot = { loaderParsed: 0, first3d: 0, heroReady: 0 };
-  (window as Window & { __boot?: typeof boot }).__boot = boot;
+  const bootHost = window as Window & { __boot?: { firstPaint?: number; heroReady?: number; heroFrame?: number; first3d?: number; loaderFrame?: number; bytes?: number; playLoader?: boolean } };
+  const boot = bootHost.__boot || {};
+  bootHost.__boot = boot;
+  if (!boot.firstPaint) boot.firstPaint = performance.now();
   try {
-    world = await loadWorld(renderer, mobileQuery || window.innerWidth < 760, source, (progress, label) => {
-      loadProgress = progress;
-      publish({ progress, label, intro: !shot });
-    });
-    boot.loaderParsed = performance.now();
-    if (shot) await Promise.all([world.loaded, world.animReady]);
+    world = await loadWorld(
+      renderer,
+      mobileQuery || window.innerWidth < 760,
+      source,
+      (progress, label) => {
+        loadProgress = progress;
+        publish({ progress, label, t: 6, beatId: "hero", intro: false, poster: shot ? 0 : 1 });
+      },
+      quality,
+    );
+    boot.heroReady = performance.now();
+    if (shot) {
+      world.startQueue();
+      await world.loaded;
+    }
   } catch (error) {
     console.error(error);
     publish({ fallback: true, intro: false, ready: true, label: "assets" });
@@ -160,15 +187,16 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   let running = true;
   let disposed = false;
   let intro = !shot;
-  let clock = shot ? Number(params.get("t") || 6) : 0;
-  let mix = loaderMixAt(clock);
+  let clock = shot ? Number(params.get("t") || 6) : 6;
+  let mix = shot ? loaderMixAt(clock) : 0;
   let cross = 0;
-  let assetsReady = false;
-  let tracksReady = false;
-  let painted = false;
-  void world.animReady.then(() => {
-    tracksReady = true;
-  });
+  const deadline = (boot.firstPaint || 0) + 1500;
+  const waitForLoader = !shot && (boot.heroReady || 0) <= deadline;
+  let phase: "wait" | "loader" | "hero" = shot ? "hero" : "wait";
+  let poster = shot ? 0 : 1;
+  let fading = false;
+  let fade = 0;
+  if (shot) world.startQueue();
   let epoch = false;
   let wrapping = false;
   let sand = 0;
@@ -218,21 +246,69 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   const anchors = (t: number): AnchorPoint[] => {
     const beat = beatAt(t);
     const list: AnchorPoint[] = [];
+    const width = canvas.clientWidth || window.innerWidth || 1;
+    const height = canvas.clientHeight || window.innerHeight || 1;
     if (beat.id === "layers") {
-      const height = canvas.clientHeight || 1;
       for (const callout of LAYER_CALLOUTS) {
-        const p = world.project(callout.node);
-        const inCopy = Boolean(p && mobile && p.y > height * 0.72);
-        list.push({ id: callout.id, x: p?.x ?? 0, y: p?.y ?? 0, visible: Boolean(p && p.visible && !inCopy && p.x > 8 && p.y > 48 && p.x < (canvas.clientWidth || 1) - 8) });
+        const box = world.projectBox(callout.node);
+        const mid = box ? (box.y0 + box.y1) / 2 : 0;
+        const visible = Boolean(box && box.x1 > 0 && box.x0 < width && mid > 48 && mid < height - 24);
+        list.push({
+          id: callout.id,
+          x: box?.x1 ?? 0,
+          y: mid,
+          x0: box?.x0 ?? 0,
+          y0: box?.y0 ?? 0,
+          x1: box?.x1 ?? 0,
+          y1: box?.y1 ?? 0,
+          visible,
+          focus: false,
+        });
       }
     }
     if (beat.id === "attention") {
-      for (const product of PRODUCTS) {
-        const p = world.project(product.node);
-        list.push({ id: product.id, x: p?.x ?? 0, y: p?.y ?? 0, visible: Boolean(p && p.visible) });
+      const focus = productFocus(t);
+      const used = new Set<string>();
+      const ordered = [...PRODUCTS].sort((a, b) => Number(b.id === focus) - Number(a.id === focus));
+      for (const product of ordered) {
+        let box: { x0: number; y0: number; x1: number; y1: number } | null = null;
+        for (const name of product.anchors) {
+          if (used.has(name)) continue;
+          const next = world.projectBox(name);
+          const on = Boolean(next && next.x1 > 24 && next.x0 < width - 24 && next.y1 > 48 && next.y0 < height - 24);
+          if (next && on) {
+            box = next;
+            used.add(name);
+            break;
+          }
+        }
+        const cy = box ? (box.y0 + box.y1) / 2 : 0;
+        list.push({
+          id: product.id,
+          x: box ? box.x1 : 0,
+          y: cy,
+          x0: box?.x0 ?? 0,
+          y0: box?.y0 ?? 0,
+          x1: box?.x1 ?? 0,
+          y1: box?.y1 ?? 0,
+          visible: Boolean(box),
+          focus: focus === product.id,
+        });
       }
     }
     return list;
+  };
+
+  const noteBytes = () => {
+    const entries = performance.getEntriesByType("resource") as PerformanceResourceTiming[];
+    const rows = entries
+      .filter((entry) => entry.responseEnd > 0 && entry.responseEnd <= performance.now() + 30)
+      .map((entry) => ({
+        name: entry.name.replace(location.origin, "").split("?")[0],
+        bytes: entry.transferSize || entry.encodedBodySize || 0,
+      }));
+    boot.bytes = rows.reduce((sum, row) => sum + row.bytes, 0);
+    (boot as { resources?: typeof rows }).resources = rows;
   };
 
   const finishShot = async (t: number) => {
@@ -275,6 +351,9 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       intro: false,
       sand: 0,
       anchors: anchors(t),
+      poster: 0,
+      obstacles: world.obstacles(beatScenes(beatAt(t).id)),
+      focus: productFocus(t),
     });
   };
 
@@ -301,6 +380,9 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
         intro: false,
         sand: 0,
         anchors: anchors(t),
+        poster: 0,
+        obstacles: world.obstacles(beatScenes(beatAt(t).id)),
+        focus: productFocus(t),
       });
     };
   }
@@ -321,33 +403,80 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     if (shot) {
       world.pose(shotT, poseOpts(shotT));
       world.render();
+      publish({
+        t: shotT,
+        beatId: beatAt(shotT).id,
+        ready: true,
+        progress: 1,
+        label: "shot",
+        intro: false,
+        sand: 0,
+        anchors: anchors(shotT),
+        poster: 0,
+        obstacles: world.obstacles(beatScenes(beatAt(shotT).id)),
+        focus: productFocus(shotT),
+      });
       requestAnimationFrame(frame);
       return;
     }
 
-    if (intro) {
-      if (!tracksReady) {
+    if (phase === "wait") {
+      const loaderInTime = waitForLoader && world.hasScene("loader") && performance.now() <= deadline && !reduced;
+      if (loaderInTime) {
+        phase = "loader";
         clock = 0;
         mix = 1;
-      } else if (!assetsReady) {
-        if (clock >= INTRO_END) clock = INTRO_LOOP_A;
-        clock += dt;
-        if (clock >= INTRO_END) clock = INTRO_LOOP_A;
-        mix = 1;
+        fading = true;
+        fade = 0;
+        boot.playLoader = true;
+        boot.loaderFrame = performance.now();
+        world.startQueue();
       } else {
-        clock += dt;
-        if (clock < INTRO_END) mix = 1;
-        else {
-          cross += dt;
-          clock = INTRO_END;
-          mix = Math.max(0, 1 - cross / CROSSFADE);
-          if (mix <= 0) {
-            intro = false;
-            mix = 0;
-            document.documentElement.style.overflow = "";
-            scrollToTime(INTRO_END);
-            audio.cue("hero");
+        phase = "hero";
+        clock = 6;
+        mix = 0;
+        fading = true;
+        fade = 0;
+        boot.playLoader = false;
+        boot.heroFrame = performance.now();
+        boot.first3d = boot.heroFrame;
+        noteBytes();
+        scrollToTime(6);
+        world.startQueue();
+        void world.sceneReady("input").then(() => world.upgrade());
+      }
+    }
+    if (phase === "loader") {
+      clock += dt;
+      if (clock < INTRO_END) mix = 1;
+      else {
+        cross += dt;
+        clock = INTRO_END;
+        mix = Math.max(0, 1 - cross / CROSSFADE);
+        if (mix <= 0) {
+          phase = "hero";
+          intro = false;
+          mix = 0;
+          document.documentElement.style.overflow = "";
+          scrollToTime(INTRO_END);
+          audio.cue("hero");
+          if (!boot.heroFrame) {
+            boot.heroFrame = performance.now();
+            boot.first3d = boot.heroFrame;
+            noteBytes();
           }
+        }
+      }
+    }
+    if (fading) {
+      fade += dt;
+      poster = Math.max(0, 1 - fade / CROSSFADE);
+      if (poster === 0) {
+        fading = false;
+        if (phase === "hero" && intro) {
+          intro = false;
+          document.documentElement.style.overflow = "";
+          audio.cue("hero");
         }
       }
     }
@@ -357,7 +486,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       springTo(spring, Math.min(storyPx / px, Math.max(0, targetTau)), SCROLL_OMEGA, dt);
       tau = spring.x;
     }
-    let t = intro ? Math.min(clock, INTRO_END) : timeAtTau(table, tau);
+    let t = phase === "loader" ? Math.min(clock, INTRO_END) : intro ? 6 : timeAtTau(table, tau);
 
     if (reduced && !intro) {
       const next = beatAt(t);
@@ -394,9 +523,14 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     }
 
     world.pose(t, poseOpts(t));
-    if (!painted) {
-      painted = true;
-      boot.first3d = performance.now();
+    if (!shot && phase !== "wait") {
+      const beatNow = beatAt(intro ? clock : t);
+      const span = beatNow.t1 - beatNow.t0;
+      const liveT = intro ? clock : t;
+      if (span > 0 && (liveT - beatNow.t0) / span >= 0.5) {
+        const next = nextScene(beatNow.id);
+        if (next) world.prefetch(next);
+      }
     }
     if (!reduced && !dive && idleFor > 0.45 && idleFor < 8) {
       const wobble = Math.sin(now * 0.001 * Math.PI * 2 * 0.2);
@@ -405,7 +539,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     }
     world.render();
 
-    const beat = beatAt(intro ? 0 : t);
+    const beat = beatAt(phase === "loader" ? t : intro ? 6 : t);
     if (!intro && beat.id !== lastBeat) {
       lastBeat = beat.id;
       const cue = (beat.id === "book" ? "book" : beat.id) as CueName;
@@ -421,28 +555,26 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       resize();
     }
 
+    const shown = t;
     publish({
-      t: intro ? clock : t,
-      beatId: intro ? "loader" : beat.id,
-      ready: assetsReady,
-      progress: assetsReady ? 1 : loadProgress,
-      label: intro ? "network" : beat.id,
-      intro,
+      t: shown,
+      beatId: phase === "loader" ? "loader" : beat.id,
+      ready: phase !== "wait",
+      progress: phase === "wait" ? loadProgress : 1,
+      label: phase === "wait" ? "hero" : beat.id,
+      intro: phase === "loader",
       epoch,
-      sand: intro ? 0 : sand,
+      sand: phase === "loader" ? 0 : sand,
       dive: dive && dive.u > 0.02 ? dive.id : null,
-      anchors: anchors(intro ? 0 : t),
+      anchors: anchors(shown),
+      poster,
+      obstacles: world.obstacles(beatScenes(phase === "loader" ? "loader" : beat.id)),
+      focus: productFocus(shown),
     });
     requestAnimationFrame(frame);
   };
 
-  if (!shot) {
-    void Promise.all([world.sceneReady("hero"), world.sceneReady("input")]).then(() => {
-      assetsReady = true;
-      boot.heroReady = performance.now();
-    });
-    document.documentElement.style.overflow = "hidden";
-  }
+  if (!shot) document.documentElement.style.overflow = "hidden";
   requestAnimationFrame(frame);
 
   const onResize = () => resize();

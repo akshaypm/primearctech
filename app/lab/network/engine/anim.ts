@@ -1,18 +1,16 @@
 import * as THREE from "three";
 
 type Channel = { c: number } | { o: number; lo: number; hi: number };
-type TrackJson = {
-  name: string;
-  f0: number;
-  f1: number;
-  p: Channel[];
-  q: Channel[];
-  s: Channel[];
-  scenes?: string[];
-};
+type TrackJson = { name: string; f0: number; f1: number; p: Channel[]; q: Channel[]; s: Channel[] };
 type ScalarJson = { name: string; c?: number; f0?: number; f1?: number; v?: Channel };
 type MorphMesh = { name: string; nverts: number; o: number; w_bake: number; weight_track: string };
-type AnimJson = { fps: number; bin: string; tracks: TrackJson[]; scalars: ScalarJson[]; threads_morph: { bin: string; meshes: MorphMesh[] } };
+export type AnimPack = {
+  fps: number;
+  bin: string;
+  tracks: TrackJson[];
+  scalars: ScalarJson[];
+  threads_morph?: { bin: string; meshes: MorphMesh[] };
+};
 
 export type WorldTRS = { p: number[]; q: number[]; s: number[] };
 
@@ -20,17 +18,25 @@ export type AnimApi = {
   world: (name: string, t: number) => WorldTRS | null;
   scalar: (name: string, t: number) => number | undefined;
   apply: (t: number, nodesByName: Record<string, THREE.Object3D[]>) => void;
+  addPack: (pack: AnimPack, buffer: ArrayBuffer) => void;
+  invalidate: () => void;
   initThreads: (nodesByName: Record<string, THREE.Object3D[]>) => Promise<number>;
   applyThreads: (t: number) => void;
   warnings: string[];
   names: string[];
 };
 
-/** Decoder from anim/anim.js. World TRS, parents first, zero scale hides. Thread morph is Draco vertex order. */
-export async function loadAnim(base: string): Promise<AnimApi> {
-  const J = (await (await fetch(base + "anim.json")).json()) as AnimJson;
-  const B = new Uint16Array(await (await fetch(base + J.bin)).arrayBuffer());
-  const dec = (c: Channel, n: number) => {
+type Decoded = { f0: number; n: number; fps: number; ch: Float32Array[] };
+type DecodedScalar = { c: number } | { f0: number; n: number; fps: number; v: Float32Array };
+
+/** Scene packs share this decoder. Tracks are uint16 zig-zag deltas, parents first, zero scale hides. */
+export function createAnim(): AnimApi {
+  const tracks = new Map<string, Decoded>();
+  const scal = new Map<string, DecodedScalar>();
+  let threads: { bin: string; meshes: MorphMesh[] } | null = null;
+  const warnings: string[] = [];
+
+  const decode = (view: Uint16Array, c: Channel, n: number) => {
     const out = new Float32Array(n);
     if ("c" in c) {
       out.fill(c.c);
@@ -39,42 +45,53 @@ export async function loadAnim(base: string): Promise<AnimApi> {
     let u = 0;
     const k = (c.hi - c.lo) / 65535;
     for (let i = 0; i < n; i += 1) {
-      u = (u + B[c.o + i]) & 0xffff;
+      u = (u + view[c.o + i]) & 0xffff;
       out[i] = c.lo + u * k;
     }
     return out;
   };
-  const tracks = new Map<string, { f0: number; n: number; ch: Float32Array[] }>();
-  const scal = new Map<string, { c: number } | { f0: number; n: number; v: Float32Array }>();
-  for (const tr of J.tracks) {
-    const n = tr.f1 - tr.f0 + 1;
-    tracks.set(tr.name, { f0: tr.f0, n, ch: [...tr.p, ...tr.q, ...tr.s].map((c) => dec(c, n)) });
-  }
-  for (const s of J.scalars) {
-    if ("c" in s && s.c !== undefined && s.v === undefined) scal.set(s.name, { c: s.c });
-    else if (s.f0 !== undefined && s.f1 !== undefined && s.v) scal.set(s.name, { f0: s.f0, n: s.f1 - s.f0 + 1, v: dec(s.v, s.f1 - s.f0 + 1) });
-  }
-  const idx = (f0: number, n: number, t: number) => {
-    const fr = Math.min(Math.max(t * J.fps - f0, 0), n - 1);
+
+  const addPack = (pack: AnimPack, buffer: ArrayBuffer) => {
+    const view = new Uint16Array(buffer);
+    for (const tr of pack.tracks) {
+      const n = tr.f1 - tr.f0 + 1;
+      tracks.set(tr.name, { f0: tr.f0, n, fps: pack.fps, ch: [...tr.p, ...tr.q, ...tr.s].map((c) => decode(view, c, n)) });
+    }
+    for (const s of pack.scalars) {
+      if (s.v === undefined && s.c !== undefined) scal.set(s.name, { c: s.c });
+      else if (s.f0 !== undefined && s.f1 !== undefined && s.v) {
+        const n = s.f1 - s.f0 + 1;
+        scal.set(s.name, { f0: s.f0, n, fps: pack.fps, v: decode(view, s.v, n) });
+      }
+    }
+    if (pack.threads_morph) threads = pack.threads_morph;
+    order = null;
+  };
+
+  const idx = (f0: number, n: number, fps: number, t: number) => {
+    const fr = Math.min(Math.max(t * fps - f0, 0), n - 1);
     const i = Math.floor(fr);
     return [i, Math.min(i + 1, n - 1), fr - i] as const;
   };
+
   const world = (name: string, t: number): WorldTRS | null => {
     const tr = tracks.get(name);
     if (!tr) return null;
-    const [i, j, a] = idx(tr.f0, tr.n, t);
+    const [i, j, a] = idx(tr.f0, tr.n, tr.fps, t);
     const v = tr.ch.map((c) => c[i] + (c[j] - c[i]) * a);
     const q = v.slice(3, 7);
     const l = Math.hypot(...q) || 1;
     return { p: v.slice(0, 3), q: q.map((x) => x / l), s: v.slice(7, 10) };
   };
+
   const scalar = (name: string, t: number) => {
     const s = scal.get(name);
     if (!s) return undefined;
     if ("c" in s) return s.c;
-    const [i, j, a] = idx(s.f0, s.n, t);
+    const [i, j, a] = idx(s.f0, s.n, s.fps, t);
     return s.v[i] + (s.v[j] - s.v[i]) * a;
   };
+
   const depth = (o: THREE.Object3D) => {
     let d = 0;
     let x: THREE.Object3D | null = o;
@@ -84,12 +101,16 @@ export async function loadAnim(base: string): Promise<AnimApi> {
     }
     return d;
   };
+
   const M = new THREE.Matrix4();
   const P = new THREE.Vector3();
   const Q = new THREE.Quaternion();
   const S = new THREE.Vector3();
   const IP = new THREE.Matrix4();
   let order: [number, THREE.Object3D, string][] | null = null;
+  const invalidate = () => {
+    order = null;
+  };
   const apply = (t: number, nodesByName: Record<string, THREE.Object3D[]>) => {
     if (!order) {
       order = [];
@@ -119,13 +140,15 @@ export async function loadAnim(base: string): Promise<AnimApi> {
       o.updateMatrixWorld(true);
     }
   };
+
   type Thread = { mesh: THREE.Mesh; base: Float32Array; d: Float32Array; wb: number; wt: string };
   let TH: Thread[] | null = null;
-  const warnings: string[] = [];
   const initThreads = async (nodesByName: Record<string, THREE.Object3D[]>) => {
-    const raw = new Uint16Array(await (await fetch(base + J.threads_morph.bin)).arrayBuffer());
+    if (!threads) return 0;
+    const url = threads.bin.startsWith("/") ? threads.bin : `/network/anim/${threads.bin}`;
+    const raw = new Uint16Array(await (await fetch(url)).arrayBuffer());
     TH = [];
-    for (const m of J.threads_morph.meshes) {
+    for (const m of threads.meshes) {
       const d = new Float32Array(m.nverts * 3);
       for (let i = 0; i < d.length; i += 1) d[i] = THREE.DataUtils.fromHalfFloat(raw[m.o + i]);
       for (const o of nodesByName[m.name] || []) {
@@ -155,5 +178,17 @@ export async function loadAnim(base: string): Promise<AnimApi> {
       pa.needsUpdate = true;
     }
   };
-  return { world, scalar, apply, initThreads, applyThreads, warnings, names: [...tracks.keys()] };
+  return {
+    world,
+    scalar,
+    apply,
+    addPack,
+    invalidate,
+    initThreads,
+    applyThreads,
+    warnings,
+    get names() {
+      return [...tracks.keys()];
+    },
+  };
 }

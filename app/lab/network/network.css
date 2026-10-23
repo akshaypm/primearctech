@@ -136,6 +136,12 @@ html:has(.net) body {
   cursor: pointer;
 }
 
+.net-sound:hover,
+.net-sound:focus-visible {
+  background: var(--ink);
+  color: var(--bone);
+}
+
 .net-cta {
   display: inline-block;
   background: var(--terracotta);
@@ -146,9 +152,36 @@ html:has(.net) body {
   text-transform: uppercase;
 }
 
+.net-cta:hover,
+.net-cta:focus-visible {
+  background: var(--clay);
+  color: var(--bone);
+}
+
+.net-poster {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--sand);
+  opacity: 1;
+  transition: opacity 400ms linear;
+}
+
+.net-poster img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.net[data-poster="0"] .net-poster {
+  opacity: 0;
+}
+
 .net-copy {
   pointer-events: none;
-  width: min(32rem, 40vw);
+  width: min(35rem, 42vw);
 }
 
 .net-copy[data-place="hero"],
@@ -189,24 +222,14 @@ html:has(.net) body {
   width: min(24rem, 30vw);
 }
 
-.net-copy[data-place="input"] h2,
-.net-copy[data-place="layers"] h2,
-.net-copy[data-place="attention"] h2,
-.net-copy[data-place="loss"] h2,
-.net-copy[data-place="embedding"] h2 {
-  font-size: clamp(1.7rem, 2.8vw, 2.5rem);
-}
-
 .net-kicker,
 .net-tag,
-.net-callout,
-.net-product small,
 .net-epoch p,
 .net-boot p,
 .net-stat dt {
   font-family: var(--font-mono), monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: 12px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--secondary);
 }
@@ -225,11 +248,21 @@ html:has(.net) body {
 }
 
 .net-copy h2 {
-  font-size: clamp(2rem, 4vw, 3.4rem);
+  font-size: 56px;
+  line-height: 60px;
+  letter-spacing: -0.02em;
+}
+
+.net-copy[data-scrim="1"] {
+  background: rgb(239 230 214 / 92%);
+  border: 1px solid rgb(107 86 70 / 20%);
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 0.85rem 1rem 1rem;
 }
 
 .net-copy p,
-.net-product span,
 .net-fallback p {
   margin: 0.8rem 0 0;
   max-width: 34rem;
@@ -284,59 +317,124 @@ html:has(.net) body {
 .net-callout,
 .net-product {
   position: absolute;
-  display: flex;
-  gap: 0.45rem;
-  align-items: baseline;
-  color: var(--ink);
-  background: var(--bone);
+  margin: 0;
+  padding: 0;
+  background: none;
   border: 0;
-  border-bottom: 1px solid var(--ink);
-  padding: 0.2rem 0.15rem;
-  text-align: left;
+  box-shadow: none;
+  color: var(--ink);
 }
 
-.net-callout b,
-.net-product strong {
-  font-family: var(--font-sans), sans-serif;
-  font-weight: 500;
-  letter-spacing: -0.03em;
+.net-callout {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-size: 0.95rem;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+.net-leader {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  height: 1px;
+  background: #6b5646;
 }
 
 .net-product {
-  pointer-events: auto;
-  flex-direction: column;
-  align-items: flex-start;
-  width: min(16rem, 70vw);
-  padding: 0.55rem 0.6rem 0.7rem;
-  background: var(--bone);
+  pointer-events: none;
 }
 
-.net-product button,
-.net-product a {
-  margin-top: 0.45rem;
+.net-product-body {
+  position: absolute;
+  left: 36px;
+  top: 0;
+  transform: translateY(-40%);
+  width: min(16rem, 70vw);
+}
+
+.net-product[data-flip="1"] .net-product-body {
+  left: auto;
+  right: 36px;
+}
+
+.net-product .net-leader {
+  right: auto;
+  left: 0;
+  top: 0;
+}
+
+.net-product[data-flip="1"] .net-leader {
+  left: auto;
+  right: 0;
+}
+
+.net-product[data-focus="0"] .net-line,
+.net-product[data-focus="0"] .net-enter {
+  display: none;
+}
+
+.net-product[data-focus="0"] .net-product-body {
+  width: auto;
+  transform: translate(12px, -50%);
+}
+
+.net-product[data-focus="0"][data-flip="1"] .net-product-body {
+  right: 0;
+  transform: translate(-12px, -50%);
+}
+
+.net-product[data-focus="0"] .net-name {
   font-family: var(--font-mono), monospace;
-  font-size: 0.68rem;
+  font-size: 11px;
+  line-height: 1;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink);
-  background: transparent;
-  border: 0;
-  padding: 0;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
-.net-product small {
   color: var(--secondary);
 }
 
-.net-product span {
-  margin: 0.35rem 0 0;
+.net-product[data-rise="1"] .net-product-body {
+  top: 0;
+  transform: translateY(calc(-100% - 8px));
+}
+
+.net-product[data-focus="1"] .net-name {
   font-family: var(--font-sans), sans-serif;
-  font-size: 0.95rem;
-  line-height: 1.3;
+  font-size: 28px;
+  line-height: 32px;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--ink);
+}
+
+.net-line {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 15px;
+  line-height: 1.35;
+  color: #6b5646;
+}
+
+.net-enter {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.net-enter:hover,
+.net-enter:focus-visible {
+  color: var(--terracotta);
 }
 
 .net-foot {
@@ -457,16 +555,16 @@ html:has(.net) body {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .net {
+  .net[data-cursor="1"] {
     cursor: none;
   }
 
-  .net-cursor {
+  .net[data-cursor="1"] .net-cursor {
     display: block;
   }
 
-  .net a,
-  .net button {
+  .net[data-cursor="1"] a,
+  .net[data-cursor="1"] button {
     cursor: none;
   }
 }
@@ -477,10 +575,7 @@ html:has(.net) body {
   outline-offset: 3px;
 }
 
-.net[data-intro="1"] .net-copy {
-  visibility: hidden;
-}
-
+.net[data-shot] .net-poster,
 .net[data-shot] .net-nav,
 .net[data-shot] .net-copy,
 .net[data-shot] .net-callouts,
@@ -520,41 +615,11 @@ html:has(.net) body {
     gap: 0.6rem;
   }
 
-  .net-copy,
-  .net-copy[data-place="hero"],
-  .net-copy[data-place="book"],
-  .net-copy[data-place="loader"],
-  .net-copy[data-place="layers"],
-  .net-copy[data-place="embedding"] {
-    left: 0;
-    right: 0;
-    top: auto;
-    bottom: 0;
-    width: auto;
-    padding: 1.15rem 0.95rem 1rem;
-    background: var(--sand);
-  }
-
-  .net-copy[data-place="input"],
-  .net-copy[data-place="attention"],
-  .net-copy[data-place="loss"] {
-    left: 0;
-    right: 0;
-    top: 5.4rem;
-    bottom: auto;
-    width: auto;
-    padding: 0.85rem 0.95rem 1rem;
-    background: var(--sand);
-  }
-
-  .net[data-beat="book"] .net-copy[data-place="book"] {
-    bottom: 2.6rem;
-  }
-
-  .net-copy h1,
   .net-copy h2,
-  .net-fallback h1 {
-    font-size: 1.85rem;
+  .net-fallback h2 {
+    font-size: 34px;
+    line-height: 38px;
+    letter-spacing: -0.02em;
   }
 
   .net-boot {

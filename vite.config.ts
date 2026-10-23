@@ -1,6 +1,7 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
+import { precompressedStatic } from "./scripts/precompressed-static";
 import { sites } from "./scripts/sites-vite-plugin";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
@@ -52,6 +53,7 @@ export default defineConfig(async () => {
         : {}),
     },
     plugins: [
+      precompressedStatic(process.cwd()),
       vinext(),
       sites(),
       cloudflare({
