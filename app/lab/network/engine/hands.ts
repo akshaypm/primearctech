@@ -1,8 +1,7 @@
 import * as THREE from "three";
 import type { BeatId } from "./copy";
-import { squashScale, stepVec, vecSpring } from "./clay";
+import { clampScreenPull, hopWeight, resolveStack, stepUnder, stepVec, vecSpring } from "./clay";
 
-type TRS = { p: number[]; q: number[]; s: number[] };
 type Hit = { name: string; object: THREE.Object3D; point: THREE.Vector3 };
 type Cue = "click" | "hover" | "dive";
 
@@ -10,10 +9,9 @@ export type HandWorld = {
   camera: THREE.Camera;
   named: (test: (name: string) => boolean) => THREE.Object3D[];
   pick: (x: number, y: number, test?: (name: string) => boolean) => Hit | null;
-  sample: (name: string, t: number) => TRS | null;
-  trackWindow: (name: string) => { t0: number; t1: number } | null;
   heightAt: (x: number, z: number) => number | null;
   basin: () => THREE.Vector3 | null;
+  lossBounds: () => { minX: number; maxX: number; minZ: number; maxZ: number } | null;
   bendThreads: (point: THREE.Vector3 | null, reach: number) => void;
   screen: (prefix: string) => { name: string; x: number; y: number; box: { x0: number; y0: number; x1: number; y1: number } | null }[];
   attach: (object: THREE.Object3D) => void;
@@ -23,16 +21,25 @@ export type HandWorld = {
 
 export type HandFrame = { cursor: "default" | "grab" | "grabbing"; hint: string | null };
 
-const PRODUCT: Record<string, string> = { ATTN_chain: "fieldrelay", ATTN_coil: "counter", ATTN_tile22: "roster" };
-const BEAT_OF: Record<string, BeatId> = {
-  hero: "hero",
-  input: "input",
-  layers: "layers",
-  products: "attention",
-  loss: "loss",
-  pebbles: "embedding",
-  ripple: "book",
+export type HandProof = {
+  pull: number;
+  bend: number;
+  pulse: number;
+  rod: number;
+  squash: string[];
+  spread: number;
+  bead: { x: number; y: number } | null;
+  jobs: number;
+  age: number;
+  home: number;
+  ball: { x: number; y: number; z: number; speed: number; basin: number; gap: number; radius: number; sx: number; sy: number } | null;
 };
+
+const PRODUCT: Record<string, string> = { ATTN_chain: "fieldrelay", ATTN_coil: "counter", ATTN_tile22: "roster" };
+const PULL_FRAC = 0.22;
+const ROD_FALLBACK = 0.028;
+const PULSE_HOP = 0.5;
+const PULSE_TRAVEL = 0.72;
 
 function objectName(object: THREE.Object3D) {
   const named = object.userData.name;
@@ -41,56 +48,142 @@ function objectName(object: THREE.Object3D) {
 
 type Body = {
   spring: ReturnType<typeof vecSpring>;
-  base: THREE.Vector3;
   goal: THREE.Vector3;
-  gone: boolean;
-  snap: boolean;
-  hold: number;
-  dwell: number;
+  release: boolean;
 };
+
+type EdgeMesh = {
+  mesh: THREE.Mesh;
+  rest: Float32Array;
+  param: Float32Array | null;
+  radius: number;
+};
+
+type EdgeRec = {
+  from: string;
+  to: string;
+  meshes: EdgeMesh[];
+  radius: number;
+};
+
+type PulseJob = { edge: EdgeRec; delay: number; u: number; hop: number };
+
+type Ball = {
+  obj: THREE.Object3D;
+  x: number;
+  z: number;
+  vx: number;
+  vz: number;
+  radius: number;
+  spin: THREE.Quaternion;
+  trail: { x: number; z: number; born: number }[];
+};
+
+function edgeEnds(name: string) {
+  const match = name.match(/^HERO_e(\d+)_(\d+)_(\d+)$/);
+  if (!match) return null;
+  const layer = Number(match[1]);
+  return { from: `HERO_n${layer}_${match[2]}`, to: `HERO_n${layer + 1}_${match[3]}` };
+}
+
+function objectRadius(object: THREE.Object3D) {
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  return 0.5 * Math.max(size.x, size.y, size.z);
+}
+
+function estimateRadius(rest: Float32Array) {
+  const count = rest.length / 3;
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < count; i += 1) {
+    for (let k = 0; k < 3; k += 1) {
+      const value = rest[i * 3 + k];
+      if (value < min[k]) min[k] = value;
+      if (value > max[k]) max[k] = value;
+    }
+  }
+  const size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+  let axis = 0;
+  if (size[1] > size[axis]) axis = 1;
+  if (size[2] > size[axis]) axis = 2;
+  const a = (axis + 1) % 3;
+  const b = (axis + 2) % 3;
+  const lo = min[axis] + size[axis] * 0.42;
+  const hi = min[axis] + size[axis] * 0.58;
+  const pts: [number, number][] = [];
+  for (let i = 0; i < count; i += 1) {
+    const value = rest[i * 3 + axis];
+    if (value < lo || value > hi) continue;
+    pts.push([rest[i * 3 + a], rest[i * 3 + b]]);
+  }
+  if (pts.length < 8) return ROD_FALLBACK;
+  let mx = 0;
+  let my = 0;
+  for (const point of pts) {
+    mx += point[0];
+    my += point[1];
+  }
+  mx /= pts.length;
+  my /= pts.length;
+  const dists = pts.map((point) => Math.hypot(point[0] - mx, point[1] - my)).sort((p, q) => p - q);
+  const median = dists[Math.floor(dists.length * 0.55)] || ROD_FALLBACK;
+  return Math.min(0.05, Math.max(0.012, median));
+}
 
 export function createHands(world: HandWorld, hooks: { dive: (id: string) => void; cue: (name: Cue) => void }) {
   const bodies = new Map<THREE.Object3D, Body>();
   const plane = new THREE.Plane();
   const normal = new THREE.Vector3();
-  const aimDelta = new THREE.Vector3();
-  const aimOrigin = new THREE.Vector3();
+  const aim = new THREE.Vector3();
+  const grabPoint = new THREE.Vector3();
   const spreadSpring = vecSpring();
   const spreadTarget = new THREE.Vector3();
-  const sweep = new THREE.Vector3();
   const parentQuat = new THREE.Quaternion();
-  const pointer = { x: 0, y: 0, down: false };
+  const pointer = { x: 0, y: 0, down: false, moved: false };
+  const restPos = new Map<string, THREE.Vector3>();
+  const nodeRadius = new Map<string, number>();
   let holding: THREE.Object3D | null = null;
   let holdName = "";
   let hover = "";
   let lastHover = "";
-  let spread = 0;
   let spreadGoal = 0;
-  let pulse = 0;
-  let ripple = 0;
+  let stackBounce = 0;
   let layerDrag = false;
-  let sweepValid = false;
-  let lastPickX = 0;
-  let lastPickY = 0;
+  let grabbedAt = false;
   let script: { kind: string; age: number } | null = null;
+  let scriptNode = "";
   const fired = new Set<string>();
   const used = new Set<string>();
-  let ball: { obj: THREE.Object3D; x: number; y: number; z: number; ox: number; oz: number; px: number; py: number; vx: number; vz: number; live: boolean; trail: THREE.Vector3[] } | null = null;
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.4, 1.85, 64),
-    new THREE.MeshBasicMaterial({ color: 0x843829, transparent: true, opacity: 0, depthWrite: false, depthTest: false, side: THREE.DoubleSide }),
-  );
-  ring.name = "clay-ripple";
-  ring.rotation.x = -Math.PI / 2;
-  ring.visible = false;
-  ring.frustumCulled = false;
-  ring.renderOrder = 20;
-  world.attach(ring);
+  let ball: Ball | null = null;
+  let pit: THREE.Vector3 | null = null;
+  let clock = 0;
+  let edges: EdgeRec[] | null = null;
+  let neighbors = new Map<string, string[]>();
+  let edgesDirty = false;
+  let bendNow = 0;
+  let rodNow = ROD_FALLBACK;
+  const pulseJobs: PulseJob[] = [];
+  const squash = new Map<string, number>();
+  const beadGeo = new THREE.SphereGeometry(1, 14, 10);
+  const beadMat = new THREE.MeshBasicMaterial({ color: 0xf3ede1 });
+  const beads: THREE.Mesh[] = [];
+  for (let i = 0; i < 40; i += 1) {
+    const bead = new THREE.Mesh(beadGeo, beadMat);
+    bead.name = "clay-bead";
+    bead.visible = false;
+    bead.frustumCulled = false;
+    bead.renderOrder = 4;
+    world.attach(bead);
+    beads.push(bead);
+  }
+  const heightCache = new Map<string, number | null>();
+  const proof: HandProof = { pull: 0, bend: 0, pulse: 0, rod: ROD_FALLBACK, squash: [], spread: 0, bead: null, jobs: 0, age: 0, home: 0, ball: null };
 
   function bodyOf(object: THREE.Object3D) {
     let item = bodies.get(object);
     if (!item) {
-      item = { spring: vecSpring(), base: object.scale.clone(), goal: new THREE.Vector3(), gone: false, snap: false, hold: 0, dwell: 0 };
+      item = { spring: vecSpring(), goal: new THREE.Vector3(), release: false };
       bodies.set(object, item);
     }
     return item;
@@ -114,376 +207,810 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
     }
   }
 
-  function underPointer(prefix: string, x: number, y: number) {
-    let best = "";
-    let area = Infinity;
-    for (const item of world.screen(prefix)) {
-      const box = item.box;
-      if (!box || x < box.x0 || x > box.x1 || y < box.y0 || y > box.y1) continue;
-      const next = Math.max(1, (box.x1 - box.x0) * (box.y1 - box.y0));
-      if (next < area) {
-        area = next;
-        best = item.name;
-      }
-    }
-    return best;
+  function signature(beat: BeatId) {
+    return beat === "hero" || beat === "book" || beat === "layers" || beat === "loss";
   }
 
-  function interactive(name: string, beat: BeatId) {
-    if (beat === "hero" || beat === "book") return name.startsWith("HERO_n");
-    if (beat === "input") return name.startsWith("INPUT_fg");
-    if (beat === "layers") return name.startsWith("LAYERS_blk");
-    if (beat === "attention") return name in PRODUCT;
-    if (beat === "loss") return name === "LOSS_ball";
-    if (beat === "embedding") return name.startsWith("EMB_peb");
-    return false;
+  function project(point: THREE.Vector3) {
+    const p = point.clone().project(world.camera);
+    const width = window.innerWidth || 1;
+    const height = window.innerHeight || 1;
+    return { x: (p.x * 0.5 + 0.5) * width, y: (-p.y * 0.5 + 0.5) * height };
   }
 
-  function place(object: THREE.Object3D, x: number, y: number, z: number) {
-    aimOrigin.set(x, y, z);
-    if (object.parent) object.parent.worldToLocal(aimOrigin);
-    object.position.copy(aimOrigin);
+  function toLocal(object: THREE.Object3D, delta: THREE.Vector3) {
+    if (!object.parent) return delta.clone();
+    object.parent.getWorldQuaternion(parentQuat);
+    return delta.clone().applyQuaternion(parentQuat.clone().invert());
   }
 
-  function aim(object: THREE.Object3D) {
-    world.camera.getWorldDirection(normal);
-    object.getWorldPosition(aimOrigin);
-    plane.setFromNormalAndCoplanarPoint(normal, aimOrigin);
-    const point = world.rayPoint(pointer.x, pointer.y, plane);
-    if (!point) return aimDelta.set(0, 0, 0);
-    return aimDelta.copy(point).sub(aimOrigin);
+  function putWorld(object: THREE.Object3D, point: THREE.Vector3) {
+    object.position.copy(point);
+    if (object.parent) object.parent.worldToLocal(object.position);
+    object.updateMatrixWorld(true);
   }
 
-  function couple(center: THREE.Object3D) {
-    center.getWorldPosition(aimOrigin);
-    const lead = bodyOf(center).goal;
+  function snapshotHero() {
+    restPos.clear();
     for (const node of world.named((name) => name.startsWith("HERO_n"))) {
-      if (node === center) continue;
       const at = new THREE.Vector3();
+      node.updateWorldMatrix(true, false);
       node.getWorldPosition(at);
-      const dist = at.distanceTo(aimOrigin);
-      if (dist > 2.2) continue;
-      bodyOf(node).goal.copy(lead).multiplyScalar((1 - dist / 2.2) * 0.7);
+      restPos.set(objectName(node), at);
+      if (!nodeRadius.has(objectName(node))) nodeRadius.set(objectName(node), objectRadius(node));
     }
   }
 
-  function firePulse() {
-    if (pulse > 0) return;
-    pulse = 1;
-    hooks.cue("click");
+  function ensureEdges() {
+    if (edges) return edges;
+    const built: EdgeRec[] = [];
+    const links = new Map<string, string[]>();
+    const link = (a: string, b: string) => {
+      const list = links.get(a) || [];
+      if (!list.includes(b)) list.push(b);
+      links.set(a, list);
+    };
+    for (const object of world.named((name) => name.startsWith("HERO_e"))) {
+      const ends = edgeEnds(objectName(object));
+      if (!ends) continue;
+      const meshes: EdgeMesh[] = [];
+      object.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const attr = mesh.geometry?.getAttribute("position");
+        if (!attr) return;
+        const rest = new Float32Array(attr.count * 3);
+        for (let i = 0; i < attr.count; i += 1) {
+          rest[i * 3] = attr.getX(i);
+          rest[i * 3 + 1] = attr.getY(i);
+          rest[i * 3 + 2] = attr.getZ(i);
+        }
+        const radius = estimateRadius(rest);
+        meshes.push({ mesh, rest, param: null, radius });
+      });
+      if (!meshes.length) continue;
+      const radius = meshes.reduce((sum, mesh) => sum + mesh.radius, 0) / meshes.length;
+      built.push({ from: ends.from, to: ends.to, meshes, radius });
+      link(ends.from, ends.to);
+      link(ends.to, ends.from);
+    }
+    edges = built;
+    neighbors = links;
+    if (built.length) rodNow = built.reduce((sum, edge) => sum + edge.radius, 0) / built.length;
+    proof.rod = rodNow;
+    return built;
   }
 
-  function snapSheet(object: THREE.Object3D) {
-    const from = new THREE.Vector3();
-    object.getWorldPosition(from);
-    const spots = world.screen("INPUT_feed").filter((item) => item.box && item.box.x1 > item.box.x0 + 4);
-    const spot = spots[0];
-    let target: THREE.Vector3 | null = null;
-    if (spot?.box) {
-      const feed = world.named((name) => name === spot.name)[0];
-      if (feed) {
-        feed.getWorldPosition(aimOrigin);
-        world.camera.getWorldDirection(normal);
-        plane.setFromNormalAndCoplanarPoint(normal, aimOrigin);
-        const hit = world.rayPoint((spot.box.x0 + spot.box.x1) / 2, (spot.box.y0 + spot.box.y1) / 2, plane);
-        if (hit) target = hit.clone();
+  function hopsFrom(origin: string) {
+    const dist = new Map<string, number>([[origin, 0]]);
+    const queue = [origin];
+    while (queue.length) {
+      const name = queue.shift();
+      if (!name) break;
+      const hop = dist.get(name) ?? 0;
+      if (hop >= 2) continue;
+      for (const next of neighbors.get(name) || []) {
+        if (dist.has(next)) continue;
+        dist.set(next, hop + 1);
+        queue.push(next);
       }
     }
-    if (!target) {
-      const feed = world.named((name) => name.startsWith("INPUT_feed"))[0];
-      if (!feed) return;
-      target = new THREE.Vector3();
-      feed.getWorldPosition(target);
-    }
-    const item = bodyOf(object);
-    item.snap = true;
-    item.dwell = 0;
-    item.goal.copy(target).sub(from);
-    if (item.goal.length() > 2.4) item.goal.setLength(2.4);
-    item.goal.y += 0.45;
-    item.spring.vel.copy(item.goal).setLength(Math.min(6, Math.max(2.2, item.goal.length() * 3)));
+    return dist;
   }
 
-  function rippleAt(point: THREE.Vector3) {
-    ring.position.set(point.x, point.y + 0.05, point.z);
-    ring.visible = true;
-    ripple = 1;
-    hooks.cue("click");
+  function pullDelta(object: THREE.Object3D) {
+    const rest = restPos.get(objectName(object));
+    if (!rest) return aim.set(0, 0, 0);
+    world.camera.getWorldDirection(normal);
+    plane.setFromNormalAndCoplanarPoint(normal, rest);
+    const hit = world.rayPoint(pointer.x, pointer.y, plane);
+    if (!hit) return aim.set(0, 0, 0);
+    const delta = hit.clone().sub(grabPoint);
+    const from = project(rest);
+    const to = project(rest.clone().add(delta));
+    const clamped = clampScreenPull(to.x - from.x, to.y - from.y, window.innerHeight || 1, PULL_FRAC);
+    const span = Math.hypot(to.x - from.x, to.y - from.y);
+    proof.pull = clamped.frac;
+    if (span > 1e-3) delta.multiplyScalar(Math.hypot(clamped.x, clamped.y) / span);
+    return delta;
   }
 
-  function apply(dt: number, reduced: boolean) {
+  function metresPerPixel(object: THREE.Object3D) {
+    const at = new THREE.Vector3();
+    object.getWorldPosition(at);
+    const up = at.clone();
+    up.y += 1;
+    const a = project(at);
+    const b = project(up);
+    const px = Math.max(8, Math.abs(b.y - a.y));
+    return 1 / px;
+  }
+
+  function applyBodies(dt: number, reduced: boolean) {
+    let home = 0;
     for (const [object, item] of bodies) {
-      if (item.gone) {
-        object.visible = false;
+      const heroNode = objectName(object).startsWith("HERO_n");
+      if (object === holding && pointer.down) {
+        item.spring.offset.copy(item.goal);
+        item.spring.vel.set(0, 0, 0);
+      } else if (item.release) {
+        stepUnder(item.spring, item.goal, 9, 0.52, dt, reduced);
+        if (item.spring.offset.length() < 0.012 && item.spring.vel.length() < 0.05) item.release = false;
+      } else {
+        stepVec(item.spring, item.goal, heroNode ? 16 : 14, dt, reduced);
+      }
+      if (heroNode) home = Math.max(home, item.spring.offset.length());
+      const local = toLocal(object, item.spring.offset);
+      object.position.add(local);
+      object.updateMatrixWorld(true);
+      if (object !== holding && !item.release && item.spring.offset.lengthSq() < 1e-6) item.goal.set(0, 0, 0);
+    }
+    proof.home = home;
+  }
+
+  function warpEdges(list: EdgeRec[]) {
+    bendNow = 0;
+    let active = false;
+    const inv = new THREE.Matrix4();
+    const worldPoint = new THREE.Vector3();
+    const local = new THREE.Vector3();
+    const bow = new THREE.Vector3();
+    const chord = new THREE.Vector3();
+    for (const edge of list) {
+      const from = restPos.get(edge.from);
+      const to = restPos.get(edge.to);
+      const fromNow = world.named((name) => name === edge.from)[0];
+      const toNow = world.named((name) => name === edge.to)[0];
+      if (!from || !to || !fromNow || !toNow) continue;
+      const aNow = new THREE.Vector3();
+      const bNow = new THREE.Vector3();
+      fromNow.getWorldPosition(aNow);
+      toNow.getWorldPosition(bNow);
+      const dispA = aNow.clone().sub(from);
+      const dispB = bNow.clone().sub(to);
+      if (dispA.lengthSq() < 1e-6 && dispB.lengthSq() < 1e-6) {
+        if (!edgesDirty) continue;
+        for (const part of edge.meshes) {
+          const attr = part.mesh.geometry.getAttribute("position");
+          for (let i = 0; i < attr.count; i += 1) {
+            attr.setXYZ(i, part.rest[i * 3], part.rest[i * 3 + 1], part.rest[i * 3 + 2]);
+          }
+          attr.needsUpdate = true;
+        }
         continue;
       }
-      const flung = objectName(object).startsWith("EMB_peb") && (item.goal.lengthSq() > 0.04 || item.hold > 0);
-      const omega = item.snap ? 11 : object === holding ? 24 : flung ? 70 : 8;
-      stepVec(item.spring, item.goal, omega, dt, reduced);
-      if (item.hold > 0) item.hold = Math.max(0, item.hold - dt);
-      if (item.snap && item.spring.offset.distanceTo(item.goal) < 0.15) item.dwell += dt;
-      if (item.snap && item.dwell > 0.9) item.gone = true;
-      if (object !== holding && item.spring.offset.lengthSq() < 1e-6) item.base.copy(object.scale);
-      object.position.add(item.spring.offset);
-      squashScale(object.scale, item.base, item.spring.offset.length());
-      object.updateMatrixWorld(true);
-      if (object !== holding && !item.snap && item.hold <= 0) item.goal.set(0, 0, 0);
+      active = true;
+      chord.copy(bNow).sub(aNow);
+      bow.copy(dispA).sub(dispB);
+      const chordLen = chord.length() || 1;
+      const along = bow.dot(chord) / (chordLen * chordLen);
+      bow.addScaledVector(chord, -along);
+      const cap = chordLen * 0.45;
+      if (bow.length() > cap) bow.setLength(cap);
+      if (bow.length() > bendNow) bendNow = bow.length();
+      for (const part of edge.meshes) {
+        const attr = part.mesh.geometry.getAttribute("position");
+        part.mesh.updateWorldMatrix(true, false);
+        inv.copy(part.mesh.matrixWorld).invert();
+        if (!part.param) {
+          part.param = new Float32Array(attr.count);
+          const span = Math.max(1e-4, to.clone().sub(from).lengthSq());
+          const ab = to.clone().sub(from);
+          for (let i = 0; i < attr.count; i += 1) {
+            worldPoint.set(part.rest[i * 3], part.rest[i * 3 + 1], part.rest[i * 3 + 2]).applyMatrix4(part.mesh.matrixWorld);
+            const t = THREE.MathUtils.clamp(worldPoint.clone().sub(from).dot(ab) / span, 0, 1);
+            part.param[i] = t;
+          }
+        }
+        for (let i = 0; i < attr.count; i += 1) {
+          const t = part.param[i];
+          worldPoint.set(part.rest[i * 3], part.rest[i * 3 + 1], part.rest[i * 3 + 2]).applyMatrix4(part.mesh.matrixWorld);
+          worldPoint.addScaledVector(dispA, 1 - t);
+          worldPoint.addScaledVector(dispB, t);
+          worldPoint.addScaledVector(bow, Math.sin(Math.PI * t));
+          local.copy(worldPoint).applyMatrix4(inv);
+          attr.setXYZ(i, local.x, local.y, local.z);
+        }
+        attr.needsUpdate = true;
+      }
+    }
+    edgesDirty = active;
+    proof.bend = bendNow;
+  }
+
+  function sampleEdge(edge: EdgeRec, tFind: number) {
+    const cam = new THREE.Vector3();
+    world.camera.getWorldPosition(cam);
+    const near: THREE.Vector3[] = [];
+    const worldPoint = new THREE.Vector3();
+    for (const part of edge.meshes) {
+      if (!part.param) continue;
+      const attr = part.mesh.geometry.getAttribute("position");
+      part.mesh.updateWorldMatrix(true, false);
+      const step = Math.max(1, Math.floor(attr.count / 220));
+      for (let i = 0; i < attr.count; i += step) {
+        if (Math.abs(part.param[i] - tFind) > 0.045) continue;
+        worldPoint.fromBufferAttribute(attr, i).applyMatrix4(part.mesh.matrixWorld);
+        near.push(worldPoint.clone());
+      }
+    }
+    if (!near.length) return null;
+    const center = new THREE.Vector3();
+    for (const point of near) center.add(point);
+    center.multiplyScalar(1 / near.length);
+    let facing = near[0];
+    let best = -Infinity;
+    const toCam = cam.sub(center);
+    for (const point of near) {
+      const score = point.dot(toCam);
+      if (score <= best) continue;
+      best = score;
+      facing = point;
+    }
+    return { center, facing };
+  }
+
+  function startPulse(origin: string) {
+    pulseJobs.length = 0;
+    const list = ensureEdges();
+    const dist = new Map<string, number>([[origin, 0]]);
+    const queue = [origin];
+    while (queue.length) {
+      const name = queue.shift();
+      if (!name) break;
+      const hop = dist.get(name) ?? 0;
+      for (const edge of list) {
+        if (edge.from !== name) continue;
+        if (!dist.has(edge.to)) {
+          dist.set(edge.to, hop + 1);
+          queue.push(edge.to);
+        }
+        pulseJobs.push({ edge, delay: hop * PULSE_HOP, u: 0, hop });
+      }
+    }
+    hooks.cue("click");
+  }
+
+  function stepPulse(dt: number, reduced: boolean) {
+    let live = 0;
+    let maxAge = 0;
+    let shown: THREE.Mesh | null = null;
+    let shownHop = -1;
+    for (let i = 0; i < beads.length; i += 1) beads[i].visible = false;
+    if (reduced) {
+      pulseJobs.length = 0;
+      proof.pulse = 0;
+      proof.age = 0;
+      proof.bead = null;
+      return;
+    }
+    let slot = 0;
+    for (const job of pulseJobs) {
+      job.u += dt / PULSE_TRAVEL;
+      const age = job.u * PULSE_TRAVEL;
+      if (age > maxAge) maxAge = age;
+      if (age < job.delay) continue;
+      const u = THREE.MathUtils.clamp((age - job.delay) / PULSE_TRAVEL, 0, 1);
+      const output = job.edge.to.startsWith("HERO_n3");
+      if (u >= 1 && output && !squash.has(job.edge.to)) squash.set(job.edge.to, 0.28);
+      const hold = output && (squash.get(job.edge.to) || 0) > 0;
+      if (u >= 1 && !hold) continue;
+      const from = world.named((name) => name === job.edge.from)[0];
+      const to = world.named((name) => name === job.edge.to)[0];
+      if (!from || !to) continue;
+      const a = new THREE.Vector3();
+      const b = new THREE.Vector3();
+      from.getWorldPosition(a);
+      to.getWorldPosition(b);
+      const len = Math.max(0.2, a.distanceTo(b));
+      const beadR = 2.5 * (job.edge.radius || rodNow);
+      const t0 = Math.min(0.4, ((nodeRadius.get(job.edge.from) || 0.11) + beadR) / len);
+      const t1 = 1 - Math.min(0.45, ((nodeRadius.get(job.edge.to) || 0.11) + beadR) / len);
+      const along = t0 + Math.max(0.05, t1 - t0) * (hold ? 1 : u);
+      const sample = sampleEdge(job.edge, along);
+      const outward = new THREE.Vector3();
+      let center: THREE.Vector3;
+      if (sample) {
+        outward.copy(sample.facing).sub(sample.center);
+        if (outward.lengthSq() < 1e-8) outward.set(0, 1, 0);
+        outward.normalize();
+        center = sample.facing.clone().addScaledVector(outward, beadR);
+      } else {
+        center = a.clone().lerp(b, along);
+      }
+      const bead = beads[slot];
+      slot += 1;
+      if (!bead) continue;
+      putWorld(bead, center);
+      bead.scale.setScalar(beadR);
+      bead.visible = true;
+      live += 1;
+      if (job.hop >= shownHop) {
+        shown = bead;
+        shownHop = job.hop;
+      }
+    }
+    for (const [name, left] of [...squash]) {
+      const node = world.named((entry) => entry === name)[0];
+      const k = Math.sin(Math.min(1, left / 0.28) * Math.PI) * 0.16;
+      if (node && k > 0) {
+        node.scale.y *= 1 - k;
+        node.scale.x *= 1 + k * 0.55;
+        node.scale.z *= 1 + k * 0.55;
+        node.updateMatrixWorld(true);
+      }
+      const next = left - dt;
+      if (next <= 0) squash.delete(name);
+      else squash.set(name, next);
+    }
+    proof.jobs = pulseJobs.length;
+    proof.pulse = live;
+    proof.age = maxAge;
+    proof.squash = [...squash.keys()];
+    if (shown) {
+      const at = new THREE.Vector3();
+      shown.getWorldPosition(at);
+      const screen = project(at);
+      proof.bead = { x: Math.round(screen.x), y: Math.round(screen.y) };
+    } else proof.bead = null;
+  }
+
+  function driveHero(dt: number, reduced: boolean) {
+    snapshotHero();
+    ensureEdges();
+    let delta: THREE.Vector3 | null = null;
+    let leader = "";
+    if (holding && pointer.down && holdName.startsWith("HERO_n")) {
+      delta = pullDelta(holding);
+      leader = holdName;
+    } else if (script?.kind === "hero" && scriptNode) {
+      const u = Math.sin(Math.min(1, script.age / 0.8) * Math.PI);
+      const node = world.named((name) => name === scriptNode)[0];
+      const metres = node ? metresPerPixel(node) * (window.innerHeight || 1) * PULL_FRAC : 0.6;
+      delta = new THREE.Vector3(metres * u, metres * 0.35 * u, 0);
+      leader = scriptNode;
+      proof.pull = u * PULL_FRAC;
+      if (script.age > 0.82 && !fired.has("pulse")) {
+        fired.add("pulse");
+        startPulse(scriptNode);
+        for (const [object, item] of bodies) {
+          if (!objectName(object).startsWith("HERO_n")) continue;
+          item.goal.set(0, 0, 0);
+          item.release = true;
+        }
+      }
+    }
+    if (delta && leader) {
+      const falloff = hopsFrom(leader);
+      for (const [name, hop] of falloff) {
+        const node = world.named((entry) => entry === name)[0];
+        if (!node) continue;
+        const item = bodyOf(node);
+        item.goal.copy(delta).multiplyScalar(hopWeight(hop));
+        item.release = false;
+        if (hop === 0) holding = pointer.down ? holding : node;
+      }
+      for (const node of world.named((name) => name.startsWith("HERO_n"))) {
+        if (falloff.has(objectName(node))) continue;
+        const item = bodyOf(node);
+        if (!item.release) item.goal.set(0, 0, 0);
+      }
+    }
+    applyBodies(dt, reduced);
+    warpEdges(ensureEdges());
+    stepPulse(dt, reduced);
+  }
+
+  function driveStack(dt: number, reduced: boolean) {
+    spreadTarget.set(spreadGoal, 0, 0);
+    stepUnder(spreadSpring, spreadTarget, 9, 0.55, dt, reduced);
+    const spread = Math.max(0, spreadSpring.offset.x);
+    const groups = new Map<number, THREE.Object3D[]>();
+    for (const block of world.named((name) => /^LAYERS_blk\d+_(box|lid)/.test(name))) {
+      const match = objectName(block).match(/LAYERS_blk(\d+)/);
+      if (!match) continue;
+      const index = Number(match[1]);
+      const list = groups.get(index) || [];
+      list.push(block);
+      groups.set(index, list);
+    }
+    const indices = [...groups.keys()].sort((a, b) => a - b);
+    const top: number[] = [];
+    const bottom: number[] = [];
+    const off = indices.map((index) => spread * index * 0.75);
+    const vel = indices.map((index) => spreadSpring.vel.x * index * 0.75);
+    for (const index of indices) {
+      const box = new THREE.Box3();
+      for (const part of groups.get(index) || []) {
+        if (!objectName(part).endsWith("_box")) continue;
+        box.expandByObject(part);
+      }
+      top.push(box.max.y);
+      bottom.push(box.min.y);
+    }
+    const resolved = indices.length > 1 ? resolveStack(off, top, bottom, vel) : { off, vel };
+    const pushed = resolved.off.some((value, index) => value > off[index] + 0.001);
+    stackBounce = pushed ? Math.max(stackBounce, 0.06) : Math.max(0, stackBounce - dt * 0.35);
+    indices.forEach((index, i) => {
+      const extra = resolved.off[i] + (i > 0 ? stackBounce : 0);
+      for (const part of groups.get(index) || []) part.position.y += extra;
+    });
+    proof.spread = resolved.off[resolved.off.length - 1] || 0;
+  }
+
+  function cachedHeight(x: number, z: number) {
+    const key = `${Math.round(x * 8)}:${Math.round(z * 8)}`;
+    const cached = heightCache.get(key);
+    if (cached !== undefined) return cached;
+    const y = world.heightAt(x, z);
+    heightCache.set(key, y);
+    return y;
+  }
+
+  function support(x: number, z: number) {
+    const h = world.heightAt(x, z);
+    if (h === null) return null;
+    const e = 0.22;
+    const hx = world.heightAt(x + e, z);
+    const hnx = world.heightAt(x - e, z);
+    const hz = world.heightAt(x, z + e);
+    const hnz = world.heightAt(x, z - e);
+    const dx = hx !== null && hnx !== null ? (hx - hnx) / (2 * e) : 0;
+    const dz = hz !== null && hnz !== null ? (hz - hnz) / (2 * e) : 0;
+    const n = new THREE.Vector3(-dx, 1, -dz).normalize();
+    return { h, n };
+  }
+
+  function clampLandscape(x: number, z: number, vx: number, vz: number, radius: number) {
+    const bounds = world.lossBounds();
+    if (!bounds) return { x, z, vx, vz };
+    const inset = radius + 0.08;
+    let nx = x;
+    let nz = z;
+    let nvx = vx;
+    let nvz = vz;
+    if (nx < bounds.minX + inset) {
+      nx = bounds.minX + inset;
+      nvx = Math.abs(nvx) * 0.25;
+    } else if (nx > bounds.maxX - inset) {
+      nx = bounds.maxX - inset;
+      nvx = -Math.abs(nvx) * 0.25;
+    }
+    if (nz < bounds.minZ + inset) {
+      nz = bounds.minZ + inset;
+      nvz = Math.abs(nvz) * 0.25;
+    } else if (nz > bounds.maxZ - inset) {
+      nz = bounds.maxZ - inset;
+      nvz = -Math.abs(nvz) * 0.25;
+    }
+    return { x: nx, z: nz, vx: nvx, vz: nvz };
+  }
+
+  function groundBeads() {
+    const beadsOn = world.named((name) => /^LOSS_bead\d+$/.test(name));
+    const trail = ball?.trail.filter((dot) => clock - dot.born < 2) || [];
+    beadsOn.forEach((bead, index) => {
+      if (trail.length) {
+        const dot = trail[Math.min(trail.length - 1, Math.floor((index / Math.max(1, beadsOn.length - 1)) * (trail.length - 1)))];
+        const h = cachedHeight(dot.x, dot.z);
+        if (h === null) {
+          bead.visible = false;
+          return;
+        }
+        const age = (clock - dot.born) / 2;
+        putWorld(bead, new THREE.Vector3(dot.x, h + 0.02, dot.z));
+        const scale = Math.max(0, 1 - age);
+        bead.scale.setScalar(scale);
+        bead.visible = scale > 0.04;
+        return;
+      }
+      const at = new THREE.Vector3();
+      bead.getWorldPosition(at);
+      const h = cachedHeight(at.x, at.z);
+      if (h === null) return;
+      putWorld(bead, new THREE.Vector3(at.x, h + 0.02, at.z));
+      bead.scale.setScalar(1);
+      bead.visible = true;
+    });
+  }
+
+  function pitPoint() {
+    if (pit) return pit;
+    const bounds = world.lossBounds();
+    if (!bounds) return world.basin();
+    const width = window.innerWidth || 1;
+    const height = window.innerHeight || 1;
+    const margin = Math.min(width, height) * 0.16;
+    const framed = (x: number, y: number, z: number) => {
+      const ndc = new THREE.Vector3(x, y, z).project(world.camera);
+      if (ndc.z < -1 || ndc.z > 1) return false;
+      const sx = (ndc.x * 0.5 + 0.5) * width;
+      const sy = (-ndc.y * 0.5 + 0.5) * height;
+      return sx > margin && sy > margin && sx < width - margin && sy < height - margin;
+    };
+    let bestX = 0;
+    let bestZ = 0;
+    let bestY = Infinity;
+    const columns = 16;
+    const rows = 10;
+    for (let i = 0; i <= columns; i += 1) {
+      for (let j = 0; j <= rows; j += 1) {
+        const x = THREE.MathUtils.lerp(bounds.minX, bounds.maxX, i / columns);
+        const z = THREE.MathUtils.lerp(bounds.minZ, bounds.maxZ, j / rows);
+        const h = world.heightAt(x, z);
+        if (h === null || h >= bestY || !framed(x, h, z)) continue;
+        bestY = h;
+        bestX = x;
+        bestZ = z;
+      }
+    }
+    if (bestY === Infinity) return world.basin();
+    for (let i = -3; i <= 3; i += 1) {
+      for (let j = -3; j <= 3; j += 1) {
+        const x = bestX + i * 0.35;
+        const z = bestZ + j * 0.35;
+        const h = world.heightAt(x, z);
+        if (h === null || h >= bestY || !framed(x, h, z)) continue;
+        bestY = h;
+        bestX = x;
+        bestZ = z;
+      }
+    }
+    pit = new THREE.Vector3(bestX, bestY, bestZ);
+    return pit;
+  }
+
+  function driveLoss(dt: number, reduced: boolean) {
+    groundBeads();
+    if (!ball) return;
+    const dragging = holding === ball.obj && pointer.down;
+    const step = Math.min(Math.max(dt, 0.001), 0.05);
+    if (dragging) {
+      const hit = world.groundPoint(pointer.x, pointer.y);
+      let nx = ball.x;
+      let nz = ball.z;
+      let vx = ball.vx;
+      let vz = ball.vz;
+      const near = hit ? Math.hypot(hit.x - ball.x, hit.z - ball.z) : Infinity;
+      if (hit && near > 0.01 && near < 4) {
+        const move = Math.min(near, 0.55);
+        nx = ball.x + ((hit.x - ball.x) / near) * move;
+        nz = ball.z + ((hit.z - ball.z) / near) * move;
+        vx = (nx - ball.x) / step;
+        vz = (nz - ball.z) / step;
+      }
+      const clamped = clampLandscape(nx, nz, vx, vz, ball.radius);
+      ball.vx = clamped.vx;
+      ball.vz = clamped.vz;
+      ball.x = clamped.x;
+      ball.z = clamped.z;
+    } else if (!reduced) {
+      const slope = support(ball.x, ball.z);
+      const g = 9.8;
+      if (slope) {
+        ball.vx += g * slope.n.x * slope.n.y * step;
+        ball.vz += g * slope.n.z * slope.n.y * step;
+      }
+      const speed = Math.hypot(ball.vx, ball.vz);
+      const drop = Math.min(speed, 0.05 * g * step);
+      if (speed > 1e-4) {
+        ball.vx -= (ball.vx / speed) * drop;
+        ball.vz -= (ball.vz / speed) * drop;
+      }
+      const low = pitPoint();
+      const slowed = Math.hypot(ball.vx, ball.vz);
+      if (low) {
+        const dx = low.x - ball.x;
+        const dz = low.z - ball.z;
+        const dist = Math.hypot(dx, dz);
+        const here = world.heightAt(ball.x, ball.z);
+        if (dist > 0.4) {
+          const higher = here !== null && here > low.y + 0.015;
+          const urge = slowed < 0.3 ? 2.8 : higher ? (slowed < 0.8 ? 3.2 : 1.2) : 0;
+          if (urge > 0) {
+            ball.vx += (dx / dist) * urge * step;
+            ball.vz += (dz / dist) * urge * step;
+          }
+        }
+      }
+      const capped = Math.hypot(ball.vx, ball.vz);
+      if (capped > 4.2) {
+        ball.vx *= 4.2 / capped;
+        ball.vz *= 4.2 / capped;
+      }
+      ball.x += ball.vx * step;
+      ball.z += ball.vz * step;
+      const limited = clampLandscape(ball.x, ball.z, ball.vx, ball.vz, ball.radius);
+      ball.x = limited.x;
+      ball.z = limited.z;
+      ball.vx = limited.vx;
+      ball.vz = limited.vz;
+      const lowNow = pitPoint();
+      if (lowNow) {
+        const lifted = world.heightAt(ball.x, ball.z);
+        const ndc = new THREE.Vector3(ball.x, lifted ?? lowNow.y, ball.z).project(world.camera);
+        const width = window.innerWidth || 1;
+        const height = window.innerHeight || 1;
+        const sx = (ndc.x * 0.5 + 0.5) * width;
+        const sy = (-ndc.y * 0.5 + 0.5) * height;
+        const margin = Math.min(width, height) * 0.06;
+        const inside = ndc.z >= -1 && ndc.z <= 1 && sx > margin && sy > margin && sx < width - margin && sy < height - margin;
+        if (!inside) {
+          const dx = lowNow.x - ball.x;
+          const dz = lowNow.z - ball.z;
+          const dist = Math.hypot(dx, dz) || 1;
+          const stepBack = Math.min(0.2, dist);
+          ball.x += (dx / dist) * stepBack;
+          ball.z += (dz / dist) * stepBack;
+          ball.vx = (dx / dist) * 0.6;
+          ball.vz = (dz / dist) * 0.6;
+        }
+      }
+      const rolling = Math.hypot(ball.vx, ball.vz);
+      if (rolling > 0.05 && slope) {
+        const vel = new THREE.Vector3(ball.vx, 0, ball.vz);
+        const axis = new THREE.Vector3().crossVectors(slope.n, vel);
+        if (axis.lengthSq() > 1e-6) {
+          axis.normalize();
+          ball.spin.premultiply(new THREE.Quaternion().setFromAxisAngle(axis, (rolling / ball.radius) * step));
+        }
+      }
+    }
+    const placed = support(ball.x, ball.z);
+    const h = placed ? placed.h : world.heightAt(ball.x, ball.z);
+    const n = placed?.n || new THREE.Vector3(0, 1, 0);
+    const y = (h === null ? 0 : h) + n.y * ball.radius;
+    putWorld(ball.obj, new THREE.Vector3(ball.x + n.x * ball.radius, y, ball.z + n.z * ball.radius));
+    ball.obj.quaternion.premultiply(ball.spin);
+    ball.obj.scale.set(1, 1, 1);
+    ball.obj.updateMatrixWorld(true);
+    ball.trail.push({ x: ball.x, z: ball.z, born: clock });
+    if (ball.trail.length > 48) ball.trail.shift();
+    const low = pitPoint();
+    const gap = h === null ? 0 : y - (h + n.y * ball.radius);
+    const shown = new THREE.Vector3();
+    ball.obj.getWorldPosition(shown);
+    const screen = project(shown);
+    proof.ball = {
+      x: Number(ball.x.toFixed(3)),
+      y: Number(y.toFixed(3)),
+      z: Number(ball.z.toFixed(3)),
+      speed: Number(Math.hypot(ball.vx, ball.vz).toFixed(3)),
+      basin: low ? Number(Math.hypot(low.x - ball.x, low.z - ball.z).toFixed(3)) : -1,
+      gap: Number(gap.toFixed(4)),
+      radius: Number(ball.radius.toFixed(3)),
+      sx: Math.round(screen.x),
+      sy: Math.round(screen.y),
+    };
+    groundBeads();
+  }
+
+  function driveHover(beat: BeatId) {
+    if (beat === "attention") {
+      const threads = world.named((name) => name.startsWith("ATTN_th"));
+      const anchor = threads[0];
+      let point: THREE.Vector3 | null = null;
+      if (anchor && (pointer.x !== 0 || pointer.y !== 0)) {
+        world.camera.getWorldDirection(normal);
+        anchor.getWorldPosition(aim);
+        plane.setFromNormalAndCoplanarPoint(normal, aim);
+        point = world.rayPoint(pointer.x, pointer.y, plane);
+      }
+      world.bendThreads(point, point ? 1.3 : 0);
+      return;
+    }
+    if (beat === "input") {
+      const sheets = world.screen("INPUT_fg");
+      let hot = "";
+      let area = Infinity;
+      for (const item of sheets) {
+        const box = item.box;
+        if (!box || pointer.x < box.x0 || pointer.x > box.x1 || pointer.y < box.y0 || pointer.y > box.y1) continue;
+        const next = Math.max(1, (box.x1 - box.x0) * (box.y1 - box.y0));
+        if (next < area) {
+          area = next;
+          hot = item.name;
+        }
+      }
+      for (const sheet of world.named((name) => name.startsWith("INPUT_fg"))) {
+        const item = bodyOf(sheet);
+        item.release = false;
+        if (objectName(sheet) === hot) item.goal.copy(toLocal(sheet, new THREE.Vector3(0, 0.06, 0)));
+        else if (item.spring.offset.lengthSq() < 1e-5) item.goal.set(0, 0, 0);
+      }
+      return;
+    }
+    if (beat === "embedding") {
+      world.camera.updateMatrixWorld();
+      const right = new THREE.Vector3().setFromMatrixColumn(world.camera.matrixWorld, 0);
+      const up = new THREE.Vector3().setFromMatrixColumn(world.camera.matrixWorld, 1);
+      for (const spot of world.screen("EMB_peb")) {
+        const pebble = world.named((name) => name === spot.name)[0];
+        if (!pebble) continue;
+        const item = bodyOf(pebble);
+        item.release = false;
+        const dx = (spot.box ? (spot.box.x0 + spot.box.x1) / 2 : spot.x) - pointer.x;
+        const dy = (spot.box ? (spot.box.y0 + spot.box.y1) / 2 : spot.y) - pointer.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 90 || dist < 1) {
+          if (item.spring.offset.lengthSq() < 1e-5) item.goal.set(0, 0, 0);
+          continue;
+        }
+        const mag = 0.05 * (1 - dist / 90);
+        const goal = right.clone().multiplyScalar((dx / dist) * mag).addScaledVector(up, (-dy / dist) * mag);
+        item.goal.copy(toLocal(pebble, goal));
+      }
     }
   }
 
-  function runScript(dt: number) {
-    if (!script) return;
-    const current = script;
-    current.age += dt;
-    const u = Math.min(1, current.age / 0.8);
-    if (current.kind === "hero") {
-      const nodes = world.named((name) => name.startsWith("HERO_n"));
-      const node = nodes[4] || nodes[0];
-      if (node && u <= 0.95) {
-        holding = node;
-        bodyOf(node).goal.set(Math.sin(u * Math.PI) * 0.9, 0.12, 0);
-        couple(node);
-      } else if (node && !fired.has("pulse")) {
-        fired.add("pulse");
-        holding = null;
-        firePulse();
-      }
-    } else if (current.kind === "input") {
-      const sheet = world.named((name) => name.startsWith("INPUT_fg"))[0];
-      if (sheet && u < 0.7) bodyOf(sheet).goal.set(0, 0.2, Math.sin(u * Math.PI) * 0.8);
-      else if (sheet && !fired.has("snap")) {
-        fired.add("snap");
-        snapSheet(sheet);
-      }
-    } else if (current.kind === "layers") spreadGoal = Math.sin(u * Math.PI);
-    else if (current.kind === "products" && current.age > 0.4 && !fired.has("dive")) {
-      fired.add("dive");
-      hooks.dive("fieldrelay");
-    } else if (current.kind === "loss" && !ball) {
-      const node = world.named((name) => name === "LOSS_ball")[0];
-      if (node) {
-        const at = new THREE.Vector3();
-        node.getWorldPosition(at);
-        ball = { obj: node, x: at.x, y: at.y, z: at.z, ox: at.x, oz: at.z, px: 0, py: 0, vx: 2.4, vz: 0.6, live: true, trail: [at.clone()] };
-      }
-    } else if (current.kind === "pebbles" && !fired.has("peb")) {
-      fired.add("peb");
-      const pebble = world.named((name) => name.startsWith("EMB_peb"))[3] || world.named((name) => name.startsWith("EMB_peb"))[0];
-      if (pebble) bodyOf(pebble).spring.vel.set(2.4, 0.3, 0.4);
-    } else if (current.kind === "ripple" && !fired.has("rip")) {
-      fired.add("rip");
-      const ground = world.groundPoint(window.innerWidth / 2, window.innerHeight * 0.55);
-      if (ground) rippleAt(ground);
+  function releaseHero() {
+    if (!holdName.startsWith("HERO_n")) return;
+    for (const [object, item] of bodies) {
+      if (!objectName(object).startsWith("HERO_n")) continue;
+      item.goal.set(0, 0, 0);
+      item.release = true;
     }
-    if (current.age > 1.7) {
-      holding = null;
-      script = null;
-    }
+    startPulse(holdName);
   }
 
   return {
+    proof: () => proof,
     step(dt: number, beat: BeatId, reduced: boolean): HandFrame {
-      const scripting = Boolean(script);
-      runScript(dt);
-      spreadTarget.set(spreadGoal, 0, 0);
-      stepVec(spreadSpring, spreadTarget, 8, dt, reduced);
-      spread = spreadSpring.offset.x;
-      if (!scripting && holding && pointer.down && (beat === "hero" || beat === "book" || beat === "input")) {
-        const delta = aim(holding);
-        if (delta.length() > 1.35) delta.setLength(1.35);
-        bodyOf(holding).goal.copy(delta);
-        if (beat === "hero" || beat === "book") couple(holding);
-      }
-      apply(dt, reduced);
-      if ((beat === "layers" || scripting) && spread > 0.004) {
-        for (const block of world.named((name) => /^LAYERS_blk\d/.test(name))) {
-          const match = objectName(block).match(/LAYERS_blk(\d+)/);
-          block.position.y += spread * (match ? Number(match[1]) : 0) * 0.75;
-          block.updateMatrixWorld(true);
-        }
-      }
-      if (beat === "attention") {
-        const threads = world.named((name) => name.startsWith("ATTN_th"));
-        const anchor = threads[0];
-        let point: THREE.Vector3 | null = null;
-        if (anchor && (pointer.x !== 0 || pointer.y !== 0)) {
-          world.camera.getWorldDirection(normal);
-          anchor.getWorldPosition(aimOrigin);
-          plane.setFromNormalAndCoplanarPoint(normal, aimOrigin);
-          point = world.rayPoint(pointer.x, pointer.y, plane);
-        }
-        world.bendThreads(point, point ? 2.6 : 0);
-      }
-      if (beat === "embedding" && (pointer.x !== 0 || pointer.y !== 0)) {
-        const movedPx = Math.hypot(pointer.x - sweep.x, pointer.y - sweep.y);
-        if (sweepValid && movedPx > 8) {
-          world.camera.updateMatrixWorld();
-          normal.setFromMatrixColumn(world.camera.matrixWorld, 0);
-          aimOrigin.setFromMatrixColumn(world.camera.matrixWorld, 1);
-          for (const spot of world.screen("EMB_peb")) {
-            const dx = (spot.box ? (spot.box.x0 + spot.box.x1) / 2 : spot.x) - pointer.x;
-            const dy = (spot.box ? (spot.box.y0 + spot.box.y1) / 2 : spot.y) - pointer.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist > 140) continue;
-            const pebble = world.named((name) => name === spot.name)[0];
-            if (!pebble) continue;
-            const travel = Math.hypot(pointer.x - sweep.x, pointer.y - sweep.y) || 1;
-            const nx = dist < 8 ? (pointer.x - sweep.x) / travel : dx / dist;
-            const ny = dist < 8 ? (pointer.y - sweep.y) / travel : dy / dist;
-            const item = bodyOf(pebble);
-            const mag = Math.max(0.62, Math.min(0.95, dist < 8 ? 0.78 : 1.05 - dist / 180));
-            item.goal.copy(normal).multiplyScalar(nx * mag).addScaledVector(aimOrigin, -ny * mag);
-            if (pebble.parent) {
-              pebble.parent.getWorldQuaternion(parentQuat);
-              item.goal.applyQuaternion(parentQuat.invert());
-            }
-            item.hold = 0.8;
+      clock += dt;
+      if (script) {
+        script.age += dt;
+        if (script.kind === "layers") spreadGoal = Math.sin(Math.min(1, script.age / 0.9) * Math.PI);
+        if (script.kind === "loss" && !ball) {
+          const node = world.named((name) => name === "LOSS_ball")[0];
+          if (node) {
+            const at = new THREE.Vector3();
+            node.getWorldPosition(at);
+            ball = { obj: node, x: at.x, z: at.z, vx: 2.2, vz: 0.4, radius: objectRadius(node) || 0.17, spin: new THREE.Quaternion(), trail: [{ x: at.x, z: at.z, born: clock }] };
           }
         }
-        sweep.set(pointer.x, pointer.y, 0);
-        sweepValid = true;
+        if (script.age > 1.6 && script.kind !== "hero") script = null;
       }
-      if (ball?.live) {
-        const dtClamped = Math.min(Math.max(dt, 0.001), 0.05);
-        const dragging = holding === ball.obj && pointer.down;
-        if (dragging) {
-          const point = world.groundPoint(pointer.x, pointer.y);
-          let nx = ball.x;
-          let nz = ball.z;
-          const near = point && Math.hypot(point.x - ball.x, point.z - ball.z);
-          if (point && near > 0.01 && near < 3.5) {
-            const step = Math.min(near, 0.9);
-            nx = ball.x + ((point.x - ball.x) / near) * step;
-            nz = ball.z + ((point.z - ball.z) / near) * step;
-          } else {
-            world.camera.updateMatrixWorld();
-            normal.setFromMatrixColumn(world.camera.matrixWorld, 0);
-            aimOrigin.setFromMatrixColumn(world.camera.matrixWorld, 2);
-            const sx = (pointer.x - ball.px) / Math.max(1, window.innerWidth);
-            const sy = (pointer.y - ball.py) / Math.max(1, window.innerHeight);
-            nx = ball.ox + normal.x * sx * 4.2 + aimOrigin.x * sy * 3.2;
-            nz = ball.oz + normal.z * sx * 4.2 + aimOrigin.z * sy * 3.2;
-          }
-          const span = Math.hypot(nx - ball.ox, nz - ball.oz);
-          if (span > 3.2) {
-            nx = ball.ox + ((nx - ball.ox) / span) * 3.2;
-            nz = ball.oz + ((nz - ball.oz) / span) * 3.2;
-          }
-          ball.vx = (nx - ball.x) / dtClamped;
-          ball.vz = (nz - ball.z) / dtClamped;
-          ball.x = nx;
-          ball.z = nz;
-        } else if (!reduced) {
-          const ground = world.heightAt(ball.x, ball.z);
-          const hx = world.heightAt(ball.x + 1.1, ball.z);
-          const hz = world.heightAt(ball.x, ball.z + 1.1);
-          if (ground !== null && hx !== null) ball.vx += (ground - hx) * 36 * dtClamped;
-          if (ground !== null && hz !== null) ball.vz += (ground - hz) * 36 * dtClamped;
-          const low = world.basin();
-          if (ground !== null && low) {
-            const dx = low.x - ball.x;
-            const dz = low.z - ball.z;
-            const dist = Math.hypot(dx, dz);
-            const gap = ground - low.y;
-            if (dist > 0.25 && gap > 0.001) {
-              const accel = Math.min(7, gap * 40);
-              ball.vx += (dx / dist) * accel * dtClamped;
-              ball.vz += (dz / dist) * accel * dtClamped;
-            } else if (dist > 0.25) {
-              ball.vx += (dx / dist) * 1.4 * dtClamped;
-              ball.vz += (dz / dist) * 1.4 * dtClamped;
-            }
-          }
-          ball.vx *= Math.exp(-0.55 * dtClamped);
-          ball.vz *= Math.exp(-0.55 * dtClamped);
-          const speed = Math.hypot(ball.vx, ball.vz);
-          if (speed > 6) {
-            ball.vx *= 6 / speed;
-            ball.vz *= 6 / speed;
-          }
-          ball.x += ball.vx * dtClamped;
-          ball.z += ball.vz * dtClamped;
-        }
-        const sampled = world.heightAt(ball.x, ball.z);
-        const y = (sampled === null || Math.abs(sampled) > 30 ? ball.y : sampled) + 0.2;
-        const before = ball.obj.position.clone();
-        place(ball.obj, ball.x, y, ball.z);
-        ball.obj.scale.set(1, 1, 1);
-        ball.obj.updateMatrixWorld(true);
-        const sample = new THREE.Vector3();
-        ball.obj.getWorldPosition(sample);
-        if (sample.distanceTo(world.camera.position) < 1.1) {
-          ball.obj.position.copy(before);
-          ball.vx = 0;
-          ball.vz = 0;
-          ball.obj.updateMatrixWorld(true);
-          ball.obj.getWorldPosition(sample);
-          ball.x = sample.x;
-          ball.z = sample.z;
-        }
-        ball.y = sample.y;
-        ball.trail.push(sample.clone());
-        if (ball.trail.length > 28) ball.trail.shift();
-        const trail = ball.trail;
-        world.named((name) => /^LOSS_bead\d+$/.test(name)).forEach((bead, index, list) => {
-          const at = trail[Math.min(trail.length - 1, Math.floor((index / Math.max(1, list.length - 1)) * (trail.length - 1)))];
-          if (!at) return;
-          place(bead, at.x, at.y + 0.04, at.z);
-          bead.visible = true;
-          bead.updateMatrixWorld(true);
-        });
-      }
-      if (pulse > 0) {
-        pulse = reduced ? 0 : Math.max(0, pulse - dt / 0.9);
-        if (pulse > 0) {
-          for (const node of world.named((name) => name.startsWith("HERO_pulse"))) {
-            const name = objectName(node);
-            const win = world.trackWindow(name);
-            const trs = win ? world.sample(name, win.t0 + (1 - pulse) * Math.max(0.05, win.t1 - win.t0)) : null;
-            if (!trs) continue;
-            node.position.fromArray(trs.p);
-            node.quaternion.fromArray(trs.q);
-            node.scale.fromArray(trs.s);
-            node.visible = node.scale.x * node.scale.y * node.scale.z > 1e-4;
-            node.updateMatrixWorld(true);
-          }
-        }
-      }
-      if (ripple > 0) {
-        if (reduced) {
-          ripple = 0;
-          ring.visible = false;
-        } else {
-          ripple = Math.max(0, ripple - dt / 1.5);
-          ring.scale.setScalar(2.8 + (1 - ripple) * 5.6);
-          (ring.material as THREE.MeshBasicMaterial).opacity = 0.2 + ripple * 0.8;
-          ring.visible = ripple > 0.02;
-        }
-      }
-      const moved = Math.abs(pointer.x - lastPickX) > 2 || Math.abs(pointer.y - lastPickY) > 2;
+      const heroBeat = beat === "hero" || beat === "book";
+      if (heroBeat) driveHero(dt, reduced);
+      else applyBodies(dt, reduced);
+      if (beat === "layers" || script?.kind === "layers") driveStack(dt, reduced);
+      if (beat === "loss" || ball) driveLoss(dt, reduced);
+      if (!pointer.down) driveHover(beat);
+      const moved = pointer.moved;
       if (pointer.down || moved) {
-        const hit = world.pick(pointer.x, pointer.y, (name) => interactive(name, beat));
+        const hit = world.pick(pointer.x, pointer.y, (name) => {
+          if (heroBeat) return name.startsWith("HERO_n");
+          if (beat === "layers") return name.startsWith("LAYERS_blk");
+          if (beat === "loss") return name === "LOSS_ball";
+          if (beat === "attention") return name in PRODUCT;
+          return false;
+        });
         hover = hit ? hit.name : "";
-        lastPickX = pointer.x;
-        lastPickY = pointer.y;
         if (hover && hover !== lastHover) hooks.cue("hover");
         lastHover = hover;
+        pointer.moved = false;
       }
       return {
-        cursor: holding && pointer.down ? "grabbing" : hover ? "grab" : "default",
-        hint: seen(beat) || beat === "loader" ? null : "drag",
+        cursor: holding && pointer.down ? "grabbing" : hover && signature(beat) ? "grab" : "default",
+        hint: seen(beat) || !signature(beat) ? null : "drag",
       };
     },
     down(x: number, y: number, beat: BeatId) {
       pointer.x = x;
       pointer.y = y;
       pointer.down = true;
-      lastPickX = x + 4;
-      mark(beat);
-      const hit = world.pick(x, y, (name) => interactive(name, beat));
+      pointer.moved = true;
+      if (signature(beat)) mark(beat);
+      const heroBeat = beat === "hero" || beat === "book";
+      const hit = world.pick(x, y, (name) => {
+        if (heroBeat) return name.startsWith("HERO_n");
+        if (beat === "layers") return name.startsWith("LAYERS_blk");
+        if (beat === "loss") return name === "LOSS_ball";
+        if (beat === "attention") return name in PRODUCT;
+        return false;
+      });
       if (hit && PRODUCT[hit.name]) {
         hooks.dive(PRODUCT[hit.name]);
-        rippleAt(hit.point);
         return false;
       }
       if (beat === "layers") {
@@ -493,41 +1020,52 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
           return true;
         }
       }
-      if (!hit && beat === "input") {
-        const name = underPointer("INPUT_fg", x, y);
-        const sheet = name ? world.named((entry) => entry === name)[0] : undefined;
-        if (sheet) {
-          holding = sheet;
-          holdName = name;
-          return true;
-        }
-      }
-      if (hit && beat !== "embedding") {
+      if (hit && heroBeat) {
+        snapshotHero();
+        ensureEdges();
         holding = hit.object;
         holdName = hit.name;
-        if (hit.name === "LOSS_ball") {
-          const at = new THREE.Vector3();
-          hit.object.getWorldPosition(at);
-          ball = { obj: hit.object, x: at.x, y: at.y, z: at.z, ox: at.x, oz: at.z, px: x, py: y, vx: 0, vz: 0, live: true, trail: [at.clone()] };
-        }
+        const rest = restPos.get(hit.name);
+        world.camera.getWorldDirection(normal);
+        if (rest) plane.setFromNormalAndCoplanarPoint(normal, rest);
+        const onPlane = rest ? world.rayPoint(x, y, plane) : null;
+        grabPoint.copy(onPlane || hit.point);
+        grabbedAt = true;
         return true;
       }
-      const ground = world.groundPoint(x, y) || hit?.point;
-      if (ground) rippleAt(ground);
+      if (hit?.name === "LOSS_ball") {
+        const at = new THREE.Vector3();
+        hit.object.getWorldPosition(at);
+        holding = hit.object;
+        holdName = hit.name;
+        ball = {
+          obj: hit.object,
+          x: at.x,
+          z: at.z,
+          vx: 0,
+          vz: 0,
+          radius: objectRadius(hit.object) || 0.17,
+          spin: new THREE.Quaternion(),
+          trail: [{ x: at.x, z: at.z, born: clock }],
+        };
+        return true;
+      }
       return false;
     },
     move(x: number, y: number, beat: BeatId) {
       const prev = pointer.y;
       pointer.x = x;
       pointer.y = y;
-      if (pointer.down && layerDrag && beat === "layers") spreadGoal = Math.min(1, Math.max(0, spreadGoal + (prev - y) * 0.008));
+      pointer.moved = true;
+      if (pointer.down && layerDrag && beat === "layers") spreadGoal = Math.min(1, Math.max(0, spreadGoal + (prev - y) * 0.0045));
     },
     up(beat: BeatId) {
+      const dragged = pointer.moved && (holding !== null || layerDrag);
       pointer.down = false;
       layerDrag = false;
-      if (holding && (beat === "hero" || beat === "book")) firePulse();
-      if (holding && beat === "input") snapSheet(holding);
-      if (ball && holdName === "LOSS_ball" && Math.hypot(ball.vx, ball.vz) < 0.4) ball.vx += 1.1;
+      if (holding && (beat === "hero" || beat === "book")) releaseHero();
+      if (!dragged && !grabbedAt) hooks.cue("click");
+      grabbedAt = false;
       holding = null;
       holdName = "";
     },
@@ -538,50 +1076,50 @@ export function createHands(world: HandWorld, hooks: { dive: (id: string) => voi
         handled = true;
       }
       if (key === "ArrowUp" && beat === "layers") {
-        spreadGoal = Math.min(1, spreadGoal + 0.2);
+        spreadGoal = Math.min(1, spreadGoal + 0.25);
         handled = true;
       }
       if (key === "ArrowDown" && beat === "layers") {
-        spreadGoal = Math.max(0, spreadGoal - 0.2);
+        spreadGoal = Math.max(0, spreadGoal - 0.25);
         handled = true;
       }
       if ((key === "ArrowRight" || key === "ArrowLeft") && (beat === "hero" || beat === "book")) {
         const node = world.named((name) => name.startsWith("HERO_n"))[0];
         if (node) {
-          bodyOf(node).spring.vel.x += key === "ArrowRight" ? 2 : -2;
-          firePulse();
+          const metres = metresPerPixel(node) * (window.innerHeight || 1) * 0.18;
+          const item = bodyOf(node);
+          item.spring.offset.set(key === "ArrowRight" ? metres : -metres, 0, 0);
+          item.goal.set(0, 0, 0);
+          item.release = true;
+          startPulse(objectName(node));
           handled = true;
         }
-      }
-      if (key === "Enter" && beat === "input") {
-        const sheet = world.named((name) => name.startsWith("INPUT_fg"))[0];
-        if (sheet) snapSheet(sheet);
-        handled = true;
       }
       if (key === "ArrowRight" && beat === "loss") {
         const node = world.named((name) => name === "LOSS_ball")[0];
         if (node) {
           const at = new THREE.Vector3();
           node.getWorldPosition(at);
-          ball = { obj: node, x: at.x, y: at.y, z: at.z, ox: at.x, oz: at.z, px: 0, py: 0, vx: 2.4, vz: 0.4, live: true, trail: [at.clone()] };
+          ball = { obj: node, x: at.x, z: at.z, vx: 2.4, vz: 0.3, radius: objectRadius(node) || 0.17, spin: new THREE.Quaternion(), trail: [{ x: at.x, z: at.z, born: clock }] };
           handled = true;
         }
       }
-      if (key === " " || (key === "Enter" && beat !== "attention" && beat !== "input")) {
-        const ground = world.groundPoint(window.innerWidth / 2, window.innerHeight * 0.62);
-        if (ground) {
-          rippleAt(ground);
-          handled = true;
-        }
+      if (key === " " || (key === "Enter" && beat !== "attention")) {
+        hooks.cue("click");
+        handled = true;
       }
-      if (handled) mark(beat);
+      if (handled && signature(beat)) mark(beat);
       return handled;
     },
     play(kind: string) {
       script = { kind, age: 0 };
       fired.clear();
+      if (kind === "hero") {
+        const nodes = world.named((name) => name.startsWith("HERO_n") && !name.startsWith("HERO_n3"));
+        scriptNode = objectName(nodes[4] || nodes[0] || world.named((name) => name.startsWith("HERO_n"))[0]);
+      }
       if (kind === "loss") ball = null;
-      const beat = BEAT_OF[kind];
+      const beat = kind === "hero" ? "hero" : kind === "layers" ? "layers" : kind === "loss" ? "loss" : "";
       if (beat) mark(beat);
     },
   };

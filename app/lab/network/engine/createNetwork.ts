@@ -29,6 +29,7 @@ export type FrameState = {
   reduced: boolean;
   fallback: boolean;
   dive: string | null;
+  diveU: number;
   anchors: AnchorPoint[];
   poster: number;
   obstacles: Obstacle[];
@@ -113,6 +114,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       reduced,
       fallback: forceFallback,
       dive: null,
+      diveU: 0,
       anchors: [],
       poster: 1,
       obstacles: [],
@@ -553,6 +555,8 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
         label: "shot",
         intro: false,
         sand: 0,
+        dive: dive && dive.u > 0.02 ? dive.id : null,
+        diveU: dive?.u ?? 0,
         anchors: anchors(shotT),
         poster,
         obstacles: world.obstacles(beatScenes(beatAt(shotT).id)),
@@ -704,6 +708,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       epoch,
       sand: phase === "loader" ? 0 : sand,
       dive: dive && dive.u > 0.02 ? dive.id : null,
+      diveU: dive?.u ?? 0,
       anchors: anchors(shown),
       poster,
       obstacles: world.obstacles(beatScenes(phase === "loader" ? "loader" : beat.id)),
@@ -746,10 +751,12 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     __points?: (prefix: string) => ReturnType<NetworkWorld["screen"]>;
     __bend?: () => number;
     __pixels?: () => number[][];
+    __proof?: () => ReturnType<typeof hands.proof>;
   };
   host.__hands = { play: (kind: string) => hands.play(kind) };
   host.__points = (prefix: string) => world.screen(prefix);
   host.__bend = () => world.bendPeak;
+  host.__proof = () => hands.proof();
 
   return {
     audio,

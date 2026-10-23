@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { BEATS, LAYER_CALLOUTS, LOSS_STATS, NAV, PRODUCTS, beatBias, copyMotion, type Beat } from "./engine/copy";
+import { BEATS, LAYER_CALLOUTS, NAV, PRODUCTS, beatBias, copyMotion, type Beat } from "./engine/copy";
 import { createNetwork, type FrameState, type NetworkHandle } from "./engine/createNetwork";
 import { clampLabel, intersections, largestEmptyRect, textContrast, relativeLuminance, type Rect } from "./engine/safe";
 import "./network.css";
@@ -152,6 +152,7 @@ export function NetworkExperience() {
   const [dive, setDive] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const hintRef = useRef<string | null>(null);
+  const veilRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -197,6 +198,10 @@ export function NetworkExperience() {
         onFrame: (state: FrameState) => {
           if (!alive) return;
           if (sandRef.current) sandRef.current.style.opacity = String(state.sand);
+          if (veilRef.current) {
+            const cover = state.diveU > 0.58 ? Math.min(1, (state.diveU - 0.58) / 0.42) : 0;
+            veilRef.current.style.opacity = String(cover);
+          }
           const placed = state.anchors.filter((anchor) => anchor.visible);
           const canvasEl = canvasRef.current;
           const labelBoxes: Rect[] = [];
@@ -471,6 +476,7 @@ export function NetworkExperience() {
         </picture>
       </div>
       <canvas ref={canvasRef} className="net-canvas" aria-hidden={fallback} />
+      <div ref={veilRef} className="net-veil" />
       <div ref={sandRef} className="net-sand" />
       <div ref={cursorRef} className="net-cursor" aria-hidden="true" />
       {hint ? (
@@ -507,20 +513,6 @@ export function NetworkExperience() {
         {beat.h1 ? <h1>{beat.title}</h1> : <h2>{beat.title}</h2>}
         {beat.body ? <p>{beat.body}</p> : null}
         {beat.placeholder ? <span className="net-tag">placeholder</span> : null}
-        {beat.id === "loss" ? (
-          <dl className="net-stats">
-            {LOSS_STATS.map((stat) => (
-              <div className="net-stat" key={stat.label}>
-                <dt>{stat.label}</dt>
-                <dd>
-                  {stat.value}
-                  {stat.placeholder ? " ·" : ""}
-                </dd>
-              </div>
-            ))}
-            <span className="net-tag">placeholder</span>
-          </dl>
-        ) : null}
       </section>
 
       <StageLabels onDive={onDive} />

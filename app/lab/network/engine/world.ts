@@ -168,6 +168,7 @@ export type NetworkWorld = {
   bendThreads: (point: THREE.Vector3 | null, reach: number) => void;
   readonly bendPeak: number;
   basin: () => THREE.Vector3 | null;
+  lossBounds: () => { minX: number; maxX: number; minZ: number; maxZ: number } | null;
   screen: (prefix: string) => { name: string; x: number; y: number; wx: number; wy: number; wz: number; visible: boolean; box: ScreenRect | null }[];
   attach: (object: THREE.Object3D) => void;
   groundPoint: (x: number, y: number) => THREE.Vector3 | null;
@@ -1269,23 +1270,28 @@ export async function loadWorld(
     const list = nodeObj[name];
     if (!list?.length) return;
     const u = smootherstep(Math.min(1, Math.max(0, amount)));
-    const anchor = new THREE.Vector3();
-    list[0].o.getWorldPosition(anchor);
+    const box = new THREE.Box3();
+    for (const entry of list) box.expandByObject(entry.o);
+    if (box.isEmpty()) return;
+    const sphere = new THREE.Sphere();
+    box.getBoundingSphere(sphere);
+    const anchor = sphere.center;
+    const stop = sphere.radius + 0.55;
     const fromPos = camera.position.clone();
     const fromQuat = camera.quaternion.clone();
     const fromFov = camera.fov;
     const offset = fromPos.clone().sub(anchor);
-    if (offset.lengthSq() < 1e-4) offset.set(0.6, 0.45, 0.8);
-    const dist = Math.max(1.2, Math.min(2.4, offset.length() * 0.42));
+    if (offset.lengthSq() < 1e-4) offset.set(0.2, 0.35, 0.8);
+    const startDist = offset.length();
+    const dist = Math.max(stop, THREE.MathUtils.lerp(startDist, stop, u));
     const toPos = anchor.clone().addScaledVector(offset.normalize(), dist);
-    toPos.y = Math.max(toPos.y, anchor.y + 0.28);
     camera.position.copy(toPos);
     camera.up.set(0, 1, 0);
     camera.lookAt(anchor);
     const toQuat = camera.quaternion.clone();
     camera.position.lerpVectors(fromPos, toPos, u);
     camera.quaternion.copy(fromQuat).slerp(toQuat, u);
-    camera.fov = fromFov + (30 - fromFov) * u;
+    camera.fov = fromFov + (32 - fromFov) * u * 0.35;
     if (u > 0.02) camera.clearViewOffset();
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
@@ -1596,6 +1602,17 @@ export async function loadWorld(
     return basinPoint;
   }
 
+  function lossBounds() {
+    const box = new THREE.Box3();
+    let any = false;
+    for (const object of named((name) => name === "ground_loss")) {
+      box.expandByObject(object);
+      any = true;
+    }
+    if (!any || box.isEmpty()) return null;
+    return { minX: box.min.x, maxX: box.max.x, minZ: box.min.z, maxZ: box.max.z };
+  }
+
   function screen(prefix: string) {
     const out: { name: string; x: number; y: number; wx: number; wy: number; wz: number; visible: boolean; box: ScreenRect | null }[] = [];
     const at = new THREE.Vector3();
@@ -1738,6 +1755,7 @@ export async function loadWorld(
       return bendPeak;
     },
     basin,
+    lossBounds,
     screen,
     attach,
     groundPoint,

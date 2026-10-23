@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import * as THREE from "three";
 import { createAnim } from "../app/lab/network/engine/anim";
-import { bendPush, stepVec, vecSpring } from "../app/lab/network/engine/clay";
+import { bendPush, clampScreenPull, hopWeight, resolveStack, stepUnder, stepVec, vecSpring } from "../app/lab/network/engine/clay";
 import { copyMotion, productFocus } from "../app/lab/network/engine/copy";
 import { cueFile } from "../app/lab/network/engine/manifest";
 import { clampLabel, contrastRatio, largestEmptyRect, minInkContrast, placeBeside } from "../app/lab/network/engine/safe";
@@ -93,10 +93,58 @@ describe("network scroll map", () => {
     assert.equal(hitsOther, false);
   });
 
-  it("bends a nearby thread by at least 0.3 m", () => {
-    assert.ok(bendPush(0.2, 2.6) >= 0.3);
-    assert.ok(bendPush(0.4, 2.6) >= 0.3);
-    assert.equal(bendPush(3, 2.6), 0);
+  it("leans a nearby thread a few centimetres and leaves the far ones", () => {
+    const near = bendPush(0.1, 1.3);
+    assert.ok(near > 0.02 && near < 0.05, `near ${near}`);
+    assert.ok(bendPush(0.8, 1.3) < near);
+    assert.equal(bendPush(1.3, 1.3), 0);
+  });
+
+  it("follows the grabbed node for two hops and then stops", () => {
+    assert.equal(hopWeight(0), 1);
+    assert.equal(hopWeight(1), 0.45);
+    assert.equal(hopWeight(2), 0.18);
+    assert.equal(hopWeight(3), 0);
+  });
+
+  it("clamps a pull at 22% of the screen height", () => {
+    const big = clampScreenPull(0, 400, 900);
+    assert.ok(Math.abs(big.frac - 0.22) < 1e-6, `frac ${big.frac}`);
+    assert.ok(big.frac >= 0.15);
+    const small = clampScreenPull(0, 90, 900);
+    assert.ok(Math.abs(small.y - 90) < 1e-6);
+    assert.ok(small.frac >= 0.1 - 1e-6);
+  });
+
+  it("springs back with one overshoot and is settled by 0.8 s", () => {
+    const spring = vecSpring();
+    spring.offset.set(1, 0, 0);
+    const target = new THREE.Vector3();
+    let min = 1;
+    let overs = 0;
+    let below = false;
+    for (let t = 0; t < 0.8; t += 1 / 60) {
+      stepUnder(spring, target, 9, 0.52, 1 / 60, false);
+      if (spring.offset.x < -0.08) {
+        if (!below) overs += 1;
+        below = true;
+      } else if (spring.offset.x > -0.02) below = false;
+      if (spring.offset.x < min) min = spring.offset.x;
+    }
+    assert.equal(overs, 1);
+    assert.ok(min < -0.1, `min ${min}`);
+    assert.ok(Math.abs(spring.offset.x) < 0.05, `x=${spring.offset.x}`);
+  });
+
+  it("keeps stacked blocks from closing the authored gap and bounces off the floor", () => {
+    const closed = resolveStack([0, -0.4], [1, 2], [0, 1.4], [0, -1]);
+    const gap = 1.4 + closed.off[1] - (1 + closed.off[0]);
+    assert.ok(gap >= 0.4 - 1e-6, `gap ${gap}`);
+    assert.equal(closed.off[1], 0);
+    assert.ok(closed.vel[1] > 0);
+    const floor = resolveStack([-0.2], [1], [0], [-1]);
+    assert.equal(floor.off[0], 0);
+    assert.ok(floor.vel[0] > 0);
   });
 
   it("flips a product label that would leave the right margin", () => {
