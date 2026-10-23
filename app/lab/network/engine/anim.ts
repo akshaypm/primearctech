@@ -16,6 +16,7 @@ export type WorldTRS = { p: number[]; q: number[]; s: number[] };
 
 export type AnimApi = {
   world: (name: string, t: number) => WorldTRS | null;
+  span: (name: string) => { t0: number; t1: number } | null;
   scalar: (name: string, t: number) => number | undefined;
   apply: (t: number, nodesByName: Record<string, THREE.Object3D[]>) => void;
   addPack: (pack: AnimPack, buffer: ArrayBuffer) => void;
@@ -82,6 +83,12 @@ export function createAnim(): AnimApi {
     const q = v.slice(3, 7);
     const l = Math.hypot(...q) || 1;
     return { p: v.slice(0, 3), q: q.map((x) => x / l), s: v.slice(7, 10) };
+  };
+
+  const span = (name: string) => {
+    const tr = tracks.get(name);
+    if (!tr || tr.n < 1) return null;
+    return { t0: tr.f0 / tr.fps, t1: (tr.f0 + tr.n - 1) / tr.fps };
   };
 
   const scalar = (name: string, t: number) => {
@@ -180,6 +187,7 @@ export function createAnim(): AnimApi {
   };
   return {
     world,
+    span,
     scalar,
     apply,
     addPack,

@@ -157,6 +157,17 @@ export type NetworkWorld = {
   prefetch: (name: string) => void;
   startQueue: () => void;
   upgrade: () => void;
+  prepareLoader: () => Promise<void>;
+  warm: () => Promise<void>;
+  named: (test: (name: string) => boolean) => THREE.Object3D[];
+  pick: (x: number, y: number, test?: (name: string) => boolean) => { name: string; object: THREE.Object3D; point: THREE.Vector3 } | null;
+  sample: (name: string, t: number) => { p: number[]; q: number[]; s: number[] } | null;
+  trackWindow: (name: string) => { t0: number; t1: number } | null;
+  heightAt: (x: number, z: number) => number | null;
+  bendThreads: (point: THREE.Vector3 | null, reach: number) => void;
+  attach: (object: THREE.Object3D) => void;
+  groundPoint: (x: number, y: number) => THREE.Vector3 | null;
+  rayPoint: (x: number, y: number, plane: THREE.Plane) => THREE.Vector3 | null;
   dispose: () => void;
 };
 
@@ -338,15 +349,18 @@ export async function loadWorld(
     let pending = packLoaded.get(file);
     if (!pending) {
       pending = (async () => {
-        const pack = (await fetch(`/network/anim/scenes/${file}.json`).then((r) => {
-          if (!r.ok) throw new Error(`missing ${file} anim (${r.status})`);
-          return r.json();
-        })) as AnimPack;
-        const bin = await fetch(`/network/anim/scenes/${pack.bin}`).then((r) => {
-          if (!r.ok) throw new Error(`missing ${pack.bin} (${r.status})`);
-          return r.arrayBuffer();
-        });
-        anim.addPack(pack, bin);
+        const packRes = await fetch(`/network/anim/scenes/${file}.json`);
+        if (!packRes.ok) {
+          console.warn(`missing ${file} anim (${packRes.status})`);
+          return;
+        }
+        const pack = (await packRes.json()) as AnimPack;
+        const binRes = await fetch(`/network/anim/scenes/${pack.bin}`);
+        if (!binRes.ok) {
+          console.warn(`missing ${pack.bin} (${binRes.status})`);
+          return;
+        }
+        anim.addPack(pack, await binRes.arrayBuffer());
       })();
       packLoaded.set(file, pending);
     }
@@ -443,12 +457,22 @@ export async function loadWorld(
   );
 
   async function loadScene(name: string, preset?: ArrayBuffer) {
+    if (roots.has(name)) {
+      readyResolve.get(name)?.();
+      return;
+    }
     await loadPack(name);
-    let buf = preset ?? await fetch(`/network/${source}/${name}-baked.glb`).then((r) => {
-      if (!r.ok) throw new Error(`missing ${name} glb (${r.status})`);
-      return r.arrayBuffer();
-    });
-    if (name === "hero" && quality === "boot" && source === "ktx") buf = retargetGlb(buf, "../tex/", "../boot/");
+    let buf = preset;
+    if (!buf) {
+      const res = await fetch(`/network/${source}/${name}-baked.glb`);
+      if (!res.ok) {
+        console.warn(`missing ${name} glb (${res.status})`);
+        readyResolve.get(name)?.();
+        return;
+      }
+      buf = await res.arrayBuffer();
+    }
+    if ((name === "hero" || name === "loader") && quality === "boot" && source === "ktx") buf = retargetGlb(buf, "../tex/", "../boot/");
     const header = new DataView(buf);
     const jsonLen = header.getUint32(12, true);
     const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen))) as Parser["json"];
@@ -643,10 +667,8 @@ export async function loadWorld(
   let pumping = false;
   let queueStarted = false;
   let resolveLoaded = () => {};
-  let rejectLoaded: (error: unknown) => void = () => {};
-  const loaded = new Promise<void>((resolve, reject) => {
+  const loaded = new Promise<void>((resolve) => {
     resolveLoaded = resolve;
-    rejectLoaded = reject;
   });
   const pump = () => {
     if (!queueStarted || pumping) return;
@@ -668,8 +690,9 @@ export async function loadWorld(
         pump();
       })
       .catch((error) => {
+        console.warn(error);
         pumping = false;
-        rejectLoaded(error);
+        pump();
       });
   };
 
@@ -1076,8 +1099,8 @@ export async function loadWorld(
     clearShadow();
     const stackOn = t >= 19.5 && t <= 31;
     const pcss = (["emb", "loader"] as const).filter((name) => t >= (name === "emb" ? 49 : 0) && t <= (name === "emb" ? 57 : 8.5) && (name !== "loader" || loaderMix > 0.45));
-    if (!stackOn && pcss.length === 0) {
-      if (shadow) {
+    if (!stackOn && (pcss.length === 0 || t < 6)) {
+      if (shadow && t > 6) {
         shadow.target.dispose();
         shadow = null;
       }
@@ -1426,6 +1449,147 @@ export async function loadWorld(
     }
   }
 
+  const raycaster = new THREE.Raycaster();
+  const pointerNdc = new THREE.Vector2();
+  const rayHit = new THREE.Vector3();
+  const heightOrigin = new THREE.Vector3();
+  const heightDir = new THREE.Vector3(0, -1, 0);
+  const heightRay = new THREE.Raycaster();
+  const bendLocal = new THREE.Vector3();
+  const bendInverse = new THREE.Matrix4();
+  const groundScratch = new THREE.Vector3();
+
+  function pointerRay(x: number, y: number) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    const width = rect.width || cssW || 1;
+    const height = rect.height || cssH || 1;
+    pointerNdc.x = ((x - rect.left) / width) * 2 - 1;
+    pointerNdc.y = -((y - rect.top) / height) * 2 + 1;
+    raycaster.setFromCamera(pointerNdc, camera);
+  }
+
+  function named(test: (name: string) => boolean) {
+    const out: THREE.Object3D[] = [];
+    for (const [name, list] of Object.entries(nodeObj)) {
+      if (!test(name)) continue;
+      for (const entry of list) out.push(entry.o);
+    }
+    return out;
+  }
+
+  function pick(x: number, y: number, test?: (name: string) => boolean) {
+    if (!test) return null;
+    pointerRay(x, y);
+    const targets = named(test);
+    if (!targets.length) return null;
+    const hits = raycaster.intersectObjects(targets, true);
+    for (const hit of hits) {
+      let object: THREE.Object3D | null = hit.object;
+      while (object) {
+        const name = nodeName(object);
+        if (name && test(name)) return { name, object, point: hit.point };
+        object = object.parent;
+      }
+    }
+    return null;
+  }
+
+  function rayPoint(x: number, y: number, plane: THREE.Plane) {
+    pointerRay(x, y);
+    return raycaster.ray.intersectPlane(plane, rayHit);
+  }
+
+  function groundPoint(x: number, y: number) {
+    pointerRay(x, y);
+    const grounds = named((name) => name.startsWith("ground"));
+    const hits = raycaster.intersectObjects(grounds, true);
+    if (!hits.length) return null;
+    groundScratch.copy(hits[0].point);
+    return groundScratch;
+  }
+
+  function heightAt(x: number, z: number) {
+    heightOrigin.set(x, 80, z);
+    heightRay.set(heightOrigin, heightDir);
+    const loss = named((name) => name === "ground_loss");
+    const grounds = loss.length ? loss : named((name) => name.startsWith("ground"));
+    const hits = heightRay.intersectObjects(grounds, true);
+    return hits.length ? hits[0].point.y : null;
+  }
+
+  function bendThreads(point: THREE.Vector3 | null, reach: number) {
+    if (!point || reach <= 0) return;
+    for (const object of named((name) => name.startsWith("ATTN_th"))) {
+      object.updateWorldMatrix(true, false);
+      object.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const attr = mesh.geometry?.attributes?.position;
+        if (!attr) return;
+        const array = attr.array as Float32Array;
+        bendInverse.copy(mesh.matrixWorld).invert();
+        bendLocal.copy(point).applyMatrix4(bendInverse);
+        const stride = attr.count > 2400 ? 2 : 1;
+        for (let i = 0; i < attr.count; i += stride) {
+          const ix = i * 3;
+          const dx = bendLocal.x - array[ix];
+          const dy = bendLocal.y - array[ix + 1];
+          const dz = bendLocal.z - array[ix + 2];
+          const dist = Math.hypot(dx, dy, dz);
+          if (dist >= reach || dist < 1e-4) continue;
+          const falloff = (1 - dist / reach) * 0.35;
+          array[ix] += dx * falloff;
+          array[ix + 1] += dy * falloff;
+          array[ix + 2] += dz * falloff;
+        }
+        attr.needsUpdate = true;
+      });
+    }
+  }
+
+  function attach(object: THREE.Object3D) {
+    scene.add(object);
+  }
+
+  async function prepareLoader() {
+    if (roots.has("loader")) return;
+    await loadScene("loader", heroReadyBuf.slice(0));
+  }
+
+  async function warm() {
+    const opts = (t: number, loaderMix: number): PoseOptions => ({
+      mobile: mobileShader || cssW < cssH,
+      smoothCamera: false,
+      loaderMix,
+      dive: null,
+      fullResidency: false,
+    });
+    const compile = async () => {
+      try {
+        if (renderer.compileAsync) await renderer.compileAsync(scene, camera);
+        else renderer.compile(scene, camera);
+      } catch (error) {
+        console.warn(error);
+        try {
+          renderer.compile(scene, camera);
+        } catch {
+          /* shader warmup is best-effort */
+        }
+      }
+    };
+    const draw = async (t: number, loaderMix: number) => {
+      pose(t, opts(t, loaderMix));
+      await compile();
+      renderer.setRenderTarget(null);
+      renderer.render(scene, camera);
+    };
+    await draw(6, 0);
+    if (roots.has("loader")) {
+      await draw(2, 1);
+      await draw(3.7, 0.5);
+    }
+  }
+
   function render() {
     renderer.setRenderTarget(null);
     renderer.render(scene, camera);
@@ -1485,6 +1649,21 @@ export async function loadWorld(
       queueStarted = true;
       pump();
     },
+    prepareLoader,
+    warm,
+    named,
+    pick,
+    sample(name: string, t: number) {
+      return anim.world(name, t);
+    },
+    trackWindow(name: string) {
+      return anim.span(name);
+    },
+    heightAt,
+    bendThreads,
+    attach,
+    groundPoint,
+    rayPoint,
     upgrade,
     dispose() {
       shadow?.target.dispose();

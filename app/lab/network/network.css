@@ -39,6 +39,7 @@ html:has(.net) body {
 .net-canvas {
   display: block;
   z-index: 0;
+  touch-action: pan-y;
 }
 
 .net-sand {
@@ -545,6 +546,39 @@ html:has(.net) body {
   pointer-events: none;
 }
 
+.net-cursor[data-hand="grab"] {
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
+  background: transparent;
+  border: 1.5px solid var(--clay);
+}
+
+.net-cursor[data-hand="grabbing"] {
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+  background: var(--clay);
+  border: 0;
+}
+
+.net-hint {
+  position: fixed;
+  z-index: 4;
+  left: 50%;
+  bottom: 1.4rem;
+  transform: translateX(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--secondary);
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .net-fallback {
   position: relative;
   z-index: 3;
@@ -599,6 +633,7 @@ html:has(.net) body {
 .net[data-shot] .net-boot,
 .net[data-shot] .net-skip,
 .net[data-shot] .net-cursor,
+.net[data-shot] .net-hint,
 .net[data-shot] .net-fallback {
   display: none;
 }

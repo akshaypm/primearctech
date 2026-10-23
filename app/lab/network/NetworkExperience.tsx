@@ -12,12 +12,17 @@ const LABEL_GAP = 50;
 
 let pixelBuf = new Uint8Array(0);
 
+let gridAt = 0;
+let gridSample: [number, number, number][] = [[228, 216, 196]];
+
 /** Darkest canvas pixel under a copy block. An 8px stride still hits a clay wedge the old 6×4 grid stepped over. */
-function readGrid(canvas: HTMLCanvasElement, rect: Rect): [number, number, number][] {
+function readGrid(canvas: HTMLCanvasElement, rect: Rect, storyT: number): [number, number, number][] {
+  const now = performance.now();
+  if ((storyT >= 3 && storyT <= 5) || now - gridAt < 320) return gridSample;
   const gl = canvas.getContext("webgl2");
   const cssW = rect.x1 - rect.x0;
   const cssH = rect.y1 - rect.y0;
-  if (!gl || cssW < 4 || cssH < 4) return [];
+  if (!gl || cssW < 4 || cssH < 4) return gridSample;
   const dpr = canvas.width / Math.max(1, canvas.clientWidth);
   const scaleY = canvas.height / Math.max(1, canvas.clientHeight);
   let x0 = Math.floor(rect.x0 * dpr);
@@ -52,7 +57,9 @@ function readGrid(canvas: HTMLCanvasElement, rect: Rect): [number, number, numbe
   consider(pw - 1, 0);
   consider(0, ph - 1);
   consider(pw - 1, ph - 1);
-  return [best];
+  gridAt = now;
+  gridSample = [best];
+  return gridSample;
 }
 
 function sandPixel(buf: Uint8Array): boolean {
@@ -143,6 +150,8 @@ export function NetworkExperience() {
   const [fallback, setFallback] = useState(false);
   const [sound, setSound] = useState(false);
   const [dive, setDive] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  const hintRef = useRef<string | null>(null);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -166,7 +175,16 @@ export function NetworkExperience() {
     window.addEventListener("pointermove", move);
 
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") handleRef.current?.cancelDive();
+      const tag = (event.target as HTMLElement | null)?.tagName;
+      if (tag === "BUTTON" || tag === "A" || tag === "INPUT" || tag === "TEXTAREA") {
+        if (event.key === "Escape") handleRef.current?.cancelDive();
+        return;
+      }
+      if (event.key === "Escape") {
+        handleRef.current?.cancelDive();
+        return;
+      }
+      if (handleRef.current?.press(event.key)) event.preventDefault();
     };
     window.addEventListener("keydown", onKey);
 
@@ -310,7 +328,7 @@ export function NetworkExperience() {
             copy.style.transform = posterOn ? "none" : `translate3d(0, ${motion.y}px, 0)`;
             const box = copy.getBoundingClientRect();
             let copyRect = { x0: box.left, y0: box.top, x1: box.right, y1: box.bottom };
-            let samples = posterOn || !canvasEl ? [] : readGrid(canvasEl, copyRect);
+            let samples = posterOn || !canvasEl ? [] : readGrid(canvasEl, copyRect, state.t);
             let contrast = minInkContrast(samples, false);
             let scrim = contrast < 4.5;
             if (!posterOn && !band && liveBeat.id !== "hero" && contrast < 4.5 && canvasEl) {
@@ -318,7 +336,7 @@ export function NetworkExperience() {
               copy.style.width = `${Math.round(skyW)}px`;
               const skyH = copy.offsetHeight || height;
               const sky = { x0: 16, y0: padTop, x1: 16 + skyW, y1: padTop + skyH };
-              const skySamples = readGrid(canvasEl, sky);
+              const skySamples = readGrid(canvasEl, sky, state.t);
               const skyContrast = minInkContrast(skySamples, false);
               if (skyContrast >= 4.5) {
                 x = 16;
@@ -375,7 +393,14 @@ export function NetworkExperience() {
               y: Math.round(y),
               w: Math.round(prefer),
               h: Math.round(height),
+              live: state.live,
             };
+          }
+          const cursor = cursorRef.current;
+          if (cursor && cursor.dataset.hand !== state.hand) cursor.dataset.hand = state.hand;
+          if (state.hint !== hintRef.current) {
+            hintRef.current = state.hint;
+            setHint(state.hint);
           }
           root.dataset.intro = state.intro ? "1" : "0";
           root.dataset.beat = posterOn ? "hero" : motion.beat.id;
@@ -444,6 +469,11 @@ export function NetworkExperience() {
       <canvas ref={canvasRef} className="net-canvas" aria-hidden={fallback} />
       <div ref={sandRef} className="net-sand" />
       <div ref={cursorRef} className="net-cursor" aria-hidden="true" />
+      {hint ? (
+        <button type="button" className="net-hint" onClick={() => handleRef.current?.nudge()}>
+          drag
+        </button>
+      ) : null}
 
       <header className="net-nav">
         <Link className="net-mark" href="/">

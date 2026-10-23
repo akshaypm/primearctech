@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { createNetworkAudio, type NetworkAudio } from "./audio";
 import { LAYER_CALLOUTS, PRODUCTS, beatAt, beatScenes, nextScene, productFocus, type BeatId, type CueName } from "./copy";
+import { createHands } from "./hands";
 import { SCROLL_OMEGA, STORY_END, buildTau, createSpring, pxPerSecond, springTo, tauAt, timeAtTau } from "./scroll";
 import { loadWorld, type MemoryReport, type NetworkWorld, type Obstacle } from "./world";
 
@@ -32,6 +33,9 @@ export type FrameState = {
   poster: number;
   obstacles: Obstacle[];
   focus: string | null;
+  hand: "default" | "grab" | "grabbing";
+  hint: string | null;
+  live: boolean;
 };
 
 export type NetworkHandle = {
@@ -40,6 +44,8 @@ export type NetworkHandle = {
   dive: (id: string) => void;
   cancelDive: () => void;
   skipDive: () => void;
+  nudge: () => void;
+  press: (key: string) => boolean;
   dispose: () => void;
 };
 
@@ -111,6 +117,9 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       poster: shot ? 0 : 1,
       obstacles: [],
       focus: null,
+      hand: "default",
+      hint: null,
+      live: false,
       ...partial,
     });
   };
@@ -123,6 +132,10 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       dive() {},
       cancelDive() {},
       skipDive() {},
+      nudge() {},
+      press() {
+        return false;
+      },
       dispose() {
         audio.dispose();
       },
@@ -190,8 +203,6 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   let clock = shot ? Number(params.get("t") || 6) : 6;
   let mix = shot ? loaderMixAt(clock) : 0;
   let cross = 0;
-  const deadline = (boot.firstPaint || 0) + 1500;
-  const waitForLoader = !shot && (boot.heroReady || 0) <= deadline;
   let phase: "wait" | "loader" | "hero" = shot ? "hero" : "wait";
   let poster = shot ? 0 : 1;
   let fading = false;
@@ -226,6 +237,18 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     if (spacer && !shot) spacer.style.height = `${storyPx + window.innerHeight}px`;
   };
   resize();
+
+  const diveTo = (id: string) => {
+    const node = productNode.get(id);
+    if (!node) return;
+    dive = { id, node, u: dive?.id === id ? dive.u : 0, dir: 1 };
+    audio.cue("dive");
+  };
+  const hands = createHands(world, {
+    dive: diveTo,
+    cue: (name) => audio.cue(name),
+  });
+  let shownT = shot ? clock : 0;
 
   const scrollToTime = (t: number) => {
     const tau = tauAt(table, Math.min(STORY_END, Math.max(0, t)));
@@ -389,10 +412,51 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     };
   }
 
+  if (!shot && !reduced) {
+    try {
+      await world.prepareLoader();
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+  if (!shot) {
+    try {
+      await world.warm();
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+  if (!shot && !reduced && world.hasScene("loader")) {
+    phase = "loader";
+    clock = 0;
+    mix = 1;
+    fading = true;
+    intro = true;
+    boot.playLoader = true;
+    boot.loaderFrame = performance.now();
+  } else if (!shot) {
+    phase = "hero";
+    clock = 6;
+    mix = 0;
+    fading = true;
+    intro = false;
+    const tau = tauAt(table, 6);
+    spring.x = tau;
+    spring.v = 0;
+    targetTau = tau;
+    window.scrollTo(0, tau * px);
+    boot.playLoader = false;
+    boot.heroFrame = performance.now();
+    boot.first3d = boot.heroFrame;
+    noteBytes();
+  }
+  let scrollArmed = phase !== "loader";
+  let queued = shot;
+
   let last = performance.now();
   const frame = (now: number) => {
     if (!running) return;
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
     last = now;
     if (window.scrollY !== lastScroll) {
       lastScroll = window.scrollY;
@@ -403,7 +467,14 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     idleFor = (now - scrollAt) / 1000;
 
     if (shot) {
+      if (dive) {
+        const step = dt / DIVE_SECONDS;
+        dive.u = Math.min(1, Math.max(0, dive.u + dive.dir * step));
+        if (dive.dir < 0 && dive.u <= 0) dive = null;
+      }
       world.pose(shotT, poseOpts(shotT));
+      shownT = shotT;
+      const handFrame = hands.step(dt, beatAt(shotT).id, false);
       world.render();
       publish({
         t: shotT,
@@ -417,39 +488,24 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
         poster: 0,
         obstacles: world.obstacles(beatScenes(beatAt(shotT).id)),
         focus: productFocus(shotT),
+        hand: handFrame.cursor,
+        hint: handFrame.hint,
+        live: true,
       });
       requestAnimationFrame(frame);
       return;
     }
 
-    if (phase === "wait") {
-      const loaderInTime = waitForLoader && world.hasScene("loader") && performance.now() <= deadline && !reduced;
-      if (loaderInTime) {
-        phase = "loader";
-        clock = 0;
-        mix = 1;
-        fading = true;
-        fade = 0;
-        boot.playLoader = true;
-        boot.loaderFrame = performance.now();
-        world.startQueue();
-      } else {
-        phase = "hero";
-        clock = 6;
-        mix = 0;
-        fading = true;
-        fade = 0;
-        boot.playLoader = false;
-        boot.heroFrame = performance.now();
-        boot.first3d = boot.heroFrame;
-        noteBytes();
-        scrollToTime(6);
-        world.startQueue();
-        void world.sceneReady("input").then(() => world.upgrade());
-      }
-    }
     if (phase === "loader") {
       clock += dt;
+      if (!scrollArmed && clock >= 2.4) {
+        scrollArmed = true;
+        const tau = tauAt(table, INTRO_END);
+        spring.x = tau;
+        spring.v = 0;
+        targetTau = tau;
+        window.scrollTo(0, tau * px);
+      }
       if (clock < INTRO_END) mix = 1;
       else {
         cross += dt;
@@ -459,8 +515,6 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
           phase = "hero";
           intro = false;
           mix = 0;
-          document.documentElement.style.overflow = "";
-          scrollToTime(INTRO_END);
           audio.cue("hero");
           if (!boot.heroFrame) {
             boot.heroFrame = performance.now();
@@ -477,7 +531,6 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
         fading = false;
         if (phase === "hero" && intro) {
           intro = false;
-          document.documentElement.style.overflow = "";
           audio.cue("hero");
         }
       }
@@ -525,6 +578,8 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     }
 
     world.pose(t, poseOpts(t));
+    const handBeat = beatAt(phase === "loader" ? t : intro ? 6 : t).id;
+    const handFrame = hands.step(dt, phase === "loader" ? "loader" : handBeat, reduced);
     if (!shot && phase !== "wait") {
       const beatNow = beatAt(intro ? clock : t);
       const span = beatNow.t1 - beatNow.t0;
@@ -551,13 +606,19 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     const frameMs = dt * 1000;
     if (frameMs > 22) hotFrames += 1;
     else hotFrames = Math.max(0, hotFrames - 1);
-    if (hotFrames > 20 && dpr > 1) {
+    if (hotFrames > 20 && dpr > 1 && t > 8) {
       dpr = Math.max(1, Math.round((dpr - 0.25) * 4) / 4);
       hotFrames = 0;
       resize();
     }
 
     const shown = t;
+    shownT = shown;
+    if (!queued && phase === "hero" && shown > 5.2) {
+      queued = true;
+      world.startQueue();
+      void world.sceneReady("input").then(() => world.upgrade());
+    }
     publish({
       t: shown,
       beatId: phase === "loader" ? "loader" : beat.id,
@@ -572,22 +633,41 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       poster,
       obstacles: world.obstacles(beatScenes(phase === "loader" ? "loader" : beat.id)),
       focus: productFocus(shown),
+      hand: handFrame.cursor,
+      hint: handFrame.hint,
+      live: true,
     });
     requestAnimationFrame(frame);
   };
 
-  if (!shot) document.documentElement.style.overflow = "hidden";
   requestAnimationFrame(frame);
 
   const onResize = () => resize();
   window.addEventListener("resize", onResize);
-
-  const diveTo = (id: string) => {
-    const node = productNode.get(id);
-    if (!node) return;
-    dive = { id, node, u: dive?.id === id ? dive.u : 0, dir: 1 };
-    audio.cue("dive");
+  const blockScroll = (event: Event) => {
+    if (phase === "loader") event.preventDefault();
   };
+  window.addEventListener("wheel", blockScroll, { passive: false });
+  window.addEventListener("touchmove", blockScroll, { passive: false });
+  const beatNow = () => beatAt(shot ? shotT : shownT).id;
+  const onPointerDown = (event: PointerEvent) => {
+    audio.unlock();
+    const grabbed = hands.down(event.clientX, event.clientY, beatNow());
+    if (grabbed && event.pointerType === "touch") event.preventDefault();
+    if (grabbed) canvas.setPointerCapture(event.pointerId);
+  };
+  const onPointerMove = (event: PointerEvent) => {
+    hands.move(event.clientX, event.clientY, beatNow());
+  };
+  const onPointerUp = (event: PointerEvent) => {
+    hands.up(beatNow());
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  };
+  canvas.addEventListener("pointerdown", onPointerDown);
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+  const host = window as Window & { __hands?: { play: (kind: string) => void } };
+  host.__hands = { play: (kind: string) => hands.play(kind) };
 
   return {
     audio,
@@ -599,12 +679,25 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     skipDive() {
       if (dive) dive.u = 1;
     },
+    nudge() {
+      const id = beatNow();
+      const kind =
+        id === "hero" || id === "book" ? "hero" : id === "input" ? "input" : id === "layers" ? "layers" : id === "attention" ? "products" : id === "loss" ? "loss" : id === "embedding" ? "pebbles" : "ripple";
+      hands.play(kind);
+    },
+    press(key: string) {
+      return hands.key(key, beatNow());
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
       running = false;
       window.removeEventListener("resize", onResize);
-      document.documentElement.style.overflow = "";
+      window.removeEventListener("wheel", blockScroll);
+      window.removeEventListener("touchmove", blockScroll);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
       world.dispose();
       renderer.dispose();
       audio.dispose();

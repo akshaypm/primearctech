@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
+import * as THREE from "three";
+import { createAnim } from "../app/lab/network/engine/anim";
+import { stepVec, vecSpring } from "../app/lab/network/engine/clay";
 import { copyMotion, productFocus } from "../app/lab/network/engine/copy";
+import { cueFile } from "../app/lab/network/engine/manifest";
 import { clampLabel, contrastRatio, largestEmptyRect, minInkContrast } from "../app/lab/network/engine/safe";
 import { fittedFov } from "../app/lab/network/engine/camera";
 import { buildTau, createSpring, plateau, pxPerSecond, RATE_A, springTo, tauAt, timeAtTau } from "../app/lab/network/engine/scroll";
@@ -100,5 +104,59 @@ describe("network scroll map", () => {
     for (let i = 0; i < 30; i += 1) springTo(spring, 10, 16, 1 / 60);
     assert.ok(spring.x > 9.5 && spring.x < 10.2, `x=${spring.x}`);
     assert.ok(Math.abs(spring.v) < 2, `v=${spring.v}`);
+  });
+
+  it("springs a clay offset toward the grab and snaps when motion is reduced", () => {
+    const spring = vecSpring();
+    const target = new THREE.Vector3(1, 0, 0);
+    stepVec(spring, target, 14, 1 / 60, false);
+    assert.ok(spring.offset.x > 0 && spring.offset.x < 1, `x=${spring.offset.x}`);
+    stepVec(spring, target, 14, 1 / 60, true);
+    assert.ok(Math.abs(spring.offset.x - 1) < 1e-6);
+    assert.equal(spring.vel.length(), 0);
+  });
+
+  it("resolves a cue from the manifest and falls back to webm, opus, then mp3", () => {
+    const file = cueFile({ cues: { click: { src: ["click.webm", "click.mp3"], gain: 0.4, loop: false } } }, "click");
+    assert.deepEqual(file.urls, ["/network/audio/click.webm", "/network/audio/click.mp3"]);
+    assert.equal(file.gain, 0.4);
+    assert.equal(file.loop, false);
+    const ambient = cueFile({ cues: { ambient: { src: ["room.webm"], gain: 0.2, loop: true } } }, "ambient");
+    assert.deepEqual(ambient.urls, ["/network/audio/room.webm"]);
+    assert.equal(ambient.gain, 0.2);
+    assert.equal(ambient.loop, true);
+    const missing = cueFile(null, "ambient");
+    assert.deepEqual(missing.urls, ["/network/audio/ambient.webm", "/network/audio/ambient.ogg", "/network/audio/ambient.mp3"]);
+    assert.equal(missing.gain, 0.35);
+  });
+
+  it("accepts an animation track whose node is not in the scene yet", () => {
+    const anim = createAnim();
+    anim.addPack(
+      {
+        fps: 8,
+        bin: "signal.bin",
+        tracks: [
+          {
+            name: "SIGNAL_ball",
+            f0: 0,
+            f1: 1,
+            p: [{ c: 1 }, { c: 2 }, { c: 3 }],
+            q: [{ c: 0 }, { c: 0 }, { c: 0 }, { c: 1 }],
+            s: [{ c: 1 }, { c: 1 }, { c: 1 }],
+          },
+        ],
+        scalars: [],
+      },
+      new ArrayBuffer(0),
+    );
+    anim.apply(0, {});
+    const trs = anim.world("SIGNAL_ball", 0);
+    assert.equal(trs?.p[0], 1);
+    assert.equal(trs?.p[1], 2);
+    assert.equal(anim.span("SIGNAL_ball")?.t0, 0);
+    assert.equal(anim.span("SIGNAL_ball")?.t1, 1 / 8);
+    assert.equal(anim.span("MISSING"), null);
+    assert.equal(anim.world("LAYERS_ride", 0), null);
   });
 });
