@@ -4,10 +4,83 @@ import Link from "next/link";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { BEATS, LAYER_CALLOUTS, LOSS_STATS, NAV, PRODUCTS, beatBias, copyMotion, type Beat } from "./engine/copy";
 import { createNetwork, type FrameState, type NetworkHandle } from "./engine/createNetwork";
-import { intersections, largestEmptyRect, type Rect } from "./engine/safe";
+import { clampLabel, intersections, largestEmptyRect, minInkContrast, relativeLuminance, type Rect } from "./engine/safe";
 import "./network.css";
 
 const HERO_BEAT = BEATS.find((item) => item.id === "hero") ?? BEATS[0];
+const LABEL_GAP = 50;
+
+let pixelBuf = new Uint8Array(0);
+
+/** Darkest canvas pixel under a copy block. An 8px stride still hits a clay wedge the old 6×4 grid stepped over. */
+function readGrid(canvas: HTMLCanvasElement, rect: Rect): [number, number, number][] {
+  const gl = canvas.getContext("webgl2");
+  const cssW = rect.x1 - rect.x0;
+  const cssH = rect.y1 - rect.y0;
+  if (!gl || cssW < 4 || cssH < 4) return [];
+  const dpr = canvas.width / Math.max(1, canvas.clientWidth);
+  const scaleY = canvas.height / Math.max(1, canvas.clientHeight);
+  let x0 = Math.floor(rect.x0 * dpr);
+  let x1 = Math.ceil(rect.x1 * dpr);
+  let y0 = Math.floor((canvas.clientHeight - rect.y1) * scaleY);
+  let y1 = Math.ceil((canvas.clientHeight - rect.y0) * scaleY);
+  x0 = Math.max(0, Math.min(canvas.width - 1, x0));
+  x1 = Math.max(x0 + 1, Math.min(canvas.width, x1));
+  y0 = Math.max(0, Math.min(canvas.height - 1, y0));
+  y1 = Math.max(y0 + 1, Math.min(canvas.height, y1));
+  const pw = x1 - x0;
+  const ph = y1 - y0;
+  const need = pw * ph * 4;
+  if (pixelBuf.length < need) pixelBuf = new Uint8Array(need);
+  gl.readPixels(x0, y0, pw, ph, gl.RGBA, gl.UNSIGNED_BYTE, pixelBuf);
+  const step = Math.max(1, Math.round(8 * dpr));
+  let bestL = 2;
+  let best: [number, number, number] = [228, 216, 196];
+  const consider = (col: number, row: number) => {
+    const i = (row * pw + col) * 4;
+    const rgb: [number, number, number] = [pixelBuf[i], pixelBuf[i + 1], pixelBuf[i + 2]];
+    const luma = relativeLuminance(rgb[0], rgb[1], rgb[2]);
+    if (luma < bestL) {
+      bestL = luma;
+      best = rgb;
+    }
+  };
+  for (let row = 0; row < ph; row += step) {
+    for (let col = 0; col < pw; col += step) consider(col, row);
+  }
+  consider(0, 0);
+  consider(pw - 1, 0);
+  consider(0, ph - 1);
+  consider(pw - 1, ph - 1);
+  return [best];
+}
+
+function sandPixel(buf: Uint8Array): boolean {
+  return buf[0] > 190 && buf[1] > 170 && buf[2] > 145 && buf[0] - buf[2] < 80;
+}
+
+/** The visible right edge of a block, whether the projected corner sits in clay or in the gap past it. */
+function clayEdge(canvas: HTMLCanvasElement, x1: number, y: number): number {
+  const gl = canvas.getContext("webgl2");
+  if (!gl) return x1;
+  const dpr = canvas.width / Math.max(1, canvas.clientWidth);
+  const py = Math.min(canvas.height - 1, Math.max(0, Math.floor((canvas.clientHeight - y) * dpr)));
+  const buf = new Uint8Array(4);
+  const at = (x: number) => {
+    const px = Math.min(canvas.width - 1, Math.max(0, Math.floor(x * dpr)));
+    gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    return sandPixel(buf);
+  };
+  let x = Math.min(canvas.clientWidth - 1, Math.max(0, Math.floor(x1)));
+  if (at(x)) {
+    const stop = Math.max(0, x - 240);
+    while (x > stop && at(x)) x -= 3;
+    return x;
+  }
+  const stop = Math.min(canvas.clientWidth - 1, x + 240);
+  while (x < stop && !at(x + 3)) x += 3;
+  return x;
+}
 
 const STILLS = [
   { src: "/network/stills/t06.png", id: "hero" },
@@ -30,7 +103,8 @@ const StageLabels = memo(function StageLabels({
         {LAYER_CALLOUTS.map((callout) => (
           <div key={callout.id} className="net-callout" data-anchor={callout.id} data-kind="callout" data-hidden="1">
             <span className="net-leader" />
-            {callout.index}&nbsp;&nbsp;{callout.label}
+            <span className="net-idx">{callout.index}</span>
+            <span className="net-call">{callout.label}</span>
           </div>
         ))}
       </div>
@@ -106,8 +180,16 @@ export function NetworkExperience() {
           if (!alive) return;
           if (sandRef.current) sandRef.current.style.opacity = String(state.sand);
           const placed = state.anchors.filter((anchor) => anchor.visible);
-          const calloutCol = placed.reduce((max, anchor) => Math.max(max, anchor.x1), 0) + 18;
-          root.querySelectorAll<HTMLElement>("[data-anchor]").forEach((node) => {
+          const canvasEl = canvasRef.current;
+          const labelBoxes: Rect[] = [];
+          let focusBox: Rect | null = null;
+          const labelNodes = [...root.querySelectorAll<HTMLElement>("[data-anchor]")];
+          labelNodes.sort((a, b) => {
+            const af = placed.find((item) => item.id === a.dataset.anchor)?.focus ? 1 : 0;
+            const bf = placed.find((item) => item.id === b.dataset.anchor)?.focus ? 1 : 0;
+            return bf - af;
+          });
+          labelNodes.forEach((node) => {
             const id = node.dataset.anchor || "";
             const anchor = placed.find((item) => item.id === id);
             node.dataset.hidden = anchor ? "0" : "1";
@@ -115,29 +197,52 @@ export function NetworkExperience() {
             const leader = node.querySelector<HTMLElement>(".net-leader");
             if (node.dataset.kind === "callout") {
               const mid = (anchor.y0 + anchor.y1) / 2;
-              const labelW = 96;
-              if (calloutCol + labelW > window.innerWidth - 8) {
+              const edge = canvasEl ? clayEdge(canvasEl, anchor.x1, mid) : anchor.x1;
+              const left = edge + LABEL_GAP;
+              const labelW = 112;
+              if (left + labelW > window.innerWidth - 16) {
                 node.dataset.hidden = "1";
                 return;
               }
-              node.style.left = `${Math.round(calloutCol)}px`;
+              node.style.left = `${Math.round(left)}px`;
               node.style.top = `${Math.round(mid)}px`;
-              if (leader) leader.style.width = `${Math.max(8, Math.round(calloutCol - anchor.x1))}px`;
+              if (leader) leader.style.width = `${LABEL_GAP}px`;
+              labelBoxes.push({ x0: edge, y0: mid - 14, x1: left + labelW, y1: mid + 14 });
             } else {
-              const focused = placed.find((item) => item.focus);
-              const crowded =
+              const focusedAnchor = placed.find((item) => item.focus);
+              const crowded = Boolean(
                 !anchor.focus &&
-                focused &&
-                Math.abs(anchor.y - focused.y) < 150 &&
-                Math.abs(anchor.x - focused.x) < 220;
-              const flip = crowded ? true : anchor.x > window.innerWidth * 0.62;
-              const rise = anchor.focus && anchor.y > window.innerHeight - 170;
+                  focusedAnchor &&
+                  Math.abs(anchor.y - focusedAnchor.y) < 150 &&
+                  Math.abs(anchor.x - focusedAnchor.x) < 220,
+              );
+              const body = node.querySelector<HTMLElement>(".net-product-body");
+              const want = anchor.focus ? Math.min(240, window.innerWidth - 32) : 108;
               node.style.left = `${Math.round(anchor.x)}px`;
               node.style.top = `${Math.round(anchor.y)}px`;
+              const guessed = clampLabel(anchor.x, anchor.y, want, anchor.focus ? 120 : 16, window.innerWidth, window.innerHeight, anchor.focus, crowded);
+              if (body) body.style.width = `${Math.round(guessed.width)}px`;
+              const height = body?.offsetHeight || (anchor.focus ? 108 : 14);
+              let box = clampLabel(anchor.x, anchor.y, guessed.width, height, window.innerWidth, window.innerHeight, anchor.focus, crowded);
+              if (!anchor.focus && focusBox && box.top < focusBox.y1 + 8 && box.top + height > focusBox.y0 - 8) {
+                const shifted = box.top >= (focusBox.y0 + focusBox.y1) / 2 ? focusBox.y1 + 10 : focusBox.y0 - height - 10;
+                box = { ...box, top: Math.max(52, Math.min(shifted, window.innerHeight - 16 - height)) };
+              }
+              if (anchor.focus) focusBox = { x0: box.left, y0: box.top, x1: box.left + box.width, y1: box.top + height };
               node.dataset.focus = anchor.focus ? "1" : "0";
-              node.dataset.flip = flip ? "1" : "0";
-              node.dataset.rise = rise ? "1" : "0";
-              if (leader) leader.style.width = anchor.focus ? "36px" : "0px";
+              node.dataset.flip = box.flip ? "1" : "0";
+              node.dataset.placed = "1";
+              node.dataset.rise = box.top + 8 < anchor.y - height * 0.2 ? "1" : "0";
+              if (body) {
+                body.style.left = `${Math.round(box.left - anchor.x)}px`;
+                body.style.top = `${Math.round(box.top - anchor.y)}px`;
+                body.style.width = `${Math.round(box.width)}px`;
+              }
+              if (leader) {
+                leader.style.width = anchor.focus ? `${Math.max(8, Math.round(box.leader))}px` : "0px";
+                leader.style.top = "0px";
+              }
+              labelBoxes.push({ x0: box.left - 8, y0: box.top - 4, x1: box.left + box.width + 8, y1: box.top + height + 4 });
             }
           });
           if (posterRef.current) posterRef.current.style.opacity = String(state.poster);
@@ -162,45 +267,85 @@ export function NetworkExperience() {
           const posterOn = state.poster > 0.02 && state.beatId === "hero";
           if (copy) {
             const liveBeat = posterOn ? HERO_BEAT : motion.beat;
+            const narrow = window.innerWidth <= 760;
             const blocks: Rect[] = state.obstacles.map((item) => ({ x0: item.x0, y0: item.y0, x1: item.x1, y1: item.y1 }));
-            if (state.beatId === "layers") {
-              for (const anchor of placed) {
-                const mid = (anchor.y0 + anchor.y1) / 2;
-                blocks.push({ x0: anchor.x1, y0: mid - 14, x1: calloutCol + 140, y1: mid + 14 });
-              }
-            }
-            if (state.beatId === "attention") {
-              for (const anchor of placed) {
-                const flip = anchor.x > window.innerWidth * 0.62;
-                const w = anchor.focus ? Math.min(256, window.innerWidth * 0.7) : 108;
-                const h = anchor.focus ? 118 : 18;
-                const x0 = flip ? anchor.x - 22 - w : anchor.x;
-                const y0 = anchor.y - (anchor.focus ? 46 : 9);
-                blocks.push({ x0, y0, x1: x0 + w + 22, y1: y0 + h });
-              }
-            }
+            blocks.push(...labelBoxes);
             const nav = root.querySelector<HTMLElement>(".net-nav");
             const padTop = (nav?.offsetHeight || 64) + 10;
             const padBottom = liveBeat.id === "book" ? 64 : 16;
-            const empty = largestEmptyRect(window.innerWidth, window.innerHeight, blocks, padTop, padBottom);
-            const bias = beatBias(liveBeat.id);
-            const comfortable = Math.min(liveBeat.id === "layers" ? 640 : 520, window.innerWidth - 24);
-            const gap = Math.max(0, empty.x1 - empty.x0 - 32);
-            const prefer = Math.min(comfortable, Math.max(220, gap));
+            copy.dataset.place = liveBeat.id;
+            let x = 16;
+            let y = padTop;
+            let prefer = Math.min(liveBeat.id === "layers" ? 640 : 520, window.innerWidth - 32);
+            let band = false;
+            if (narrow && liveBeat.id === "layers") {
+              prefer = window.innerWidth - 32;
+              band = true;
+              copy.style.width = `${Math.round(prefer)}px`;
+              const height = copy.offsetHeight || 120;
+              x = 16;
+              y = Math.max(padTop, window.innerHeight - 16 - height);
+            } else {
+              const empty = largestEmptyRect(window.innerWidth, window.innerHeight, blocks, padTop, padBottom);
+              const bias = beatBias(liveBeat.id);
+              const comfortable = Math.min(liveBeat.id === "layers" ? 640 : 520, window.innerWidth - 24);
+              const gap = Math.max(0, empty.x1 - empty.x0 - 32);
+              prefer = Math.min(comfortable, Math.max(narrow ? 160 : 220, gap));
+              copy.style.width = `${Math.round(prefer)}px`;
+              const height = copy.offsetHeight || 160;
+              x = bias === "end" ? empty.x1 - 16 - prefer : empty.x0 + 16;
+              y = bias === "bottom" ? empty.y1 - 16 - height : empty.y0 + 16;
+              if (narrow && liveBeat.id === "hero") y = Math.max(y, window.innerHeight * 0.56);
+              x = Math.max(16, Math.min(x, window.innerWidth - prefer - 16));
+              y = Math.max(padTop, Math.min(y, Math.max(padTop, window.innerHeight - height - padBottom)));
+            }
+            let height = copy.offsetHeight || 160;
+            if (band) y = Math.max(padTop, window.innerHeight - 16 - height);
+            const hitsFor = (rect: Rect) => intersections(rect, state.obstacles, 80);
             copy.style.width = `${Math.round(prefer)}px`;
-            const height = copy.offsetHeight || 160;
-            let x = bias === "end" ? empty.x1 - 16 - prefer : empty.x0 + 16;
-            let y = bias === "bottom" ? empty.y1 - 16 - height : empty.y0 + 16;
-            x = Math.max(12, Math.min(x, window.innerWidth - prefer - 12));
-            y = Math.max(padTop, Math.min(y, Math.max(padTop, window.innerHeight - height - padBottom)));
-            const copyRect = { x0: x, y0: y, x1: x + prefer, y1: y + height };
-            const hits = intersections(copyRect, state.obstacles, 80);
-            const scrim = hits.length > 0;
             copy.style.left = `${Math.round(x)}px`;
             copy.style.top = `${Math.round(y)}px`;
             copy.style.right = "auto";
             copy.style.bottom = "auto";
+            copy.style.transform = posterOn ? "none" : `translate3d(0, ${motion.y}px, 0)`;
+            const box = copy.getBoundingClientRect();
+            let copyRect = { x0: box.left, y0: box.top, x1: box.right, y1: box.bottom };
+            let samples = posterOn || !canvasEl ? [] : readGrid(canvasEl, copyRect);
+            let contrast = minInkContrast(samples, false);
+            let scrim = contrast < 4.5;
+            if (!posterOn && !band && liveBeat.id !== "hero" && contrast < 4.5 && canvasEl) {
+              const skyW = narrow ? window.innerWidth - 32 : Math.min(prefer, window.innerWidth - 32);
+              copy.style.width = `${Math.round(skyW)}px`;
+              const skyH = copy.offsetHeight || height;
+              const sky = { x0: 16, y0: padTop, x1: 16 + skyW, y1: padTop + skyH };
+              const skySamples = readGrid(canvasEl, sky);
+              const skyContrast = minInkContrast(skySamples, false);
+              if (skyContrast >= 4.5) {
+                x = 16;
+                prefer = skyW;
+                y = padTop;
+                height = skyH;
+                copyRect = sky;
+                samples = skySamples;
+                contrast = skyContrast;
+                scrim = false;
+                band = false;
+              } else {
+                copy.style.width = `${Math.round(prefer)}px`;
+                scrim = true;
+                contrast = minInkContrast(samples, true);
+              }
+            }
+            const hits = hitsFor(copyRect);
+            if (!posterOn && !narrow && hits.length > 0) {
+              scrim = true;
+            }
+            if (scrim) contrast = minInkContrast(samples.length ? samples : [[228, 216, 196]], true);
+            copy.style.width = `${Math.round(prefer)}px`;
+            copy.style.left = `${Math.round(x)}px`;
+            copy.style.top = `${Math.round(y)}px`;
             copy.dataset.place = liveBeat.id;
+            copy.dataset.band = band ? "1" : "0";
             copy.dataset.scrim = scrim ? "1" : "0";
             copy.style.opacity = posterOn ? "1" : String(motion.opacity);
             copy.style.transform = posterOn ? "none" : `translate3d(0, ${motion.y}px, 0)`;
@@ -208,6 +353,8 @@ export function NetworkExperience() {
               t: Number(state.t.toFixed(2)),
               beat: liveBeat.id,
               scrim,
+              contrast: Number(contrast.toFixed(2)),
+              band,
               nodes: state.obstacles.slice(0, 80).map((item) => `${item.name}:${Math.round(item.x0)}-${Math.round(item.x1)}`),
               anchors: state.anchors.map((anchor) => ({
                 id: anchor.id,

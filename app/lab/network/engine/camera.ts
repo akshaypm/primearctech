@@ -80,6 +80,20 @@ export function sampleCamera(samples: CamSample[], t: number, smooth: boolean): 
   };
 }
 
+/**
+ * Portrait subjects are framed for a 16:10 path, so on a tall screen they shrink.
+ * Zoom until the subject is about 70% of the width, and never taller than 46% of the screen,
+ * leaving the lower half for the headline.
+ */
+export function fittedFov(fovDeg: number, width: number, height: number, boxW: number, boxH: number): number {
+  if (boxW < 8 || boxH < 8 || width < 8 || height < 8) return fovDeg;
+  let scale = (width * 0.7) / boxW;
+  if (boxH * scale > height * 0.46) scale = (height * 0.46) / boxH;
+  scale = Math.min(2.8, Math.max(1, scale));
+  const half = Math.tan((fovDeg * Math.PI) / 360);
+  return (Math.atan(half / scale) * 360) / Math.PI;
+}
+
 function look(cam: THREE.PerspectiveCamera, s: CamSample) {
   cam.position.fromArray(s.position_threejs);
   cam.up.set(0, 1, 0);

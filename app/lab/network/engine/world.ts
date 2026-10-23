@@ -151,6 +151,8 @@ export type NetworkWorld = {
   resident: () => string[];
   hasScene: (name: string) => boolean;
   projectBox: (name: string) => ScreenRect | null;
+  /** Screen x of the nearer face's right edge, so a leader meets the clay rather than the far corner. */
+  projectEdge: (name: string) => { x: number; y: number } | null;
   obstacles: (scenes: string[]) => Obstacle[];
   prefetch: (name: string) => void;
   startQueue: () => void;
@@ -747,6 +749,137 @@ export async function loadWorld(
     v.project(camera);
     return { x: (v.x * 0.5 + 0.5) * cssW, y: (-v.y * 0.5 + 0.5) * cssH, visible: v.z >= -1 && v.z <= 1 };
   }
+  function sceneScreen(scene: string): ScreenRect | null {
+    const parts: ScreenRect[] = [];
+    const all: ScreenRect[] = [];
+    for (const list of Object.values(nodeObj)) {
+      for (const entry of list) {
+        if (entry.scene !== scene) continue;
+        const mesh = entry.o as THREE.Mesh;
+        if (!mesh.isMesh || !mesh.visible || isGroundName(nodeName(mesh))) continue;
+        const next = meshBox(mesh);
+        if (!next) continue;
+        const rect = boxToScreen(next);
+        if (!rect) continue;
+        const w = rect.x1 - rect.x0;
+        const h = rect.y1 - rect.y0;
+        if (w < 6 || h < 6 || w > cssW * 1.6 || h > cssH * 1.6) continue;
+        if (rect.x1 < -cssW || rect.x0 > cssW * 2 || rect.y1 < -cssH || rect.y0 > cssH * 2) continue;
+        all.push(rect);
+        if (w < cssW * 0.62 && h < cssH * 0.72) parts.push(rect);
+      }
+    }
+    const use = parts.length >= 3 ? parts : all;
+    if (!use.length) return null;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const rect of use) {
+      x0 = Math.min(x0, rect.x0);
+      y0 = Math.min(y0, rect.y0);
+      x1 = Math.max(x1, rect.x1);
+      y1 = Math.max(y1, rect.y1);
+    }
+    return { x0, y0, x1, y1 };
+  }
+  let pixelBuf = new Uint8Array(0);
+  function measureClay(): ScreenRect | null {
+    renderer.render(scene, camera);
+    const gl = renderer.getContext();
+    const bw = gl.drawingBufferWidth;
+    const bh = gl.drawingBufferHeight;
+    if (bw < 8 || bh < 8) return null;
+    const need = bw * bh * 4;
+    if (pixelBuf.length < need) pixelBuf = new Uint8Array(need);
+    gl.readPixels(0, 0, bw, bh, gl.RGBA, gl.UNSIGNED_BYTE, pixelBuf);
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const yStart = Math.floor(bh * 0.06);
+    const yEnd = Math.floor(bh * 0.82);
+    for (let y = yStart; y < yEnd; y += 2) {
+      for (let x = 0; x < bw; x += 2) {
+        const i = (y * bw + x) * 4;
+        const r = pixelBuf[i];
+        const g = pixelBuf[i + 1];
+        const b = pixelBuf[i + 2];
+        if (r < 165 && g < 150 && b < 140 && r + g + b > 36) {
+          xs.push(x);
+          ys.push(y);
+        }
+      }
+    }
+    if (xs.length < 24) return null;
+    xs.sort((a, b) => a - b);
+    ys.sort((a, b) => a - b);
+    const pick = (values: number[], p: number) => values[Math.min(values.length - 1, Math.max(0, Math.floor(values.length * p)))];
+    const xLo = pick(xs, 0.1);
+    const xHi = pick(xs, 0.9);
+    const yLo = pick(ys, 0.1);
+    const yHi = pick(ys, 0.9);
+    return {
+      x0: (xLo / bw) * cssW,
+      x1: (xHi / bw) * cssW,
+      y0: cssH * (1 - (yHi + 1) / bh),
+      y1: cssH * (1 - yLo / bh),
+    };
+  }
+  function fitPortrait(scene: string) {
+    camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+    let box = measureClay() ?? sceneScreen(scene);
+    if (!box) return;
+    for (let pass = 0; pass < 2; pass += 1) {
+      const bw = Math.max(8, box.x1 - box.x0);
+      const bh = Math.max(8, box.y1 - box.y0);
+      let scale = (cssW * 0.7) / bw;
+      if (bh * scale > cssH * 0.46) scale = (cssH * 0.46) / bh;
+      scale = Math.min(2.4, Math.max(pass === 0 ? 1 : 0.72, scale));
+      const half = Math.tan((camera.fov * Math.PI) / 360);
+      camera.fov = (Math.atan(half / scale) * 360) / Math.PI;
+      camera.aspect = cssW / cssH;
+      camera.clearViewOffset();
+      box = measureClay() ?? box;
+    }
+    const cx = (box.x0 + box.x1) / 2;
+    const cy = (box.y0 + box.y1) / 2;
+    camera.setViewOffset(cssW, cssH, cx - cssW / 2, cy - cssH * 0.34, cssW, cssH);
+  }
+  const edgeWorld = new THREE.Vector3();
+  const edgeView = new THREE.Vector3();
+  function projectEdge(name: string): { x: number; y: number } | null {
+    const list = nodeObj[name];
+    if (!list?.length) return null;
+    const entry = list.find((e) => e.o.visible);
+    if (!entry) return null;
+    const points: { z: number; x: number; y: number }[] = [];
+    entry.o.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      const bounds = mesh.geometry.boundingBox;
+      if (!bounds) return;
+      for (let i = 0; i < 8; i += 1) {
+        edgeWorld.set(i & 1 ? bounds.max.x : bounds.min.x, i & 2 ? bounds.max.y : bounds.min.y, i & 4 ? bounds.max.z : bounds.min.z);
+        edgeWorld.applyMatrix4(mesh.matrixWorld);
+        edgeView.copy(edgeWorld).applyMatrix4(camera.matrixWorldInverse);
+        const projected = edgeWorld.project(camera);
+        if (projected.z < -1 || projected.z > 1) continue;
+        points.push({
+          z: edgeView.z,
+          x: (projected.x * 0.5 + 0.5) * cssW,
+          y: (-projected.y * 0.5 + 0.5) * cssH,
+        });
+      }
+    });
+    if (points.length < 2) return null;
+    points.sort((a, b) => b.z - a.z);
+    const near = points.slice(0, Math.max(2, Math.ceil(points.length / 2)));
+    return {
+      x: Math.max(...near.map((point) => point.x)),
+      y: near.reduce((sum, point) => sum + point.y, 0) / near.length,
+    };
+  }
   function projectBox(name: string): ScreenRect | null {
     const list = nodeObj[name];
     if (!list?.length) return null;
@@ -1090,6 +1223,7 @@ export async function loadWorld(
     spinRotors(t);
     applyRules(t, mix);
     applyCamera(camera, sampleCamera(samples.samples, t, opts.smoothCamera), t, cssW, cssH, opts.mobile, exj, params);
+    if (opts.mobile && cssW < cssH && t < 16.5) fitPortrait(t < 10.5 ? "hero" : "input");
     if (opts.dive && opts.dive.u > 0) blendDive(opts.dive.node, opts.dive.u);
     const mist = mistAt(t);
     for (const material of materials) {
@@ -1341,6 +1475,7 @@ export async function loadWorld(
       return roots.has(name);
     },
     projectBox,
+    projectEdge,
     obstacles,
     prefetch(name: string) {
       if (queue.includes(name)) prefer = name;

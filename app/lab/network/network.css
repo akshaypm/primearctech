@@ -262,6 +262,10 @@ html:has(.net) body {
   padding: 0.85rem 1rem 1rem;
 }
 
+.net-copy[data-band="1"][data-scrim="1"] {
+  padding: 0.4rem 0.65rem 0.35rem;
+}
+
 .net-copy p,
 .net-fallback p {
   margin: 0.8rem 0 0;
@@ -327,12 +331,18 @@ html:has(.net) body {
 
 .net-callout {
   font-family: var(--font-mono), monospace;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
   transform: translateY(-50%);
+  color: #222;
+}
+
+.net-idx {
+  margin-right: 0.7em;
+  color: #6b5646;
 }
 
 .net-leader {
@@ -340,7 +350,7 @@ html:has(.net) body {
   right: 100%;
   top: 50%;
   height: 1px;
-  background: #6b5646;
+  background: rgb(107 86 70 / 60%);
 }
 
 .net-product {
@@ -395,9 +405,13 @@ html:has(.net) body {
   color: var(--secondary);
 }
 
-.net-product[data-rise="1"] .net-product-body {
-  top: 0;
-  transform: translateY(calc(-100% - 8px));
+.net-product[data-placed="1"] .net-product-body,
+.net-product[data-placed="1"][data-focus="0"] .net-product-body,
+.net-product[data-placed="1"][data-flip="1"] .net-product-body,
+.net-product[data-placed="1"][data-rise="1"] .net-product-body {
+  right: auto;
+  transform: none;
+  max-width: calc(100vw - 32px);
 }
 
 .net-product[data-focus="1"] .net-name {
@@ -620,6 +634,38 @@ html:has(.net) body {
     font-size: 34px;
     line-height: 38px;
     letter-spacing: -0.02em;
+  }
+
+  .net-copy[data-place="layers"] h2 {
+    font-size: 28px;
+    line-height: 32px;
+    letter-spacing: -0.02em;
+  }
+
+  .net-copy[data-band="1"] {
+    padding-bottom: 0.15rem;
+  }
+
+  .net-copy[data-band="1"] .net-kicker {
+    margin: 0;
+  }
+
+  .net-copy[data-band="1"] h2 {
+    margin-top: 0.15rem;
+  }
+
+  .net-copy[data-band="1"] .net-tag {
+    margin-top: 0.35rem;
+  }
+
+  .net-copy[data-place="layers"] p {
+    margin-top: 0.35rem;
+    font-size: 14px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .net-boot {

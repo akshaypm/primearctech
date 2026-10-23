@@ -50,6 +50,76 @@ export function largestEmptyRect(width: number, height: number, blocks: Rect[], 
   return { x0: best.c0 * cw, y0: best.r0 * rh, x1: (best.c1 + 1) * cw, y1: (best.r1 + 1) * rh };
 }
 
+export const COPY_INK = [0x22, 0x22, 0x22] as const;
+export const COPY_SECONDARY = [0x6b, 0x56, 0x46] as const;
+export const SCRIM_RGB = [0xef, 0xe6, 0xd6] as const;
+
+export function relativeLuminance(r: number, g: number, b: number): number {
+  const channel = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+export function contrastRatio(fg: readonly [number, number, number], bg: readonly [number, number, number]): number {
+  const lighter = Math.max(relativeLuminance(fg[0], fg[1], fg[2]), relativeLuminance(bg[0], bg[1], bg[2]));
+  const darker = Math.min(relativeLuminance(fg[0], fg[1], fg[2]), relativeLuminance(bg[0], bg[1], bg[2]));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/** Sand scrim is #EFE6D6 at 92% over the canvas. */
+export function scrimBlend(bg: readonly [number, number, number]): [number, number, number] {
+  return [
+    Math.round(SCRIM_RGB[0] * 0.92 + bg[0] * 0.08),
+    Math.round(SCRIM_RGB[1] * 0.92 + bg[1] * 0.08),
+    Math.round(SCRIM_RGB[2] * 0.92 + bg[2] * 0.08),
+  ];
+}
+
+/** Lowest ink contrast under a copy block. Empty samples mean the canvas is not readable yet. */
+export function minInkContrast(samples: readonly (readonly [number, number, number])[], scrim: boolean): number {
+  if (!samples.length) return 21;
+  let worst = 21;
+  for (const sample of samples) {
+    const bg = scrim ? scrimBlend(sample) : sample;
+    worst = Math.min(worst, contrastRatio(COPY_INK, bg));
+  }
+  return worst;
+}
+
+export type LabelBox = { left: number; top: number; width: number; height: number; flip: boolean; leader: number };
+
+/** Keep a product label inside a 16px margin, flipping to the left of the sphere when the right side is short. */
+export function clampLabel(
+  anchorX: number,
+  anchorY: number,
+  width: number,
+  height: number,
+  viewW: number,
+  viewH: number,
+  focused: boolean,
+  crowded: boolean,
+): LabelBox {
+  const margin = 16;
+  const gap = focused ? 28 : 10;
+  const rightSpace = viewW - margin - (anchorX + gap);
+  const leftSpace = anchorX - gap - margin;
+  let flip = crowded || rightSpace < Math.min(width, focused ? 150 : 64);
+  if (flip && leftSpace < Math.min(width, 72) && rightSpace >= leftSpace) flip = false;
+  const room = Math.max(64, flip ? leftSpace : rightSpace);
+  const used = Math.min(width, Math.max(64, room));
+  let left = flip ? anchorX - gap - used : anchorX + gap;
+  left = Math.max(margin, Math.min(left, viewW - margin - used));
+  const fitted = Math.max(48, Math.min(used, viewW - margin - left));
+  let top = anchorY - (focused ? Math.round(height * 0.4) : height / 2);
+  const limit = viewH - margin;
+  if (top + height > limit) top = limit - height;
+  if (top < 52) top = 52;
+  const leader = Math.max(0, flip ? anchorX - (left + fitted) : left - anchorX);
+  return { left, top, width: fitted, height, flip, leader };
+}
+
 export function intersections(copy: Rect, blocks: Rect[], minArea = 80) {
   const hits: { area: number; block: Rect }[] = [];
   for (const block of blocks) {

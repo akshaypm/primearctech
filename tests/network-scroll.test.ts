@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { copyMotion, productFocus } from "../app/lab/network/engine/copy";
-import { largestEmptyRect } from "../app/lab/network/engine/safe";
+import { clampLabel, contrastRatio, largestEmptyRect, minInkContrast } from "../app/lab/network/engine/safe";
+import { fittedFov } from "../app/lab/network/engine/camera";
 import { buildTau, createSpring, plateau, pxPerSecond, RATE_A, springTo, tauAt, timeAtTau } from "../app/lab/network/engine/scroll";
 
 describe("network scroll map", () => {
@@ -53,6 +54,39 @@ describe("network scroll map", () => {
     assert.equal(productFocus(34), "counter");
     assert.equal(productFocus(37), "roster");
     assert.equal(productFocus(29.9), null);
+  });
+
+  it("keeps ink on terracotta under 4.5 and sand over it", () => {
+    const clay = minInkContrast([[105, 44, 32]], false);
+    const sand = minInkContrast([[228, 216, 196]], false);
+    const veiled = minInkContrast([[105, 44, 32]], true);
+    assert.ok(clay < 4.5, `clay ${clay}`);
+    assert.ok(sand >= 4.5, `sand ${sand}`);
+    assert.ok(veiled >= 4.5, `scrim ${veiled}`);
+    assert.ok(contrastRatio([34, 34, 34], [239, 230, 214]) > 7);
+    const mixed = minInkContrast(
+      [
+        [228, 216, 196],
+        [80, 36, 28],
+      ],
+      false,
+    );
+    assert.ok(mixed < 4.5, `mixed ${mixed}`);
+    assert.ok(minInkContrast([[80, 36, 28]], true) >= 4.5);
+  });
+
+  it("flips a product label that would leave the right margin", () => {
+    const box = clampLabel(300, 400, 220, 96, 390, 844, true, false);
+    assert.equal(box.flip, true);
+    assert.ok(box.left >= 16, `left ${box.left}`);
+    assert.ok(box.left + box.width <= 374, `right ${box.left + box.width}`);
+    assert.ok(box.top + box.height <= 828, `bottom ${box.top + box.height}`);
+  });
+
+  it("zooms a small portrait subject toward 70% of the width", () => {
+    const fov = fittedFov(50, 390, 844, 120, 140);
+    assert.ok(fov < 50, `fov ${fov}`);
+    assert.ok(fov > 18, `fov ${fov}`);
   });
 
   it("places copy in the largest gap beside clay", () => {

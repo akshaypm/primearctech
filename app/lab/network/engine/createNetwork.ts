@@ -251,15 +251,17 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     if (beat.id === "layers") {
       for (const callout of LAYER_CALLOUTS) {
         const box = world.projectBox(callout.node);
-        const mid = box ? (box.y0 + box.y1) / 2 : 0;
-        const visible = Boolean(box && box.x1 > 0 && box.x0 < width && mid > 48 && mid < height - 24);
+        const edge = world.projectEdge(callout.node);
+        const mid = box ? (box.y0 + box.y1) / 2 : (edge?.y ?? 0);
+        const x1 = edge?.x ?? box?.x1 ?? 0;
+        const visible = Boolean(box && x1 > 0 && box.x0 < width && mid > 48 && mid < height - 24);
         list.push({
           id: callout.id,
-          x: box?.x1 ?? 0,
+          x: x1,
           y: mid,
           x0: box?.x0 ?? 0,
           y0: box?.y0 ?? 0,
-          x1: box?.x1 ?? 0,
+          x1,
           y1: box?.y1 ?? 0,
           visible,
           focus: false,
