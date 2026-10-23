@@ -134,23 +134,41 @@ for (const view of views) {
         const rect = node.getBoundingClientRect();
         return { id: node.closest(".net-product")?.dataset.anchor, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
       });
-      return { beat: document.querySelector(".net")?.getAttribute("data-beat"), labels, products, productBoxes, safe: window.__safe };
+      const copyEl = document.querySelector(".net-copy");
+      const copyRect = copyEl?.getBoundingClientRect();
+      const copyOpacity = copyEl ? Number(getComputedStyle(copyEl).opacity) : 0;
+      const navRect = document.querySelector(".net-nav")?.getBoundingClientRect();
+      return {
+        beat: document.querySelector(".net")?.getAttribute("data-beat"),
+        labels,
+        products,
+        productBoxes,
+        safe: window.__safe,
+        copy: copyRect && copyOpacity > 0.15 ? { left: copyRect.left, right: copyRect.right, top: copyRect.top, bottom: copyRect.bottom } : null,
+        navBottom: navRect ? navRect.bottom : 0,
+      };
     }, time);
     for (const label of measured.labels || []) {
       const contrast = ratio(label.fg, label.bg);
       if (contrast < 4.5) {
         contrastFail.push({ t: time, beat: measured.beat, text: label.text, contrast: Number(contrast.toFixed(2)), fg: label.fg, bg: label.bg });
       }
-      if (label.left < 16 || label.right > view.width - 16 || label.top < 0 || label.bottom > view.height - 8) {
-        labelOverflow.push({ t: time, text: label.text, left: label.left, right: label.right, top: label.top, bottom: label.bottom });
+      const navLine = (measured.navBottom || 0) + 12;
+      if (label.left < 16 || label.right > view.width - 16 || label.top < navLine - 1 || label.bottom > view.height - 8) {
+        labelOverflow.push({ t: time, text: label.text, left: label.left, right: label.right, top: label.top, bottom: label.bottom, navLine });
       }
     }
     if ((measured.products || []).length > 1) piled.push({ t: time, products: measured.products });
     for (const box of measured.productBoxes || []) {
       const anchor = (measured.safe?.anchors || []).find((item) => item.id === box.id && item.visible);
-      if (!anchor) continue;
-      const hit = box.left < anchor.x1 && box.right > anchor.x0 && box.top < anchor.y1 && box.bottom > anchor.y0;
-      if (hit) piled.push({ t: time, overlap: box.id, box, anchor });
+      if (anchor) {
+        const hit = box.left < anchor.x1 && box.right > anchor.x0 && box.top < anchor.y1 && box.bottom > anchor.y0;
+        if (hit) piled.push({ t: time, overlap: box.id, box, anchor });
+      }
+      const copy = measured.copy;
+      if (copy && box.left < copy.right && box.right > copy.left && box.top < copy.bottom && box.bottom > copy.top) {
+        piled.push({ t: time, overlap: "copy", id: box.id, box, copy });
+      }
     }
   }
   report.push({

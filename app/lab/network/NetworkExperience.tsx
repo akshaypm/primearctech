@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { BEATS, LAYER_CALLOUTS, NAV, PRODUCTS, beatBias, copyMotion, type Beat } from "./engine/copy";
+import { BEATS, LAYER_CALLOUTS, NAV, PRODUCTS, beatBias, copyMotion, inChamber, type Beat } from "./engine/copy";
 import { createNetwork, type FrameState, type NetworkHandle } from "./engine/createNetwork";
 import { clampLabel, intersections, largestEmptyRect, textContrast, relativeLuminance, type Rect } from "./engine/safe";
 import "./network.css";
@@ -205,6 +205,8 @@ export function NetworkExperience() {
           const placed = state.anchors.filter((anchor) => anchor.visible);
           const canvasEl = canvasRef.current;
           const labelBoxes: Rect[] = [];
+          const navEl = root.querySelector<HTMLElement>(".net-nav");
+          const minTop = Math.round((navEl?.getBoundingClientRect().bottom ?? 40) + 12);
           const labelNodes = [...root.querySelectorAll<HTMLElement>("[data-anchor]")];
           labelNodes.sort((a, b) => {
             const af = placed.find((item) => item.id === a.dataset.anchor)?.focus ? 1 : 0;
@@ -212,61 +214,26 @@ export function NetworkExperience() {
             return bf - af;
           });
           labelNodes.forEach((node) => {
+            if (node.dataset.kind !== "callout") return;
             const id = node.dataset.anchor || "";
             const anchor = placed.find((item) => item.id === id);
             node.dataset.hidden = anchor ? "0" : "1";
             if (!anchor) return;
             const leader = node.querySelector<HTMLElement>(".net-leader");
-            if (node.dataset.kind === "callout") {
-              const mid = (anchor.y0 + anchor.y1) / 2;
-              const edge = canvasEl ? clayEdge(canvasEl, anchor.x1, mid) : anchor.x1;
-              const left = edge + LABEL_GAP;
-              const labelW = 112;
-              if (left + labelW > window.innerWidth - 16) {
-                node.dataset.hidden = "1";
-                return;
-              }
-              node.style.left = `${Math.round(left)}px`;
-              node.style.top = `${Math.round(mid)}px`;
-              if (leader) leader.style.width = `${LABEL_GAP}px`;
-              labelBoxes.push({ x0: edge, y0: mid - 14, x1: left + labelW, y1: mid + 14 });
-            } else if (!anchor.focus) {
+            const edge = canvasEl ? clayEdge(canvasEl, anchor.x1, (anchor.y0 + anchor.y1) / 2) : anchor.x1;
+            const labelW = 112;
+            const labelH = node.offsetHeight || 28;
+            let mid = (anchor.y0 + anchor.y1) / 2;
+            if (mid - labelH / 2 < minTop) mid = minTop + labelH / 2;
+            const left = edge + LABEL_GAP;
+            if (left + labelW > window.innerWidth - 16) {
               node.dataset.hidden = "1";
-              node.dataset.focus = "0";
-            } else {
-              const body = node.querySelector<HTMLElement>(".net-product-body");
-              const want = Math.min(220, window.innerWidth - 32);
-              node.style.left = `${Math.round(anchor.x)}px`;
-              node.style.top = `${Math.round(anchor.y)}px`;
-              const sphere = {
-                x0: anchor.x0 - 10,
-                y0: anchor.y0 - 10,
-                x1: anchor.x1 + 10,
-                y1: anchor.y1 + 10,
-              };
-              const avoid = placed
-                .filter((item) => item.id !== id && item.x1 > item.x0 + 8)
-                .map((item) => ({ x0: item.x0 - 8, y0: item.y0 - 8, x1: item.x1 + 8, y1: item.y1 + 8 }));
-              const guessed = clampLabel(anchor.x, anchor.y, want, 120, window.innerWidth, window.innerHeight, true, false, sphere, avoid);
-              if (body) body.style.width = `${Math.round(guessed.width)}px`;
-              const height = body?.offsetHeight || 108;
-              const box = clampLabel(anchor.x, anchor.y, guessed.width, height, window.innerWidth, window.innerHeight, true, false, sphere, avoid);
-              node.dataset.focus = "1";
-              node.dataset.flip = box.flip ? "1" : "0";
-              node.dataset.placed = "1";
-              node.dataset.rise = box.top + 8 < anchor.y - height * 0.2 ? "1" : "0";
-              if (body) {
-                body.style.left = `${Math.round(box.left - anchor.x)}px`;
-                body.style.top = `${Math.round(box.top - anchor.y)}px`;
-                body.style.width = `${Math.round(box.width)}px`;
-              }
-              if (leader) {
-                const beside = box.top < sphere.y1 && box.top + height > sphere.y0;
-                leader.style.width = beside ? `${Math.max(8, Math.round(box.leader))}px` : "0px";
-                leader.style.top = "0px";
-              }
-              labelBoxes.push({ x0: box.left - 8, y0: box.top - 4, x1: box.left + box.width + 8, y1: box.top + height + 4 });
+              return;
             }
+            node.style.left = `${Math.round(left)}px`;
+            node.style.top = `${Math.round(mid)}px`;
+            if (leader) leader.style.width = `${LABEL_GAP}px`;
+            labelBoxes.push({ x0: edge, y0: mid - labelH / 2, x1: left + labelW, y1: mid + labelH / 2 });
           });
           if (posterRef.current) posterRef.current.style.opacity = String(state.poster);
           root.dataset.poster = state.poster > 0.02 ? "1" : "0";
@@ -291,17 +258,31 @@ export function NetworkExperience() {
           if (copy) {
             const liveBeat = posterOn ? HERO_BEAT : motion.beat;
             const narrow = window.innerWidth <= 760;
+            const chamber = !posterOn && liveBeat.id === "layers" && inChamber(state.t);
             const blocks: Rect[] = state.obstacles.map((item) => ({ x0: item.x0, y0: item.y0, x1: item.x1, y1: item.y1 }));
             blocks.push(...labelBoxes);
-            const nav = root.querySelector<HTMLElement>(".net-nav");
-            const padTop = (nav?.offsetHeight || 64) + 10;
+            const padTop = Math.max((navEl?.offsetHeight || 64) + 10, minTop);
             const padBottom = liveBeat.id === "book" ? 64 : 16;
             copy.dataset.place = liveBeat.id;
+            copy.dataset.compact = chamber ? "1" : "0";
             let x = 16;
             let y = padTop;
             let prefer = Math.min(liveBeat.id === "layers" ? 640 : 520, window.innerWidth - 32);
             let band = false;
-            if (narrow && liveBeat.id === "layers") {
+            if (chamber && narrow) {
+              prefer = window.innerWidth - 32;
+              band = true;
+              copy.style.width = `${Math.round(prefer)}px`;
+              const height = copy.offsetHeight || 72;
+              x = 16;
+              y = Math.max(padTop, window.innerHeight - 16 - height);
+            } else if (chamber) {
+              prefer = Math.round(0.7 * Math.min(420, window.innerWidth - 32));
+              band = false;
+              copy.style.width = `${Math.round(prefer)}px`;
+              x = 16;
+              y = padTop;
+            } else if (narrow && liveBeat.id === "layers") {
               prefer = window.innerWidth - 32;
               band = true;
               copy.style.width = `${Math.round(prefer)}px`;
@@ -336,7 +317,8 @@ export function NetworkExperience() {
             let samples = posterOn || !canvasEl ? [] : readGrid(canvasEl, copyRect, state.t);
             let contrast = textContrast(samples, false);
             let scrim = contrast < 4.5;
-            if (!posterOn && !band && liveBeat.id !== "hero" && contrast < 4.5 && canvasEl) {
+            if (chamber && contrast < 4.5) scrim = true;
+            if (!posterOn && !band && !chamber && liveBeat.id !== "hero" && contrast < 4.5 && canvasEl) {
               const skyW = narrow ? window.innerWidth - 32 : Math.min(prefer, window.innerWidth - 32);
               copy.style.width = `${Math.round(skyW)}px`;
               const skyH = copy.offsetHeight || height;
@@ -376,12 +358,65 @@ export function NetworkExperience() {
             copy.dataset.scrim = scrim ? "1" : "0";
             copy.style.opacity = posterOn ? "1" : String(motion.opacity);
             copy.style.transform = posterOn ? "none" : `translate3d(0, ${motion.y}px, 0)`;
+            const copyBox = copy.getBoundingClientRect();
+            const cardOpacity = Number.parseFloat(copy.style.opacity || "1");
+            const cardRect =
+              cardOpacity > 0.15 && copyBox.width > 8 && copyBox.height > 8
+                ? { x0: copyBox.left - 6, y0: copyBox.top - 6, x1: copyBox.right + 6, y1: copyBox.bottom + 6 }
+                : null;
+            labelNodes.forEach((node) => {
+              if (node.dataset.kind === "callout") return;
+              const id = node.dataset.anchor || "";
+              const anchor = placed.find((item) => item.id === id);
+              node.dataset.hidden = anchor ? "0" : "1";
+              if (!anchor || !anchor.focus) {
+                node.dataset.hidden = "1";
+                node.dataset.focus = "0";
+                return;
+              }
+              const body = node.querySelector<HTMLElement>(".net-product-body");
+              const leader = node.querySelector<HTMLElement>(".net-leader");
+              const want = Math.min(220, window.innerWidth - 32);
+              node.style.left = `${Math.round(anchor.x)}px`;
+              node.style.top = `${Math.round(anchor.y)}px`;
+              const sphere = {
+                x0: anchor.x0 - 10,
+                y0: anchor.y0 - 10,
+                x1: anchor.x1 + 10,
+                y1: anchor.y1 + 10,
+              };
+              const avoid = placed
+                .filter((item) => item.id !== id && item.x1 > item.x0 + 8)
+                .map((item) => ({ x0: item.x0 - 8, y0: item.y0 - 8, x1: item.x1 + 8, y1: item.y1 + 8 }));
+              if (cardRect) avoid.push(cardRect);
+              const guessed = clampLabel(anchor.x, anchor.y, want, 120, window.innerWidth, window.innerHeight, true, false, sphere, avoid, minTop);
+              if (body) body.style.width = `${Math.round(guessed.width)}px`;
+              const height = body?.offsetHeight || 108;
+              const box = clampLabel(anchor.x, anchor.y, guessed.width, height, window.innerWidth, window.innerHeight, true, false, sphere, avoid, minTop);
+              node.dataset.focus = "1";
+              node.dataset.flip = box.flip ? "1" : "0";
+              node.dataset.placed = "1";
+              node.dataset.rise = box.top + 8 < anchor.y - height * 0.2 ? "1" : "0";
+              if (body) {
+                body.style.left = `${Math.round(box.left - anchor.x)}px`;
+                body.style.top = `${Math.round(box.top - anchor.y)}px`;
+                body.style.width = `${Math.round(box.width)}px`;
+              }
+              if (leader) {
+                const beside = box.top < sphere.y1 && box.top + height > sphere.y0;
+                leader.style.width = beside ? `${Math.max(8, Math.round(box.leader))}px` : "0px";
+                leader.style.top = "0px";
+              }
+              labelBoxes.push({ x0: box.left - 8, y0: box.top - 4, x1: box.left + box.width + 8, y1: box.top + height + 4 });
+            });
             (window as Window & { __safe?: unknown }).__safe = {
               t: Number(state.t.toFixed(2)),
               beat: liveBeat.id,
               scrim,
               contrast: Number(contrast.toFixed(2)),
               band,
+              compact: chamber,
+              minTop,
               nodes: state.obstacles.slice(0, 80).map((item) => `${item.name}:${Math.round(item.x0)}-${Math.round(item.x1)}`),
               anchors: state.anchors.map((anchor) => ({
                 id: anchor.id,

@@ -264,6 +264,20 @@ html:has(.net) body {
   letter-spacing: -0.02em;
 }
 
+.net-copy[data-compact="1"] > p:not(.net-kicker),
+.net-copy[data-compact="1"] > .net-tag {
+  display: none;
+}
+
+.net-copy[data-compact="1"] h2 {
+  font-size: 39px;
+  line-height: 43px;
+}
+
+.net-copy[data-compact="1"] .net-kicker {
+  font-size: 11px;
+}
+
 .net-copy[data-scrim="1"] {
   background: rgb(239 230 214 / 92%);
   border: 1px solid rgb(107 86 70 / 20%);
@@ -708,6 +722,15 @@ html:has(.net) body {
     font-size: 28px;
     line-height: 32px;
     letter-spacing: -0.02em;
+  }
+
+  .net-copy[data-compact="1"] h2 {
+    font-size: 20px;
+    line-height: 24px;
+  }
+
+  .net-copy[data-compact="1"] .net-kicker {
+    font-size: 10px;
   }
 
   .net-copy[data-band="1"] {

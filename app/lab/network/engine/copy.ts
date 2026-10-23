@@ -15,6 +15,15 @@ export type Beat = {
   side: "left" | "right";
 };
 
+/** The camera looks down on the rooms at 32.2 s. Copy hands off 300 ms earlier so 04 is opaque on that frame. */
+export const GATE_T = 32.2;
+export const LAYERS_END = GATE_T - 0.3;
+
+/** Interior of the stack, from the first chamber stop until the layers card leaves. */
+export function inChamber(t: number): boolean {
+  return t >= 25 && t < LAYERS_END;
+}
+
 export const BEATS: Beat[] = [
   { id: "loader", t0: 0, t1: 3.5, hold: 2, kicker: "00 — Boot", title: "initialising layer 1/4…", side: "left" },
   {
@@ -40,7 +49,7 @@ export const BEATS: Beat[] = [
   {
     id: "layers",
     t0: 19.5,
-    t1: 30,
+    t1: LAYERS_END,
     hold: 24,
     kicker: "03 — Layers",
     title: "Four layers. One signal through every one of them.",
@@ -50,7 +59,7 @@ export const BEATS: Beat[] = [
   },
   {
     id: "attention",
-    t0: 30,
+    t0: LAYERS_END,
     t1: 39,
     hold: 34,
     kicker: "04 — Outputs",
@@ -137,7 +146,7 @@ export const PRODUCTS = [
   },
 ] as const;
 
-/** Attention 30–39s is three scroll focuses: FieldRelay, Counter, Roster. */
+/** FieldRelay, Counter, Roster. The outputs card itself waits until the gate. */
 export function productFocus(t: number): (typeof PRODUCTS)[number]["id"] | null {
   if (t < 30 || t >= 39) return null;
   const index = Math.min(PRODUCTS.length - 1, Math.floor((t - 30) / 3));

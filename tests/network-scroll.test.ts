@@ -3,7 +3,7 @@ import { describe, it } from "vitest";
 import * as THREE from "three";
 import { createAnim } from "../app/lab/network/engine/anim";
 import { bendPush, clampScreenPull, hopWeight, resolveStack, stepUnder, stepVec, vecSpring } from "../app/lab/network/engine/clay";
-import { copyMotion, productFocus } from "../app/lab/network/engine/copy";
+import { GATE_T, LAYERS_END, copyMotion, inChamber, productFocus } from "../app/lab/network/engine/copy";
 import { cueFile } from "../app/lab/network/engine/manifest";
 import { clampLabel, contrastRatio, largestEmptyRect, minInkContrast, placeBeside } from "../app/lab/network/engine/safe";
 import { fittedFov } from "../app/lab/network/engine/camera";
@@ -60,6 +60,22 @@ describe("network scroll map", () => {
     assert.equal(productFocus(29.9), null);
   });
 
+  it("keeps the layers card through the chamber and switches at the gate", () => {
+    const inside = copyMotion(31);
+    assert.equal(inside.beat.id, "layers");
+    assert.equal(inside.opacity, 1);
+    assert.equal(inChamber(25), true);
+    assert.equal(inChamber(29), true);
+    assert.equal(inChamber(31), true);
+    assert.equal(inChamber(23), false);
+    assert.equal(inChamber(32.2), false);
+    const gate = copyMotion(GATE_T);
+    assert.ok(Math.abs(LAYERS_END - (GATE_T - 0.3)) < 1e-9);
+    assert.equal(gate.beat.id, "attention");
+    assert.ok(gate.opacity > 0.9, `opacity ${gate.opacity}`);
+    assert.equal(copyMotion(36).beat.id, "attention");
+  });
+
   it("keeps ink on terracotta under 4.5 and sand over it", () => {
     const clay = minInkContrast([[105, 44, 32]], false);
     const sand = minInkContrast([[228, 216, 196]], false);
@@ -91,6 +107,19 @@ describe("network scroll map", () => {
     const clear = placeBeside(sphere, 180, 96, 390, 844, [other]);
     const hitsOther = clear.left < other.x1 + 8 && clear.left + clear.width > other.x0 - 8 && clear.top < other.y1 + 8 && clear.top + clear.height > other.y0 - 8;
     assert.equal(hitsOther, false);
+  });
+
+  it("keeps a product label off the copy card and below the nav", () => {
+    const sphere = { x0: 200, y0: 120, x1: 300, y1: 240 };
+    const card = { x0: 16, y0: 64, x1: 374, y1: 250 };
+    const minTop = 100;
+    const box = placeBeside(sphere, 160, 88, 390, 844, [card], minTop);
+    assert.ok(box.top >= minTop, `top ${box.top}`);
+    assert.ok(box.left >= 16 && box.left + box.width <= 374, `x ${box.left}`);
+    const hitsCard = box.left < card.x1 && box.left + box.width > card.x0 && box.top < card.y1 && box.top + box.height > card.y0;
+    assert.equal(hitsCard, false);
+    const hitsSphere = box.left < sphere.x1 && box.left + box.width > sphere.x0 && box.top < sphere.y1 && box.top + box.height > sphere.y0;
+    assert.equal(hitsSphere, false);
   });
 
   it("leans a nearby thread a few centimetres and leaves the far ones", () => {

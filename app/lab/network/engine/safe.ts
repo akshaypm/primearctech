@@ -103,12 +103,70 @@ function rectsOverlap(a: Rect, b: Rect, pad: number) {
   return a.x0 < b.x1 + pad && a.x1 > b.x0 - pad && a.y0 < b.y1 + pad && a.y1 > b.y0 - pad;
 }
 
-/** Put the one focused label fully outside the sphere, inside the 16 px margin. */
-export function placeBeside(sphere: Rect, width: number, height: number, viewW: number, viewH: number, avoid: readonly Rect[] = []): LabelBox {
+function overlapArea(a: Rect, b: Rect) {
+  const ix = Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0));
+  const iy = Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+  return ix * iy;
+}
+
+/** Slide a label until it misses every blocked rect, staying inside the margin and below minTop. */
+function escapeOverlaps(
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+  blocks: readonly Rect[],
+  viewW: number,
+  viewH: number,
+  minTop: number,
+) {
+  const margin = 16;
+  const clamp = (x: number, y: number) => ({
+    left: Math.max(margin, Math.min(x, viewW - margin - width)),
+    top: Math.max(minTop, Math.min(y, viewH - margin - height)),
+  });
+  for (let pass = 0; pass < 8; pass += 1) {
+    const rect = { x0: left, y0: top, x1: left + width, y1: top + height };
+    const hit = blocks.find((block) => overlapArea(rect, block) > 0);
+    if (!hit) break;
+    const options = [
+      clamp(left, hit.y1 + 8),
+      clamp(left, hit.y0 - 8 - height),
+      clamp(hit.x1 + 8, top),
+      clamp(hit.x0 - 8 - width, top),
+    ];
+    let next: { left: number; top: number } | null = null;
+    let least = Infinity;
+    for (const option of options) {
+      const box = { x0: option.left, y0: option.top, x1: option.left + width, y1: option.top + height };
+      const area = blocks.reduce((sum, block) => sum + overlapArea(box, block), 0);
+      if (area < least) {
+        least = area;
+        next = option;
+      }
+    }
+    if (!next || (next.left === left && next.top === top)) break;
+    left = next.left;
+    top = next.top;
+    if (least === 0) break;
+  }
+  return { left, top };
+}
+
+/** Put the one focused label fully outside the sphere and any copy card, inside the margin and below the nav. */
+export function placeBeside(
+  sphere: Rect,
+  width: number,
+  height: number,
+  viewW: number,
+  viewH: number,
+  avoid: readonly Rect[] = [],
+  minTop = 52,
+): LabelBox {
   const margin = 16;
   const gap = 18;
   const fittedW = Math.max(48, Math.min(width, viewW - margin * 2));
-  const fittedH = Math.max(16, Math.min(height, viewH - margin - 52));
+  const fittedH = Math.max(16, Math.min(height, viewH - minTop - margin));
   const cy = (sphere.y0 + sphere.y1) / 2;
   const cx = (sphere.x0 + sphere.x1) / 2;
   const blocked = [sphere, ...avoid];
@@ -117,21 +175,27 @@ export function placeBeside(sphere: Rect, width: number, height: number, viewW: 
     { left: sphere.x0 - gap - fittedW, top: cy - fittedH * 0.45, flip: true },
     { left: cx - fittedW / 2, top: sphere.y0 - gap - fittedH, flip: false },
     { left: cx - fittedW / 2, top: sphere.y1 + gap, flip: false },
-    { left: margin, top: 52, flip: false },
+    { left: margin, top: minTop, flip: false },
     { left: viewW - margin - fittedW, top: viewH - margin - fittedH, flip: true },
   ];
-  let best: LabelBox = { left: margin, top: 52, width: fittedW, height: fittedH, flip: false, leader: gap };
+  for (const block of avoid) {
+    raw.push(
+      { left: margin, top: block.y1 + gap, flip: false },
+      { left: margin, top: block.y0 - gap - fittedH, flip: false },
+      { left: block.x1 + gap, top: minTop, flip: false },
+      { left: block.x0 - gap - fittedW, top: minTop, flip: true },
+    );
+  }
+  let best: LabelBox = { left: margin, top: minTop, width: fittedW, height: fittedH, flip: false, leader: gap };
   let bestScore = -Infinity;
   for (const item of raw) {
     const left = Math.max(margin, Math.min(item.left, viewW - margin - fittedW));
-    const top = Math.max(52, Math.min(item.top, viewH - margin - fittedH));
+    const top = Math.max(minTop, Math.min(item.top, viewH - margin - fittedH));
     const rect = { x0: left, y0: top, x1: left + fittedW, y1: top + fittedH };
     let overlap = 0;
     for (const block of blocked) {
       if (!rectsOverlap(rect, block, 10)) continue;
-      const ix = Math.max(0, Math.min(rect.x1, block.x1) - Math.max(rect.x0, block.x0));
-      const iy = Math.max(0, Math.min(rect.y1, block.y1) - Math.max(rect.y0, block.y0));
-      overlap += ix * iy;
+      overlap += overlapArea(rect, block);
     }
     const score = (overlap > 0 ? -overlap : 1_000_000) - Math.abs(left - item.left) - Math.abs(top - item.top);
     if (score > bestScore) {
@@ -140,7 +204,9 @@ export function placeBeside(sphere: Rect, width: number, height: number, viewW: 
       best = { left, top, width: fittedW, height: fittedH, flip: item.flip, leader: Math.max(8, Math.abs(leader)) };
     }
   }
-  return best;
+  const clear = escapeOverlaps(best.left, best.top, fittedW, fittedH, blocked, viewW, viewH, minTop);
+  const leader = best.flip ? sphere.x0 - (clear.left + fittedW) : clear.left - sphere.x1;
+  return { ...best, left: clear.left, top: clear.top, leader: Math.max(8, Math.abs(leader)) };
 }
 
 export function clampLabel(
@@ -154,8 +220,9 @@ export function clampLabel(
   crowded: boolean,
   sphere?: Rect,
   avoid: readonly Rect[] = [],
+  minTop = 52,
 ): LabelBox {
-  if (focused && sphere && sphere.x1 > sphere.x0 && sphere.y1 > sphere.y0) return placeBeside(sphere, width, height, viewW, viewH, avoid);
+  if (focused && sphere && sphere.x1 > sphere.x0 && sphere.y1 > sphere.y0) return placeBeside(sphere, width, height, viewW, viewH, avoid, minTop);
   const margin = 16;
   const gap = focused ? 28 : 10;
   const rightSpace = viewW - margin - (anchorX + gap);
@@ -170,9 +237,10 @@ export function clampLabel(
   let top = anchorY - (focused ? Math.round(height * 0.4) : height / 2);
   const limit = viewH - margin;
   if (top + height > limit) top = limit - height;
-  if (top < 52) top = 52;
-  const leader = Math.max(0, flip ? anchorX - (left + fitted) : left - anchorX);
-  return { left, top, width: fitted, height, flip, leader };
+  if (top < minTop) top = minTop;
+  const clear = escapeOverlaps(left, top, fitted, height, avoid, viewW, viewH, minTop);
+  const leader = Math.max(0, flip ? anchorX - (clear.left + fitted) : clear.left - anchorX);
+  return { left: clear.left, top: clear.top, width: fitted, height, flip, leader };
 }
 
 export function intersections(copy: Rect, blocks: Rect[], minArea = 80) {
