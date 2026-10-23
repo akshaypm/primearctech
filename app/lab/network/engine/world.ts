@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { bendPush } from "./clay";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
@@ -165,6 +166,9 @@ export type NetworkWorld = {
   trackWindow: (name: string) => { t0: number; t1: number } | null;
   heightAt: (x: number, z: number) => number | null;
   bendThreads: (point: THREE.Vector3 | null, reach: number) => void;
+  readonly bendPeak: number;
+  basin: () => THREE.Vector3 | null;
+  screen: (prefix: string) => { name: string; x: number; y: number; wx: number; wy: number; wz: number; visible: boolean; box: ScreenRect | null }[];
   attach: (object: THREE.Object3D) => void;
   groundPoint: (x: number, y: number) => THREE.Vector3 | null;
   rayPoint: (x: number, y: number, plane: THREE.Plane) => THREE.Vector3 | null;
@@ -727,6 +731,8 @@ export async function loadWorld(
     cssH = Math.max(1, h);
     renderer.setPixelRatio(ratio);
     renderer.setSize(cssW, cssH, false);
+    renderer.setClearColor(0xefe6d6, 1);
+    renderer.clear(true, true, true);
     camera.aspect = cssW / cssH;
   }
 
@@ -1456,8 +1462,13 @@ export async function loadWorld(
   const heightDir = new THREE.Vector3(0, -1, 0);
   const heightRay = new THREE.Raycaster();
   const bendLocal = new THREE.Vector3();
+  const bendWorld = new THREE.Vector3();
+  const bendDelta = new THREE.Vector3();
   const bendInverse = new THREE.Matrix4();
   const groundScratch = new THREE.Vector3();
+  let bendPeak = 0;
+  let basinPoint: THREE.Vector3 | null = null;
+  const bendBase = new WeakMap<THREE.BufferAttribute, Float32Array>();
 
   function pointerRay(x: number, y: number) {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -1518,33 +1529,95 @@ export async function loadWorld(
   }
 
   function bendThreads(point: THREE.Vector3 | null, reach: number) {
+    bendPeak = 0;
     if (!point || reach <= 0) return;
     for (const object of named((name) => name.startsWith("ATTN_th"))) {
-      object.updateWorldMatrix(true, false);
+      object.updateWorldMatrix(true, true);
       object.traverse((child) => {
         const mesh = child as THREE.Mesh;
         if (!mesh.isMesh) return;
         const attr = mesh.geometry?.attributes?.position;
         if (!attr) return;
         const array = attr.array as Float32Array;
+        const key = attr as THREE.BufferAttribute;
+        let base = bendBase.get(key);
+        if (!base) {
+          base = Float32Array.from(array);
+          bendBase.set(key, base);
+        } else array.set(base);
         bendInverse.copy(mesh.matrixWorld).invert();
-        bendLocal.copy(point).applyMatrix4(bendInverse);
-        const stride = attr.count > 2400 ? 2 : 1;
+        const stride = attr.count > 9000 ? 2 : 1;
         for (let i = 0; i < attr.count; i += stride) {
+          bendWorld.fromBufferAttribute(attr as THREE.BufferAttribute, i).applyMatrix4(mesh.matrixWorld);
+          const dist = bendWorld.distanceTo(point);
+          const push = bendPush(dist, reach);
+          if (push <= 0) continue;
+          bendDelta.copy(point).sub(bendWorld);
+          const len = bendDelta.length();
+          if (len < 1e-4) continue;
+          const mag = Math.min(push, len);
+          bendDelta.multiplyScalar(mag / len);
+          bendWorld.add(bendDelta);
+          if (mag > bendPeak) bendPeak = mag;
+          bendLocal.copy(bendWorld).applyMatrix4(bendInverse);
           const ix = i * 3;
-          const dx = bendLocal.x - array[ix];
-          const dy = bendLocal.y - array[ix + 1];
-          const dz = bendLocal.z - array[ix + 2];
-          const dist = Math.hypot(dx, dy, dz);
-          if (dist >= reach || dist < 1e-4) continue;
-          const falloff = (1 - dist / reach) * 0.35;
-          array[ix] += dx * falloff;
-          array[ix + 1] += dy * falloff;
-          array[ix + 2] += dz * falloff;
+          array[ix] = bendLocal.x;
+          array[ix + 1] = bendLocal.y;
+          array[ix + 2] = bendLocal.z;
         }
         attr.needsUpdate = true;
       });
     }
+  }
+
+  function basin() {
+    if (basinPoint) return basinPoint;
+    const v = new THREE.Vector3();
+    let bestY = Infinity;
+    let best: THREE.Vector3 | null = null;
+    for (const object of named((name) => name === "ground_loss")) {
+      object.updateWorldMatrix(true, true);
+      object.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const attr = mesh.geometry?.attributes?.position;
+        if (!attr) return;
+        const step = Math.max(1, Math.floor(attr.count / 5000));
+        for (let i = 0; i < attr.count; i += step) {
+          v.fromBufferAttribute(attr as THREE.BufferAttribute, i).applyMatrix4(mesh.matrixWorld);
+          if (v.y < bestY) {
+            bestY = v.y;
+            best = v.clone();
+          }
+        }
+      });
+    }
+    basinPoint = best;
+    return basinPoint;
+  }
+
+  function screen(prefix: string) {
+    const out: { name: string; x: number; y: number; wx: number; wy: number; wz: number; visible: boolean; box: ScreenRect | null }[] = [];
+    const at = new THREE.Vector3();
+    for (const object of named((name) => name.startsWith(prefix))) {
+      const name = nodeName(object);
+      if (!name.startsWith(prefix)) continue;
+      const p = project(name);
+      if (!p) continue;
+      object.getWorldPosition(at);
+      const box = projectBox(name);
+      out.push({
+        name,
+        x: p.x,
+        y: p.y,
+        wx: at.x,
+        wy: at.y,
+        wz: at.z,
+        visible: p.visible && p.x >= -20 && p.y >= -20 && p.x <= cssW + 20 && p.y <= cssH + 20,
+        box,
+      });
+    }
+    return out;
   }
 
   function attach(object: THREE.Object3D) {
@@ -1661,6 +1734,11 @@ export async function loadWorld(
     },
     heightAt,
     bendThreads,
+    get bendPeak() {
+      return bendPeak;
+    },
+    basin,
+    screen,
     attach,
     groundPoint,
     rayPoint,

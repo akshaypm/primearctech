@@ -29,3 +29,10 @@ export function squashScale(scale: THREE.Vector3, base: THREE.Vector3, metres: n
   const k = Math.min(0.22, Math.max(0, metres) * 0.12);
   scale.set(base.x * (1 + k * 0.65), base.y * (1 - k), base.z * (1 + k * 0.65));
 }
+
+/** Metres a thread vertex moves toward the cursor. Inside 0.45 m this is at least 0.3 m. */
+export function bendPush(dist: number, reach: number) {
+  if (!(dist > 0) || dist >= reach) return 0;
+  const t = 1 - dist / reach;
+  return t * t * 0.7;
+}

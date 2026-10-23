@@ -78,19 +78,71 @@ export function scrimBlend(bg: readonly [number, number, number]): [number, numb
 }
 
 /** Lowest ink contrast under a copy block. Empty samples mean the canvas is not readable yet. */
-export function minInkContrast(samples: readonly (readonly [number, number, number])[], scrim: boolean): number {
+export function minInkContrast(
+  samples: readonly (readonly [number, number, number])[],
+  scrim: boolean,
+  fg: readonly [number, number, number] = COPY_INK,
+): number {
   if (!samples.length) return 21;
   let worst = 21;
   for (const sample of samples) {
     const bg = scrim ? scrimBlend(sample) : sample;
-    worst = Math.min(worst, contrastRatio(COPY_INK, bg));
+    worst = Math.min(worst, contrastRatio(fg, bg));
   }
   return worst;
+}
+
+export function textContrast(samples: readonly (readonly [number, number, number])[], scrim: boolean): number {
+  return Math.min(minInkContrast(samples, scrim, COPY_INK), minInkContrast(samples, scrim, COPY_SECONDARY));
 }
 
 export type LabelBox = { left: number; top: number; width: number; height: number; flip: boolean; leader: number };
 
 /** Keep a product label inside a 16px margin, flipping to the left of the sphere when the right side is short. */
+function rectsOverlap(a: Rect, b: Rect, pad: number) {
+  return a.x0 < b.x1 + pad && a.x1 > b.x0 - pad && a.y0 < b.y1 + pad && a.y1 > b.y0 - pad;
+}
+
+/** Put the one focused label fully outside the sphere, inside the 16 px margin. */
+export function placeBeside(sphere: Rect, width: number, height: number, viewW: number, viewH: number, avoid: readonly Rect[] = []): LabelBox {
+  const margin = 16;
+  const gap = 18;
+  const fittedW = Math.max(48, Math.min(width, viewW - margin * 2));
+  const fittedH = Math.max(16, Math.min(height, viewH - margin - 52));
+  const cy = (sphere.y0 + sphere.y1) / 2;
+  const cx = (sphere.x0 + sphere.x1) / 2;
+  const blocked = [sphere, ...avoid];
+  const raw = [
+    { left: sphere.x1 + gap, top: cy - fittedH * 0.45, flip: false },
+    { left: sphere.x0 - gap - fittedW, top: cy - fittedH * 0.45, flip: true },
+    { left: cx - fittedW / 2, top: sphere.y0 - gap - fittedH, flip: false },
+    { left: cx - fittedW / 2, top: sphere.y1 + gap, flip: false },
+    { left: margin, top: 52, flip: false },
+    { left: viewW - margin - fittedW, top: viewH - margin - fittedH, flip: true },
+  ];
+  let best: LabelBox = { left: margin, top: 52, width: fittedW, height: fittedH, flip: false, leader: gap };
+  let bestScore = -Infinity;
+  for (const item of raw) {
+    const left = Math.max(margin, Math.min(item.left, viewW - margin - fittedW));
+    const top = Math.max(52, Math.min(item.top, viewH - margin - fittedH));
+    const rect = { x0: left, y0: top, x1: left + fittedW, y1: top + fittedH };
+    let overlap = 0;
+    for (const block of blocked) {
+      if (!rectsOverlap(rect, block, 10)) continue;
+      const ix = Math.max(0, Math.min(rect.x1, block.x1) - Math.max(rect.x0, block.x0));
+      const iy = Math.max(0, Math.min(rect.y1, block.y1) - Math.max(rect.y0, block.y0));
+      overlap += ix * iy;
+    }
+    const score = (overlap > 0 ? -overlap : 1_000_000) - Math.abs(left - item.left) - Math.abs(top - item.top);
+    if (score > bestScore) {
+      bestScore = score;
+      const leader = item.flip ? sphere.x0 - rect.x1 : rect.x0 - sphere.x1;
+      best = { left, top, width: fittedW, height: fittedH, flip: item.flip, leader: Math.max(8, Math.abs(leader)) };
+    }
+  }
+  return best;
+}
+
 export function clampLabel(
   anchorX: number,
   anchorY: number,
@@ -100,7 +152,10 @@ export function clampLabel(
   viewH: number,
   focused: boolean,
   crowded: boolean,
+  sphere?: Rect,
+  avoid: readonly Rect[] = [],
 ): LabelBox {
+  if (focused && sphere && sphere.x1 > sphere.x0 && sphere.y1 > sphere.y0) return placeBeside(sphere, width, height, viewW, viewH, avoid);
   const margin = 16;
   const gap = focused ? 28 : 10;
   const rightSpace = viewW - margin - (anchorX + gap);

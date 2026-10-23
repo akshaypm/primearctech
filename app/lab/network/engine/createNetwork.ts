@@ -114,7 +114,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       fallback: forceFallback,
       dive: null,
       anchors: [],
-      poster: shot ? 0 : 1,
+      poster: 1,
       obstacles: [],
       focus: null,
       hand: "default",
@@ -159,6 +159,50 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.setClearColor(0xefe6d6, 1);
+  renderer.setSize(Math.max(2, window.innerWidth), Math.max(2, window.innerHeight), false);
+  renderer.clear(true, true, true);
+  const probe = new Uint8Array(4);
+  const frameLit = () => {
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    if (w < 8 || h < 8) return false;
+    const spots = [
+      [w * 0.5, h * 0.55],
+      [w * 0.22, h * 0.28],
+      [w * 0.78, h * 0.28],
+      [w * 0.28, h * 0.74],
+      [w * 0.74, h * 0.7],
+    ];
+    const samples: number[][] = [];
+    for (const [x, y] of spots) {
+      gl.readPixels(Math.max(0, Math.min(w - 1, Math.floor(x))), Math.max(0, Math.min(h - 1, Math.floor(y))), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, probe);
+      samples.push([probe[0], probe[1], probe[2]]);
+    }
+    const dark = samples.filter((sample) => sample[0] < 18 && sample[1] < 18 && sample[2] < 18).length;
+    let spread = 0;
+    for (const a of samples) {
+      for (const b of samples) spread = Math.max(spread, Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]));
+    }
+    return dark === 0 && spread > 28;
+  };
+  const keepSand = () => {
+    renderer.setClearColor(0xefe6d6, 1);
+    renderer.clear(true, true, true);
+  };
+  (window as Window & { __pixels?: () => number[][] }).__pixels = () => {
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    if (w < 8 || h < 8) return [];
+    const row = new Uint8Array(w * 4);
+    const y = Math.min(h - 1, Math.floor(h * 0.42));
+    gl.readPixels(0, y, w, 1, gl.RGBA, gl.UNSIGNED_BYTE, row);
+    const out: number[][] = [];
+    for (let col = 1; col <= 8; col += 1) {
+      const x = Math.min(w - 1, Math.floor((col / 9) * w)) * 4;
+      out.push([row[x], row[x + 1], row[x + 2]]);
+    }
+    return out;
+  };
 
   let loadProgress = 0;
   const source = params.get("src") === "original" ? "original" : "ktx";
@@ -176,7 +220,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       source,
       (progress, label) => {
         loadProgress = progress;
-        publish({ progress, label, t: 6, beatId: "hero", intro: false, poster: shot ? 0 : 1 });
+        publish({ progress, label, t: 6, beatId: "hero", intro: false, poster: 1 });
       },
       quality,
     );
@@ -204,7 +248,8 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   let mix = shot ? loaderMixAt(clock) : 0;
   let cross = 0;
   let phase: "wait" | "loader" | "hero" = shot ? "hero" : "wait";
-  let poster = shot ? 0 : 1;
+  let poster = 1;
+  let revealed = false;
   let fading = false;
   let fade = 0;
   if (shot) world.startQueue();
@@ -367,6 +412,13 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       resident: world.resident(),
     };
     (window as Window & { __network?: unknown }).__network = report;
+    if (frameLit()) {
+      revealed = true;
+      poster = 0;
+    } else {
+      keepSand();
+      poster = 1;
+    }
     publish({
       t,
       beatId: beatAt(t).id,
@@ -376,7 +428,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       intro: false,
       sand: 0,
       anchors: anchors(t),
-      poster: 0,
+      poster,
       obstacles: world.obstacles(beatScenes(beatAt(t).id)),
       focus: productFocus(t),
     });
@@ -390,6 +442,13 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       shotT = t;
       world.pose(t, poseOpts(t));
       world.render();
+      if (frameLit()) {
+        revealed = true;
+        poster = 0;
+      } else if (!revealed) {
+        keepSand();
+        poster = 1;
+      }
       if (host.__network) {
         host.__network.t = t;
         const report = host.__network as { mem?: MemoryReport; resident?: string[] };
@@ -405,7 +464,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
         intro: false,
         sand: 0,
         anchors: anchors(t),
-        poster: 0,
+        poster,
         obstacles: world.obstacles(beatScenes(beatAt(t).id)),
         focus: productFocus(t),
       });
@@ -422,6 +481,11 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   if (!shot) {
     try {
       await world.warm();
+      if (frameLit()) {
+        revealed = true;
+        fading = true;
+        fade = 0;
+      } else keepSand();
     } catch (error) {
       console.warn(error);
     }
@@ -430,7 +494,6 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     phase = "loader";
     clock = 0;
     mix = 1;
-    fading = true;
     intro = true;
     boot.playLoader = true;
     boot.loaderFrame = performance.now();
@@ -438,7 +501,6 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     phase = "hero";
     clock = 6;
     mix = 0;
-    fading = true;
     intro = false;
     const tau = tauAt(table, 6);
     spring.x = tau;
@@ -476,6 +538,13 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       shownT = shotT;
       const handFrame = hands.step(dt, beatAt(shotT).id, false);
       world.render();
+      if (frameLit()) {
+        revealed = true;
+        poster = 0;
+      } else if (!revealed) {
+        keepSand();
+        poster = 1;
+      }
       publish({
         t: shotT,
         beatId: beatAt(shotT).id,
@@ -485,7 +554,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
         intro: false,
         sand: 0,
         anchors: anchors(shotT),
-        poster: 0,
+        poster,
         obstacles: world.obstacles(beatScenes(beatAt(shotT).id)),
         focus: productFocus(shotT),
         hand: handFrame.cursor,
@@ -524,18 +593,6 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
         }
       }
     }
-    if (fading) {
-      fade += dt;
-      poster = Math.max(0, 1 - fade / CROSSFADE);
-      if (poster === 0) {
-        fading = false;
-        if (phase === "hero" && intro) {
-          intro = false;
-          audio.cue("hero");
-        }
-      }
-    }
-
     let tau = spring.x;
     if (!intro) {
       springTo(spring, Math.min(storyPx / px, Math.max(0, targetTau)), SCROLL_OMEGA, dt);
@@ -595,6 +652,24 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       world.camera.position.y += Math.cos(now * 0.001) * 0.003;
     }
     world.render();
+    if (!revealed) {
+      if (frameLit()) {
+        revealed = true;
+        fading = true;
+        fade = 0;
+      } else keepSand();
+      poster = 1;
+    } else if (fading) {
+      fade += dt;
+      poster = Math.max(0, 1 - fade / CROSSFADE);
+      if (poster === 0) {
+        fading = false;
+        if (phase === "hero" && intro) {
+          intro = false;
+          audio.cue("hero");
+        }
+      }
+    }
 
     const beat = beatAt(phase === "loader" ? t : intro ? 6 : t);
     if (!intro && beat.id !== lastBeat) {
@@ -666,8 +741,15 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   canvas.addEventListener("pointerdown", onPointerDown);
   window.addEventListener("pointermove", onPointerMove);
   window.addEventListener("pointerup", onPointerUp);
-  const host = window as Window & { __hands?: { play: (kind: string) => void } };
+  const host = window as Window & {
+    __hands?: { play: (kind: string) => void };
+    __points?: (prefix: string) => ReturnType<NetworkWorld["screen"]>;
+    __bend?: () => number;
+    __pixels?: () => number[][];
+  };
   host.__hands = { play: (kind: string) => hands.play(kind) };
+  host.__points = (prefix: string) => world.screen(prefix);
+  host.__bend = () => world.bendPeak;
 
   return {
     audio,

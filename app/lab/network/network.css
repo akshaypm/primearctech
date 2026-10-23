@@ -40,6 +40,7 @@ html:has(.net) body {
   display: block;
   z-index: 0;
   touch-action: pan-y;
+  background: #efe6d6;
 }
 
 .net-sand {
@@ -294,6 +295,12 @@ html:has(.net) body {
   pointer-events: none;
 }
 
+.net-stats {
+  background: rgb(239 230 214 / 92%);
+  border: 1px solid rgb(107 86 70 / 20%);
+  padding: 0.45rem 0.65rem 0.5rem;
+}
+
 .net-chips span,
 .net-stat {
   border-top: 1px solid var(--clay);
@@ -339,6 +346,8 @@ html:has(.net) body {
   white-space: nowrap;
   transform: translateY(-50%);
   color: #222;
+  background: rgb(239 230 214 / 94%);
+  padding: 2px 4px;
 }
 
 .net-idx {
@@ -382,6 +391,10 @@ html:has(.net) body {
   right: 0;
 }
 
+.net-product[data-focus="0"] {
+  display: none;
+}
+
 .net-product[data-focus="0"] .net-line,
 .net-product[data-focus="0"] .net-enter {
   display: none;
@@ -413,6 +426,12 @@ html:has(.net) body {
   right: auto;
   transform: none;
   max-width: calc(100vw - 32px);
+}
+
+.net-product[data-focus="1"] .net-product-body {
+  background: rgb(239 230 214 / 92%);
+  border: 1px solid rgb(107 86 70 / 20%);
+  padding: 0.4rem 0.55rem 0.5rem;
 }
 
 .net-product[data-focus="1"] .net-name {

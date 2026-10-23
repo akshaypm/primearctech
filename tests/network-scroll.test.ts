@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import * as THREE from "three";
 import { createAnim } from "../app/lab/network/engine/anim";
-import { stepVec, vecSpring } from "../app/lab/network/engine/clay";
+import { bendPush, stepVec, vecSpring } from "../app/lab/network/engine/clay";
 import { copyMotion, productFocus } from "../app/lab/network/engine/copy";
 import { cueFile } from "../app/lab/network/engine/manifest";
-import { clampLabel, contrastRatio, largestEmptyRect, minInkContrast } from "../app/lab/network/engine/safe";
+import { clampLabel, contrastRatio, largestEmptyRect, minInkContrast, placeBeside } from "../app/lab/network/engine/safe";
 import { fittedFov } from "../app/lab/network/engine/camera";
 import { buildTau, createSpring, plateau, pxPerSecond, RATE_A, springTo, tauAt, timeAtTau } from "../app/lab/network/engine/scroll";
 
@@ -77,6 +77,26 @@ describe("network scroll map", () => {
     );
     assert.ok(mixed < 4.5, `mixed ${mixed}`);
     assert.ok(minInkContrast([[80, 36, 28]], true) >= 4.5);
+  });
+
+  it("keeps the focused product label outside the sphere and inside the margin", () => {
+    const sphere = { x0: 140, y0: 280, x1: 250, y1: 420 };
+    const box = placeBeside(sphere, 180, 96, 390, 844);
+    assert.ok(box.left >= 16, `left ${box.left}`);
+    assert.ok(box.left + box.width <= 374, `right ${box.left + box.width}`);
+    assert.ok(box.top >= 52 && box.top + box.height <= 828);
+    const overlaps = box.left < sphere.x1 + 8 && box.left + box.width > sphere.x0 - 8 && box.top < sphere.y1 + 8 && box.top + box.height > sphere.y0 - 8;
+    assert.equal(overlaps, false);
+    const other = { x0: 16, y0: 52, x1: 200, y1: 200 };
+    const clear = placeBeside(sphere, 180, 96, 390, 844, [other]);
+    const hitsOther = clear.left < other.x1 + 8 && clear.left + clear.width > other.x0 - 8 && clear.top < other.y1 + 8 && clear.top + clear.height > other.y0 - 8;
+    assert.equal(hitsOther, false);
+  });
+
+  it("bends a nearby thread by at least 0.3 m", () => {
+    assert.ok(bendPush(0.2, 2.6) >= 0.3);
+    assert.ok(bendPush(0.4, 2.6) >= 0.3);
+    assert.equal(bendPush(3, 2.6), 0);
   });
 
   it("flips a product label that would leave the right margin", () => {

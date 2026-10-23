@@ -4,7 +4,7 @@ import Link from "next/link";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { BEATS, LAYER_CALLOUTS, LOSS_STATS, NAV, PRODUCTS, beatBias, copyMotion, type Beat } from "./engine/copy";
 import { createNetwork, type FrameState, type NetworkHandle } from "./engine/createNetwork";
-import { clampLabel, intersections, largestEmptyRect, minInkContrast, relativeLuminance, type Rect } from "./engine/safe";
+import { clampLabel, intersections, largestEmptyRect, textContrast, relativeLuminance, type Rect } from "./engine/safe";
 import "./network.css";
 
 const HERO_BEAT = BEATS.find((item) => item.id === "hero") ?? BEATS[0];
@@ -200,7 +200,6 @@ export function NetworkExperience() {
           const placed = state.anchors.filter((anchor) => anchor.visible);
           const canvasEl = canvasRef.current;
           const labelBoxes: Rect[] = [];
-          let focusBox: Rect | null = null;
           const labelNodes = [...root.querySelectorAll<HTMLElement>("[data-anchor]")];
           labelNodes.sort((a, b) => {
             const af = placed.find((item) => item.id === a.dataset.anchor)?.focus ? 1 : 0;
@@ -226,28 +225,28 @@ export function NetworkExperience() {
               node.style.top = `${Math.round(mid)}px`;
               if (leader) leader.style.width = `${LABEL_GAP}px`;
               labelBoxes.push({ x0: edge, y0: mid - 14, x1: left + labelW, y1: mid + 14 });
+            } else if (!anchor.focus) {
+              node.dataset.hidden = "1";
+              node.dataset.focus = "0";
             } else {
-              const focusedAnchor = placed.find((item) => item.focus);
-              const crowded = Boolean(
-                !anchor.focus &&
-                  focusedAnchor &&
-                  Math.abs(anchor.y - focusedAnchor.y) < 150 &&
-                  Math.abs(anchor.x - focusedAnchor.x) < 220,
-              );
               const body = node.querySelector<HTMLElement>(".net-product-body");
-              const want = anchor.focus ? Math.min(240, window.innerWidth - 32) : 108;
+              const want = Math.min(220, window.innerWidth - 32);
               node.style.left = `${Math.round(anchor.x)}px`;
               node.style.top = `${Math.round(anchor.y)}px`;
-              const guessed = clampLabel(anchor.x, anchor.y, want, anchor.focus ? 120 : 16, window.innerWidth, window.innerHeight, anchor.focus, crowded);
+              const sphere = {
+                x0: anchor.x0 - 10,
+                y0: anchor.y0 - 10,
+                x1: anchor.x1 + 10,
+                y1: anchor.y1 + 10,
+              };
+              const avoid = placed
+                .filter((item) => item.id !== id && item.x1 > item.x0 + 8)
+                .map((item) => ({ x0: item.x0 - 8, y0: item.y0 - 8, x1: item.x1 + 8, y1: item.y1 + 8 }));
+              const guessed = clampLabel(anchor.x, anchor.y, want, 120, window.innerWidth, window.innerHeight, true, false, sphere, avoid);
               if (body) body.style.width = `${Math.round(guessed.width)}px`;
-              const height = body?.offsetHeight || (anchor.focus ? 108 : 14);
-              let box = clampLabel(anchor.x, anchor.y, guessed.width, height, window.innerWidth, window.innerHeight, anchor.focus, crowded);
-              if (!anchor.focus && focusBox && box.top < focusBox.y1 + 8 && box.top + height > focusBox.y0 - 8) {
-                const shifted = box.top >= (focusBox.y0 + focusBox.y1) / 2 ? focusBox.y1 + 10 : focusBox.y0 - height - 10;
-                box = { ...box, top: Math.max(52, Math.min(shifted, window.innerHeight - 16 - height)) };
-              }
-              if (anchor.focus) focusBox = { x0: box.left, y0: box.top, x1: box.left + box.width, y1: box.top + height };
-              node.dataset.focus = anchor.focus ? "1" : "0";
+              const height = body?.offsetHeight || 108;
+              const box = clampLabel(anchor.x, anchor.y, guessed.width, height, window.innerWidth, window.innerHeight, true, false, sphere, avoid);
+              node.dataset.focus = "1";
               node.dataset.flip = box.flip ? "1" : "0";
               node.dataset.placed = "1";
               node.dataset.rise = box.top + 8 < anchor.y - height * 0.2 ? "1" : "0";
@@ -257,7 +256,8 @@ export function NetworkExperience() {
                 body.style.width = `${Math.round(box.width)}px`;
               }
               if (leader) {
-                leader.style.width = anchor.focus ? `${Math.max(8, Math.round(box.leader))}px` : "0px";
+                const beside = box.top < sphere.y1 && box.top + height > sphere.y0;
+                leader.style.width = beside ? `${Math.max(8, Math.round(box.leader))}px` : "0px";
                 leader.style.top = "0px";
               }
               labelBoxes.push({ x0: box.left - 8, y0: box.top - 4, x1: box.left + box.width + 8, y1: box.top + height + 4 });
@@ -329,7 +329,7 @@ export function NetworkExperience() {
             const box = copy.getBoundingClientRect();
             let copyRect = { x0: box.left, y0: box.top, x1: box.right, y1: box.bottom };
             let samples = posterOn || !canvasEl ? [] : readGrid(canvasEl, copyRect, state.t);
-            let contrast = minInkContrast(samples, false);
+            let contrast = textContrast(samples, false);
             let scrim = contrast < 4.5;
             if (!posterOn && !band && liveBeat.id !== "hero" && contrast < 4.5 && canvasEl) {
               const skyW = narrow ? window.innerWidth - 32 : Math.min(prefer, window.innerWidth - 32);
@@ -337,7 +337,7 @@ export function NetworkExperience() {
               const skyH = copy.offsetHeight || height;
               const sky = { x0: 16, y0: padTop, x1: 16 + skyW, y1: padTop + skyH };
               const skySamples = readGrid(canvasEl, sky, state.t);
-              const skyContrast = minInkContrast(skySamples, false);
+              const skyContrast = textContrast(skySamples, false);
               if (skyContrast >= 4.5) {
                 x = 16;
                 prefer = skyW;
@@ -351,14 +351,18 @@ export function NetworkExperience() {
               } else {
                 copy.style.width = `${Math.round(prefer)}px`;
                 scrim = true;
-                contrast = minInkContrast(samples, true);
+                contrast = textContrast(samples, true);
               }
             }
             const hits = hitsFor(copyRect);
             if (!posterOn && !narrow && hits.length > 0) {
               scrim = true;
             }
-            if (scrim) contrast = minInkContrast(samples.length ? samples : [[228, 216, 196]], true);
+            if (scrim) contrast = textContrast(samples.length ? samples : [[228, 216, 196]], true);
+            const shift = posterOn ? 0 : motion.y;
+            const minY = padTop - Math.min(0, shift);
+            const maxY = window.innerHeight - padBottom - height - Math.max(0, shift);
+            y = Math.max(minY, Math.min(y, Math.max(minY, maxY)));
             copy.style.width = `${Math.round(prefer)}px`;
             copy.style.left = `${Math.round(x)}px`;
             copy.style.top = `${Math.round(y)}px`;
