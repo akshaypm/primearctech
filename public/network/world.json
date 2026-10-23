@@ -1,0 +1,11 @@
+{
+ "scenes": [
+  "hero",
+  "input",
+  "layers",
+  "attn",
+  "loss",
+  "emb",
+  "loader"
+ ]
+}

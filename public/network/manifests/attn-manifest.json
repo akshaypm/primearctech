@@ -1,0 +1,1795 @@
+{
+ "scene": "attn",
+ "about": "PrimeArc 'attn' baked-lighting asset. Blender Z-up metres; GLB is glTF Y-up (x, z, -y). See /workspace/primearc/rebuild/README.md.",
+ "glb": "attn-baked.glb",
+ "bake_pose_t": 37.0,
+ "verify_times": [
+  33,
+  34,
+  36,
+  38
+ ],
+ "lightmap_encoding": {
+  "rgb": "sRGB-encoded (LM / LMAX); texture.colorSpace = SRGBColorSpace, sampled with uv1 (TEXCOORD_1); irradiance = texel_linear * LMAX",
+  "LMAX": 2.0,
+  "three_lightMapIntensity_if_using_MeshStandardMaterial": 6.28319,
+  "aux": "linear (NoColorSpace), uv1, half resolution: R = sun visibility (soft shadow mask 0..1), G = baked AO (static/dyn) or 1 (ground), B unused",
+  "shading": "out = albedo * cavity(ORM.r) * (LM*LMAX + sunIrr * vis * (dot(Nd,L) - dot(Nd,Ng)*max(dot(Ng,L),0)) * detail) + spec",
+  "sun_irradiance_factor": [
+   1.01859,
+   0.99313,
+   0.95748
+  ],
+  "sun_dir_threejs": [
+   -0.07785,
+   0.7785,
+   0.6228
+  ],
+  "sun_dir_blender": [
+   -0.07785,
+   -0.6228,
+   0.7785
+  ]
+ },
+ "sets": {
+  "attn": {
+   "kind": "static",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 327254,
+   "lm_p1_p50_p99": [
+    0.0061,
+    0.2295,
+    1.1137
+   ],
+   "clipped_frac": 0.0005384909349890069,
+   "files": [
+    "lightmaps/lm_attn.webp",
+    "lightmaps/lm_attn_aux.webp"
+   ]
+  },
+  "ground_attn": {
+   "kind": "ground",
+   "size": [
+    2048,
+    1024
+   ],
+   "bytes": 59124,
+   "lm_p1_p50_p99": [
+    0.2332,
+    0.8822,
+    0.9452
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_ground_attn.webp",
+    "lightmaps/lm_ground_attn_aux.webp"
+   ]
+  },
+  "attn_dyn": {
+   "kind": "dyn",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 865014,
+   "ao_p1_p50": [
+    0.053,
+    0.409
+   ],
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ],
+   "files": [
+    "lightmaps/lm_attn_dyn_aux.webp"
+   ]
+  }
+ },
+ "materials": [
+  {
+   "material": "sand__ground_attn",
+   "index": 0,
+   "surface": "sand",
+   "kind": "sand",
+   "baseColor": "sand_albedo",
+   "normal": "sand_normal",
+   "orm": "sand_orm",
+   "uv0": "tiling, metric / 3.2 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_ground_attn.webp",
+   "lightmap_aux": "lightmaps/lm_ground_attn_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "ground__ground_attn",
+   "index": 1,
+   "surface": "ground",
+   "kind": "loss",
+   "baseColor": "sand_albedo",
+   "normal": "sand_normal",
+   "orm": "sand_orm",
+   "uv0": "tiling, metric / 3.2 m",
+   "glossy": false,
+   "loss": {
+    "clayAlbedo": 65,
+    "clayNormal": 66,
+    "clayOrm": 67,
+    "clayUvScale": 10.66667,
+    "clayMaskAttribute": "COLOR_0.r (animatic 'clay' attribute)",
+    "clayMix": "pow(clay, 0.6)",
+    "grooveStep_m": 0.090909,
+    "grooveHalfWidth": 0.055,
+    "grooveColor_linear": [
+     0.0648,
+     0.016,
+     0.0103
+    ],
+    "grooveBump": 0.55
+   },
+   "note": "sand (uv0) blended into terracotta clay (uv0 * clayUvScale) by COLOR_0; contour grooves computed from world height (see README)",
+   "lightmap": "lightmaps/lm_ground_attn.webp",
+   "lightmap_aux": "lightmaps/lm_ground_attn_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "BoneGlaze__attn",
+   "index": 2,
+   "surface": "BoneGlaze",
+   "kind": "glaze",
+   "baseColor": "glaze_albedo",
+   "normal": "glaze_normal",
+   "orm": "glaze_orm",
+   "uv0": "tiling, metric / 0.25 m",
+   "glossy": true,
+   "lightmap": "lightmaps/lm_attn.webp",
+   "lightmap_aux": "lightmaps/lm_attn_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "terracotta__attn",
+   "index": 3,
+   "surface": "terracotta",
+   "kind": "clay",
+   "baseColor": "clay_terracotta_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_attn.webp",
+   "lightmap_aux": "lightmaps/lm_attn_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "shell_in__attn",
+   "index": 4,
+   "surface": "shell_in",
+   "kind": "misc",
+   "baseColor": "clay_neutral_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "colorFactor_linear": [
+    0.09160424396395683,
+    0.020397660322487354,
+    0.013410379644483328
+   ],
+   "note": "albedo = clay_neutral_albedo (stored x0.5) * 2 * colorFactor",
+   "lightmap": "lightmaps/lm_attn.webp",
+   "lightmap_aux": "lightmaps/lm_attn_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "shell_rim__attn",
+   "index": 5,
+   "surface": "shell_rim",
+   "kind": "misc",
+   "baseColor": "clay_neutral_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "colorFactor_linear": [
+    0.1457490473985672,
+    0.027524699456989765,
+    0.01729543786495924
+   ],
+   "note": "albedo = clay_neutral_albedo (stored x0.5) * 2 * colorFactor",
+   "lightmap": "lightmaps/lm_attn.webp",
+   "lightmap_aux": "lightmaps/lm_attn_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "clayrod__attn_live_dyn",
+   "index": 6,
+   "surface": "clayrod",
+   "kind": "clay",
+   "baseColor": "clay_rod_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_attn_live_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "darkclay__attn",
+   "index": 7,
+   "surface": "darkclay",
+   "kind": "clay",
+   "baseColor": "clay_darkclay_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_attn.webp",
+   "lightmap_aux": "lightmaps/lm_attn_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "terracotta__attn_dyn",
+   "index": 8,
+   "surface": "terracotta",
+   "kind": "clay",
+   "baseColor": "clay_terracotta_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_attn_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "shell_in__attn_dyn",
+   "index": 9,
+   "surface": "shell_in",
+   "kind": "misc",
+   "baseColor": "clay_neutral_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "colorFactor_linear": [
+    0.09160424396395683,
+    0.020397660322487354,
+    0.013410379644483328
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)",
+   "lightmap": null,
+   "ao": "lightmaps/lm_attn_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ]
+  },
+  {
+   "material": "shell_rim__attn_dyn",
+   "index": 10,
+   "surface": "shell_rim",
+   "kind": "misc",
+   "baseColor": "clay_neutral_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "colorFactor_linear": [
+    0.1457490473985672,
+    0.027524699456989765,
+    0.01729543786495924
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)",
+   "lightmap": null,
+   "ao": "lightmaps/lm_attn_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ]
+  },
+  {
+   "material": "BoneGlaze__attn_live_dyn",
+   "index": 11,
+   "surface": "BoneGlaze",
+   "kind": "glaze",
+   "baseColor": "glaze_albedo",
+   "normal": "glaze_normal",
+   "orm": "glaze_orm",
+   "uv0": "tiling, metric / 0.25 m",
+   "glossy": true,
+   "lightmap": null,
+   "ao": "lightmaps/lm_attn_live_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "heat0__attn",
+   "index": 12,
+   "surface": "heat0",
+   "kind": "misc",
+   "baseColor": "clay_neutral_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "colorFactor_linear": [
+    0.046008989214897156,
+    0.011308155488222837,
+    0.007781767984852195
+   ],
+   "note": "albedo = clay_neutral_albedo (stored x0.5) * 2 * colorFactor",
+   "lightmap": "lightmaps/lm_attn.webp",
+   "lightmap_aux": "lightmaps/lm_attn_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "heat2__attn",
+   "index": 13,
+   "surface": "heat2",
+   "kind": "misc",
+   "baseColor": "clay_neutral_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "colorFactor_linear": [
+    0.09160424396395683,
+    0.020397660322487354,
+    0.013410379644483328
+   ],
+   "note": "albedo = clay_neutral_albedo (stored x0.5) * 2 * colorFactor",
+   "lightmap": "lightmaps/lm_attn.webp",
+   "lightmap_aux": "lightmaps/lm_attn_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "heat5__attn",
+   "index": 14,
+   "surface": "heat5",
+   "kind": "misc",
+   "baseColor": "clay_neutral_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "colorFactor_linear": [
+    0.20760752260684967,
+    0.03572113439440727,
+    0.020778123289346695
+   ],
+   "note": "albedo = clay_neutral_albedo (stored x0.5) * 2 * colorFactor",
+   "lightmap": "lightmaps/lm_attn.webp",
+   "lightmap_aux": "lightmaps/lm_attn_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "clayrod__attn_dyn",
+   "index": 15,
+   "surface": "clayrod",
+   "kind": "clay",
+   "baseColor": "clay_rod_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_attn_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "screen__attn_dyn",
+   "index": 16,
+   "surface": "screen",
+   "kind": "misc",
+   "baseColor": "clay_neutral_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "colorFactor_linear": [
+    0.01599629409611225,
+    0.01599629409611225,
+    0.01599629409611225
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)",
+   "lightmap": null,
+   "ao": "lightmaps/lm_attn_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ]
+  },
+  {
+   "material": "engrave2__attn_dyn",
+   "index": 17,
+   "surface": "engrave2",
+   "kind": "misc",
+   "baseColor": "clay_neutral_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "colorFactor_linear": [
+    0.48514994978904724,
+    0.3762621283531189,
+    0.2622506618499756
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)",
+   "lightmap": null,
+   "ao": "lightmaps/lm_attn_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ]
+  },
+  {
+   "material": "darkclay__attn_dyn",
+   "index": 18,
+   "surface": "darkclay",
+   "kind": "clay",
+   "baseColor": "clay_darkclay_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_attn_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "tablet__attn_dyn",
+   "index": 19,
+   "surface": "tablet",
+   "kind": "misc",
+   "baseColor": "clay_neutral_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "colorFactor_linear": [
+    0.16430173069238663,
+    0.0285414457321167,
+    0.01729543786495924
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)",
+   "lightmap": null,
+   "ao": "lightmaps/lm_attn_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4966000020503998,
+    0.43320000171661377,
+    0.38769999146461487
+   ]
+  }
+ ],
+ "objects": {
+  "ground_attn": {
+   "materials": [
+    "sand__ground_attn",
+    "ground__ground_attn"
+   ],
+   "role": "ground",
+   "lightmap": "ground_attn"
+  },
+  "ATTN_core": {
+   "materials": [
+    "BoneGlaze__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_cup": {
+   "materials": [
+    "terracotta__attn",
+    "shell_in__attn",
+    "shell_rim__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_dk133": {
+   "materials": [
+    "clayrod__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_dk142": {
+   "materials": [
+    "clayrod__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_dk153": {
+   "materials": [
+    "clayrod__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_dk223": {
+   "materials": [
+    "clayrod__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_dk251": {
+   "materials": [
+    "clayrod__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_dk253": {
+   "materials": [
+    "clayrod__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_feed": {
+   "materials": [
+    "darkclay__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok0": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok1": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok10": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok11": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok12": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok13": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok14": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok15": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok16": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok17": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok18": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok19": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok2": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok20": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok21": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok22": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok23": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok24": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok25": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok26": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok27": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok28": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok29": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok3": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok30": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok31": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok32": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok33": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok34": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok35": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok36": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok37": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok38": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok39": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok4": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok40": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok41": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok42": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok43": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok5": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok6": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok7": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok8": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_feed_tok9": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_out1": {
+   "materials": [
+    "darkclay__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_out2": {
+   "materials": [
+    "darkclay__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_pb0": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pb1": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pb2": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pb3": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pb4": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pb5": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pb6": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pb7": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pf0": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pf1": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pf2": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pf3": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pf4": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pf5": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pf6": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_pf7": {
+   "materials": [
+    "terracotta__attn_dyn",
+    "shell_in__attn_dyn",
+    "shell_rim__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th02": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th03": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th12": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th13": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th22": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th23": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th30": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th31": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th32": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th40": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th41": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th42": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th50": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th51": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_th52": {
+   "materials": [
+    "BoneGlaze__attn_live_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_tile00": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile01": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile02": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile03": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile10": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile11": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile12": {
+   "materials": [
+    "heat2__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile13": {
+   "materials": [
+    "heat2__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile20": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile21": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile22": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile23": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile30": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile31": {
+   "materials": [
+    "heat2__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile32": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile33": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile40": {
+   "materials": [
+    "heat2__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile41": {
+   "materials": [
+    "heat5__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile42": {
+   "materials": [
+    "heat2__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile43": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile50": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile51": {
+   "materials": [
+    "heat2__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile52": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tile53": {
+   "materials": [
+    "heat0__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok00": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok01": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok02": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok03": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok10": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok11": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok12": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok13": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok20": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok21": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok22": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok23": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok30": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok31": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok32": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok33": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok40": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok41": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok42": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok43": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok50": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok51": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok52": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_tok53": {
+   "materials": [
+    "terracotta__attn"
+   ],
+   "role": "static",
+   "lightmap": "attn"
+  },
+  "ATTN_coil": {
+   "materials": [
+    "clayrod__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_coil.001": {
+   "materials": [
+    "clayrod__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_coil.002": {
+   "materials": [
+    "clayrod__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_coil.003": {
+   "materials": [
+    "clayrod__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_coil.004": {
+   "materials": [
+    "clayrod__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_Plane": {
+   "materials": [
+    "screen__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_Plane.001": {
+   "materials": [
+    "engrave2__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_Plane.002": {
+   "materials": [
+    "engrave2__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_Plane.003": {
+   "materials": [
+    "screen__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_Plane.004": {
+   "materials": [
+    "engrave2__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_Plane.005": {
+   "materials": [
+    "engrave2__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_Plane.006": {
+   "materials": [
+    "screen__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_Plane.007": {
+   "materials": [
+    "engrave2__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_Plane.008": {
+   "materials": [
+    "engrave2__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_relaybead0.0": {
+   "materials": [
+    "darkclay__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_relaybead0.5": {
+   "materials": [
+    "darkclay__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_tab_FIELD": {
+   "materials": [
+    "tablet__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_tab_OFFICE": {
+   "materials": [
+    "tablet__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ATTN_tab_RELAY": {
+   "materials": [
+    "tablet__attn_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  }
+ },
+ "hidden_in_lightmaps": [],
+ "glb_bytes": 5032356,
+ "textures": [
+  {
+   "name": "sand_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 81360
+  },
+  {
+   "name": "sand_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 48824
+  },
+  {
+   "name": "sand_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 1926
+  },
+  {
+   "name": "glaze_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 134718
+  },
+  {
+   "name": "glaze_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 35568
+  },
+  {
+   "name": "glaze_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 32594
+  },
+  {
+   "name": "clay_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 764858
+  },
+  {
+   "name": "clay_terracotta_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 46996
+  },
+  {
+   "name": "clay_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 41136
+  },
+  {
+   "name": "clay_neutral_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 333498
+  },
+  {
+   "name": "clay_rod_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 69672
+  },
+  {
+   "name": "clay_darkclay_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 52750
+  },
+  {
+   "name": "lm_attn.webp",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 159900
+  },
+  {
+   "name": "lm_attn_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 167354
+  },
+  {
+   "name": "lm_ground_attn.webp",
+   "size": [
+    1024,
+    2048
+   ],
+   "bytes": 41578
+  },
+  {
+   "name": "lm_ground_attn_aux.webp",
+   "size": [
+    512,
+    1024
+   ],
+   "bytes": 17546
+  },
+  {
+   "name": "lm_attn_dyn_aux.webp",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 865014
+  },
+  {
+   "name": "clay_terracotta_albedo.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 46996
+  },
+  {
+   "name": "clay_normal.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 764858
+  },
+  {
+   "name": "clay_orm.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 269112
+  }
+ ],
+ "gpu_texture_memory_MB": 141.3,
+ "notes": "",
+ "triangles": null,
+ "ground_tiles": {
+  "ground_attn": {
+   "bbox": [
+    29.935911178588867,
+    38.627281188964844,
+    25.974971771240234,
+    46.92912292480469
+   ],
+   "polys": 10752,
+   "verts": 10985,
+   "loss_faces": 2,
+   "z": [
+    0.0,
+    2.9137802357581677e-06
+   ]
+  }
+ }
+}

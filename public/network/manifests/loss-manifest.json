@@ -1,0 +1,910 @@
+{
+ "scene": "loss",
+ "about": "PrimeArc 'loss' baked-lighting asset. Blender Z-up metres; GLB is glTF Y-up (x, z, -y). See /workspace/primearc/rebuild/README.md.",
+ "glb": "loss-baked.glb",
+ "bake_pose_t": 47.6,
+ "verify_times": [
+  41,
+  44,
+  47
+ ],
+ "lightmap_encoding": {
+  "rgb": "sRGB-encoded (LM / LMAX); texture.colorSpace = SRGBColorSpace, sampled with uv1 (TEXCOORD_1); irradiance = texel_linear * LMAX",
+  "LMAX": 2.0,
+  "three_lightMapIntensity_if_using_MeshStandardMaterial": 6.28319,
+  "aux": "linear (NoColorSpace), uv1, half resolution: R = sun visibility (soft shadow mask 0..1), G = baked AO (static/dyn) or 1 (ground), B unused",
+  "shading": "out = albedo * cavity(ORM.r) * (LM*LMAX + sunIrr * vis * (dot(Nd,L) - dot(Nd,Ng)*max(dot(Ng,L),0)) * detail) + spec",
+  "sun_irradiance_factor": [
+   1.01859,
+   0.99313,
+   0.95748
+  ],
+  "sun_dir_threejs": [
+   -0.07785,
+   0.7785,
+   0.6228
+  ],
+  "sun_dir_blender": [
+   -0.07785,
+   -0.6228,
+   0.7785
+  ]
+ },
+ "sets": {
+  "loss": {
+   "kind": "static",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 156194,
+   "lm_p1_p50_p99": [
+    0.0271,
+    0.0897,
+    1.082
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_loss.webp",
+    "lightmaps/lm_loss_aux.webp"
+   ]
+  },
+  "ground_loss": {
+   "kind": "ground",
+   "size": [
+    1024,
+    2048
+   ],
+   "bytes": 36622,
+   "lm_p1_p50_p99": [
+    0.6778,
+    0.8905,
+    1.0392
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_ground_loss.webp",
+    "lightmaps/lm_ground_loss_aux.webp"
+   ]
+  },
+  "loss_dyn": {
+   "kind": "dyn",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 290216,
+   "ao_p1_p50": [
+    0.028,
+    0.482
+   ],
+   "ambient_linear": [
+    0.15950000286102295,
+    0.13120000064373016,
+    0.1054999977350235
+   ],
+   "files": [
+    "lightmaps/lm_loss_dyn_aux.webp"
+   ]
+  }
+ },
+ "materials": [
+  {
+   "material": "sand__ground_loss",
+   "index": 0,
+   "surface": "sand",
+   "kind": "sand",
+   "baseColor": "sand_albedo",
+   "normal": "sand_normal",
+   "orm": "sand_orm",
+   "uv0": "tiling, metric / 3.2 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_ground_loss.webp",
+   "lightmap_aux": "lightmaps/lm_ground_loss_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "ground__ground_loss",
+   "index": 1,
+   "surface": "ground",
+   "kind": "loss",
+   "baseColor": "sand_albedo",
+   "normal": "sand_normal",
+   "orm": "sand_orm",
+   "uv0": "tiling, metric / 3.2 m",
+   "glossy": false,
+   "loss": {
+    "clayAlbedo": 23,
+    "clayNormal": 24,
+    "clayOrm": 25,
+    "clayUvScale": 10.66667,
+    "clayMaskAttribute": "COLOR_0.r (animatic 'clay' attribute)",
+    "clayMix": "pow(clay, 0.6)",
+    "grooveStep_m": 0.090909,
+    "grooveHalfWidth": 0.055,
+    "grooveColor_linear": [
+     0.0648,
+     0.016,
+     0.0103
+    ],
+    "grooveBump": 0.55
+   },
+   "note": "sand (uv0) blended into terracotta clay (uv0 * clayUvScale) by COLOR_0; contour grooves computed from world height (see README)",
+   "lightmap": "lightmaps/lm_ground_loss.webp",
+   "lightmap_aux": "lightmaps/lm_ground_loss_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "BoneGlaze__loss_dyn",
+   "index": 2,
+   "surface": "BoneGlaze",
+   "kind": "glaze",
+   "baseColor": "glaze_albedo",
+   "normal": "glaze_normal",
+   "orm": "glaze_orm",
+   "uv0": "tiling, metric / 0.25 m",
+   "glossy": true,
+   "lightmap": null,
+   "ao": "lightmaps/lm_loss_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.15950000286102295,
+    0.13120000064373016,
+    0.1054999977350235
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "clayrod__loss",
+   "index": 3,
+   "surface": "clayrod",
+   "kind": "clay",
+   "baseColor": "clay_rod_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_loss.webp",
+   "lightmap_aux": "lightmaps/lm_loss_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "clayrod__loss_dyn",
+   "index": 4,
+   "surface": "clayrod",
+   "kind": "clay",
+   "baseColor": "clay_rod_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_loss_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.15950000286102295,
+    0.13120000064373016,
+    0.1054999977350235
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "darkclay__loss_dyn",
+   "index": 5,
+   "surface": "darkclay",
+   "kind": "clay",
+   "baseColor": "clay_darkclay_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_loss_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.15950000286102295,
+    0.13120000064373016,
+    0.1054999977350235
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  }
+ ],
+ "objects": {
+  "ground_loss": {
+   "materials": [
+    "sand__ground_loss",
+    "ground__ground_loss"
+   ],
+   "role": "ground",
+   "lightmap": "ground_loss"
+  },
+  "LOSS_ball": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead0": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead1": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead10": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead11": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead12": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead13": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead14": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead15": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead16": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead17": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead18": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead19": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead2": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead20": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead21": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead22": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead23": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead24": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead25": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead26": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead27": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead28": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead29": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead3": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead30": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead31": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead32": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead33": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead34": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead35": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead36": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead37": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead38": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead39": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead4": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead5": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead6": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead7": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead8": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_bead9": {
+   "materials": [
+    "BoneGlaze__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_dent0": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent1": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent10": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent11": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent12": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent13": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent2": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent3": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent4": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent5": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent6": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent7": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent8": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_dent9": {
+   "materials": [
+    "clayrod__loss"
+   ],
+   "role": "static",
+   "lightmap": "loss"
+  },
+  "LOSS_pin0": {
+   "materials": [
+    "clayrod__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pin1": {
+   "materials": [
+    "clayrod__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pin2": {
+   "materials": [
+    "clayrod__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pin3": {
+   "materials": [
+    "clayrod__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pin4": {
+   "materials": [
+    "clayrod__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pin5": {
+   "materials": [
+    "clayrod__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pinhead0": {
+   "materials": [
+    "darkclay__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pinhead1": {
+   "materials": [
+    "darkclay__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pinhead2": {
+   "materials": [
+    "darkclay__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pinhead3": {
+   "materials": [
+    "darkclay__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pinhead4": {
+   "materials": [
+    "darkclay__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "LOSS_pinhead5": {
+   "materials": [
+    "darkclay__loss_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  }
+ },
+ "hidden_in_lightmaps": [
+  "LOSS_ball",
+  "LOSS_bead0",
+  "LOSS_bead1",
+  "LOSS_bead10",
+  "LOSS_bead11",
+  "LOSS_bead12",
+  "LOSS_bead13",
+  "LOSS_bead14",
+  "LOSS_bead15",
+  "LOSS_bead16",
+  "LOSS_bead17",
+  "LOSS_bead18",
+  "LOSS_bead19",
+  "LOSS_bead2",
+  "LOSS_bead20",
+  "LOSS_bead21",
+  "LOSS_bead22",
+  "LOSS_bead23",
+  "LOSS_bead24",
+  "LOSS_bead25",
+  "LOSS_bead26",
+  "LOSS_bead27",
+  "LOSS_bead28",
+  "LOSS_bead29",
+  "LOSS_bead3",
+  "LOSS_bead30",
+  "LOSS_bead31",
+  "LOSS_bead32",
+  "LOSS_bead33",
+  "LOSS_bead34",
+  "LOSS_bead35",
+  "LOSS_bead36",
+  "LOSS_bead37",
+  "LOSS_bead38",
+  "LOSS_bead39",
+  "LOSS_bead4",
+  "LOSS_bead5",
+  "LOSS_bead6",
+  "LOSS_bead7",
+  "LOSS_bead8",
+  "LOSS_bead9",
+  "LOSS_pin0",
+  "LOSS_pin1",
+  "LOSS_pin2",
+  "LOSS_pin3",
+  "LOSS_pin4",
+  "LOSS_pin5",
+  "LOSS_pinhead0",
+  "LOSS_pinhead1",
+  "LOSS_pinhead2",
+  "LOSS_pinhead3",
+  "LOSS_pinhead4",
+  "LOSS_pinhead5"
+ ],
+ "glb_bytes": 3425060,
+ "textures": [
+  {
+   "name": "sand_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 81360
+  },
+  {
+   "name": "sand_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 48824
+  },
+  {
+   "name": "sand_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 1926
+  },
+  {
+   "name": "glaze_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 134718
+  },
+  {
+   "name": "glaze_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 35568
+  },
+  {
+   "name": "glaze_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 32594
+  },
+  {
+   "name": "clay_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 764858
+  },
+  {
+   "name": "clay_rod_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 69672
+  },
+  {
+   "name": "clay_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 41136
+  },
+  {
+   "name": "clay_darkclay_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 52750
+  },
+  {
+   "name": "lm_loss.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 71048
+  },
+  {
+   "name": "lm_loss_aux.webp",
+   "size": [
+    512,
+    512
+   ],
+   "bytes": 85146
+  },
+  {
+   "name": "lm_ground_loss.webp",
+   "size": [
+    2048,
+    1024
+   ],
+   "bytes": 35014
+  },
+  {
+   "name": "lm_ground_loss_aux.webp",
+   "size": [
+    1024,
+    512
+   ],
+   "bytes": 1608
+  },
+  {
+   "name": "lm_loss_dyn_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 290216
+  },
+  {
+   "name": "clay_terracotta_albedo.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 46996
+  },
+  {
+   "name": "clay_normal.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 764858
+  },
+  {
+   "name": "clay_orm.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 269112
+  }
+ ],
+ "gpu_texture_memory_MB": 94.7,
+ "notes": "",
+ "triangles": null,
+ "ground_tiles": {
+  "ground_loss": {
+   "bbox": [
+    38.627281188964844,
+    79.02728271484375,
+    13.974970817565918,
+    35.974971771240234
+   ],
+   "polys": 88880,
+   "verts": 89505,
+   "loss_faces": 64014,
+   "z": [
+    -0.566649317741394,
+    1.2295321226119995
+   ]
+  }
+ }
+}

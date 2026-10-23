@@ -1,0 +1,152 @@
+{
+ "yaw_deg": -45,
+ "slot_half": 0.35,
+ "half_w": 3.6,
+ "depth": 6.4,
+ "left_offset": 0.3,
+ "box_h": 1.55,
+ "lid_h": 1.15,
+ "band_over": 0.14,
+ "groove_h": 0.075,
+ "groove_depth": 0.16,
+ "box_inset": 0.32,
+ "post_gap": 1.05,
+ "post_r": 0.12,
+ "plate_h": 0.14,
+ "box0_lift": 0.12,
+ "plate_lo": [
+  -5.1,
+  -4.05
+ ],
+ "plate_hi": [
+  4.7,
+  5.0
+ ],
+ "panel_w": 0.78,
+ "panel_h": 0.92,
+ "panel_depth": 0.15,
+ "panel_pitch": 1.0,
+ "cell": 0.25,
+ "cell_dx": 0.34,
+ "cell_dz": 0.29,
+ "cell_bevel": 0.09,
+ "tray_inset": 0.28,
+ "tray_depth": 0.14,
+ "spine_r": 0.27,
+ "spine_above_lid": 1.2,
+ "cap_r": 0.5,
+ "pulse_xy": 1.6,
+ "explode": {
+  "block_rise": 4.1,
+  "lid_lift": 2.2,
+  "lid_tilt_deg": 9.0,
+  "t0": [
+   20.5,
+   22.4,
+   24.3,
+   26.2
+  ],
+  "dur": [
+   2.2,
+   2.2,
+   2.2,
+   2.2
+  ],
+  "close_t0": 37.0,
+  "close_dur": 2.0,
+  "ease": "smootherstep",
+  "cap_clear": 0.3
+ },
+ "fog": {
+  "mist_start": 34.0,
+  "mist_depth": 42.0
+ },
+ "tray_floor_h": 0.03,
+ "trayfill": {
+  "w_per_half": 150.0,
+  "color": "#FFF7EE",
+  "note": "area light under each lid half, energy * o_k (live: RectAreaLight intensity * o_k); v6: 260->150 W and a more neutral colour so the terracotta keeps the ref darkness (no flat/pink)"
+ },
+ "props": {
+  "hero_du": 0.15,
+  "hero_v_front": 0.4,
+  "note": "v6: tray props shifted off the spine strip: outward (away from the gap) by hero_du and toward the camera side (front) ; AUDIT/DESIGN fill ~60% of the tray",
+  "left_items": {
+   "0": [
+    [
+     -0.4,
+     -0.8,
+     0.8
+    ],
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     -0.6,
+     -2.4,
+     0.7
+    ]
+   ],
+   "1": [
+    [
+     0.4,
+     0.6,
+     0.9
+    ],
+    [
+     -0.4,
+     -1.4,
+     0.7
+    ]
+   ],
+   "2": [
+    [
+     0.9,
+     1.7,
+     1.0
+    ],
+    [
+     0.0,
+     1.1,
+     1.0
+    ],
+    [
+     0.2,
+     0.0,
+     1.0
+    ]
+   ],
+   "3": [
+    [
+     0.3,
+     1.4,
+     1.0
+    ],
+    [
+     -0.2,
+     -1.3,
+     1.0
+    ]
+   ]
+  },
+  "left_items_note": "v7 fix3: per-item (du,dv,scale) for LEFT trays from per-item spine-projection search (14px margin, frames k0@22.2 k1@24.1 k2@26.0+27.9 k3@27.9); scale 0 = dropped (AUDIT back ledger stack, no feasible spot)"
+ },
+ "scene_rules": {
+  "fade_out": [
+   16.5,
+   18.0
+  ],
+  "fade_in": [
+   29.0,
+   31.0
+  ]
+ },
+ "v6_proportion_note": "v6: box_h 1.32->1.55, post_gap 0.5->1.05 so the closed stack reads slender/airy like the ref sketch (ref h:w ~2.3, v5 ~1.5); block_rise 4.6->4.1 keeps the open pitch ~7.85 m (v5 7.57) so the explode spacing/timing is unchanged in feel.",
+ "half_w_left": 4.0,
+ "lid_grooves": 3,
+ "lid_bevel": 0.1,
+ "v7_note": "v7: lid = one slab (lid_h) with lid_grooves grooves groove_h tall, groove_depth deep, cut all round; left half 4.0 m wide (right 3.6) + left_offset 1.1->0.3 so the visible fronts are equal at the hold (projected ratio 0.98, v6 0.80); plate grown 0.4 m on the left.",
+ "groove_note": "v7 review: 0.11/0.22 still read as 4 stacked fins at the hold; thinner/shallower grooves -> one thick slab with cut lines (land 0.23 m)"
+}

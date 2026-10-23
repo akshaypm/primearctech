@@ -1,0 +1,899 @@
+{
+ "scene": "loader",
+ "about": "PrimeArc 'loader' baked-lighting asset. Blender Z-up metres; GLB is glTF Y-up (x, z, -y). See /workspace/primearc/rebuild/README.md.",
+ "glb": "loader-baked.glb",
+ "bake_pose_t": 8.0,
+ "verify_times": [
+  1.5,
+  3.0
+ ],
+ "lightmap_encoding": {
+  "rgb": "sRGB-encoded (LM / LMAX); texture.colorSpace = SRGBColorSpace, sampled with uv1 (TEXCOORD_1); irradiance = texel_linear * LMAX",
+  "LMAX": 2.0,
+  "three_lightMapIntensity_if_using_MeshStandardMaterial": 6.28319,
+  "aux": "linear (NoColorSpace), uv1, half resolution: R = sun visibility (soft shadow mask 0..1), G = baked AO (static/dyn) or 1 (ground), B unused",
+  "shading": "out = albedo * cavity(ORM.r) * (LM*LMAX + sunIrr * vis * (dot(Nd,L) - dot(Nd,Ng)*max(dot(Ng,L),0)) * detail) + spec",
+  "sun_irradiance_factor": [
+   1.01859,
+   0.99313,
+   0.95748
+  ],
+  "sun_dir_threejs": [
+   -0.07785,
+   0.7785,
+   0.6228
+  ],
+  "sun_dir_blender": [
+   -0.07785,
+   -0.6228,
+   0.7785
+  ]
+ },
+ "sets": {
+  "ground_hero_empty": {
+   "kind": "ground_empty",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 139070,
+   "lm_p1_p50_p99": [
+    0.8784,
+    0.8839,
+    0.8893
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_ground_hero_empty.webp",
+    "lightmaps/lm_ground_hero_empty_aux.webp"
+   ]
+  },
+  "loader_dyn": {
+   "kind": "dyn",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 420424,
+   "ao_p1_p50": [
+    0.05,
+    0.536
+   ],
+   "ambient_linear": [
+    0.43619999289512634,
+    0.3702999949455261,
+    0.2919999957084656
+   ],
+   "ambient_hemi": {
+    "up": [
+     0.4331,
+     0.4047,
+     0.3688
+    ],
+    "down": [
+     0.4378,
+     0.3672,
+     0.2848
+    ],
+    "ao": 0,
+    "dir": {
+     "a": [
+      0.4354,
+      0.3859,
+      0.3268
+     ],
+     "bx": [
+      0.0962,
+      0.091,
+      0.0845
+     ],
+     "by": [
+      0.2021,
+      0.1992,
+      0.194
+     ],
+     "bz": [
+      -0.0028,
+      0.0183,
+      0.0416
+     ]
+    }
+   },
+   "files": [
+    "lightmaps/lm_loader_dyn_aux.webp"
+   ]
+  }
+ },
+ "materials": [
+  {
+   "material": "clayrod__loader_dyn",
+   "index": 0,
+   "surface": "clayrod",
+   "kind": "clay",
+   "baseColor": "clay_rod_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_loader_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.43619999289512634,
+    0.3702999949455261,
+    0.2919999957084656
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "BoneGlaze__loader_dyn",
+   "index": 1,
+   "surface": "BoneGlaze",
+   "kind": "glaze",
+   "baseColor": "glaze_albedo",
+   "normal": "glaze_normal",
+   "orm": "glaze_orm",
+   "uv0": "tiling, metric / 0.25 m",
+   "glossy": true,
+   "lightmap": null,
+   "ao": "lightmaps/lm_loader_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.43619999289512634,
+    0.3702999949455261,
+    0.2919999957084656
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "terracotta__loader_dyn",
+   "index": 2,
+   "surface": "terracotta",
+   "kind": "clay",
+   "baseColor": "clay_terracotta_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_loader_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.43619999289512634,
+    0.3702999949455261,
+    0.2919999957084656
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "darkclay__loader_dyn",
+   "index": 3,
+   "surface": "darkclay",
+   "kind": "clay",
+   "baseColor": "clay_darkclay_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_loader_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.43619999289512634,
+    0.3702999949455261,
+    0.2919999957084656
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  }
+ ],
+ "objects": {
+  "HERO_e0_0_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_0_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_1_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_1_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_2_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_2_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_2_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_3_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_3_2": {
+   "materials": [
+    "BoneGlaze__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_4_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_4_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_4_3": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_5_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_5_3": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_5_4": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_6_3": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_6_4": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_7_3": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_7_4": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_7_5": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_8_4": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_8_5": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_9_4": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e0_9_5": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_0_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_0_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_0_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_0_3": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_1_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_1_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_1_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_1_3": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_2_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_2_1": {
+   "materials": [
+    "BoneGlaze__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_2_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_2_3": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_3_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_3_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_3_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_3_3": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_4_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_4_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_4_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_4_3": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_5_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_5_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_5_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e1_5_3": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_0_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_0_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_0_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_1_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_1_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_1_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_2_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_2_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_2_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_3_0": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_3_1": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_e2_3_2": {
+   "materials": [
+    "clayrod__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n0_0": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n0_1": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n0_2": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n0_3": {
+   "materials": [
+    "BoneGlaze__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n0_4": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n0_5": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n0_6": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n0_7": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n0_8": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n0_9": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n1_0": {
+   "materials": [
+    "darkclay__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n1_1": {
+   "materials": [
+    "darkclay__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n1_2": {
+   "materials": [
+    "BoneGlaze__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n1_3": {
+   "materials": [
+    "darkclay__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n1_4": {
+   "materials": [
+    "darkclay__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n1_5": {
+   "materials": [
+    "darkclay__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n2_0": {
+   "materials": [
+    "darkclay__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n2_1": {
+   "materials": [
+    "BoneGlaze__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n2_2": {
+   "materials": [
+    "darkclay__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n2_3": {
+   "materials": [
+    "darkclay__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n3_0": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n3_1": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_n3_2": {
+   "materials": [
+    "terracotta__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_pulse0": {
+   "materials": [
+    "BoneGlaze__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_pulse1": {
+   "materials": [
+    "BoneGlaze__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_pulse2": {
+   "materials": [
+    "BoneGlaze__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_pulse3": {
+   "materials": [
+    "BoneGlaze__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_pulse4": {
+   "materials": [
+    "BoneGlaze__loader_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  }
+ },
+ "hidden_in_lightmaps": [],
+ "glb_bytes": 2746948,
+ "textures": [
+  {
+   "name": "clay_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 764858
+  },
+  {
+   "name": "clay_rod_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 69672
+  },
+  {
+   "name": "clay_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 41136
+  },
+  {
+   "name": "glaze_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 134718
+  },
+  {
+   "name": "glaze_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 35568
+  },
+  {
+   "name": "glaze_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 32594
+  },
+  {
+   "name": "clay_terracotta_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 46996
+  },
+  {
+   "name": "clay_darkclay_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 52750
+  },
+  {
+   "name": "lm_ground_hero_empty.webp",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 27832
+  },
+  {
+   "name": "lm_ground_hero_empty_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 111238
+  },
+  {
+   "name": "lm_loader_dyn_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 420424
+  }
+ ],
+ "gpu_texture_memory_MB": 74.7,
+ "notes": "",
+ "triangles": null,
+ "ground_tiles": {}
+}

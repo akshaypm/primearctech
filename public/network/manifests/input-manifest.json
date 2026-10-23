@@ -1,0 +1,1779 @@
+{
+ "scene": "input",
+ "about": "PrimeArc 'input' baked-lighting asset. Blender Z-up metres; GLB is glTF Y-up (x, z, -y). See /workspace/primearc/rebuild/README.md.",
+ "glb": "input-baked.glb",
+ "bake_pose_t": 15.0,
+ "verify_times": [
+  13,
+  15,
+  17
+ ],
+ "lightmap_encoding": {
+  "rgb": "sRGB-encoded (LM / LMAX); texture.colorSpace = SRGBColorSpace, sampled with uv1 (TEXCOORD_1); irradiance = texel_linear * LMAX",
+  "LMAX": 2.0,
+  "three_lightMapIntensity_if_using_MeshStandardMaterial": 6.28319,
+  "aux": "linear (NoColorSpace), uv1, half resolution: R = sun visibility (soft shadow mask 0..1), G = baked AO (static/dyn) or 1 (ground), B unused",
+  "shading": "out = albedo * cavity(ORM.r) * (LM*LMAX + sunIrr * vis * (dot(Nd,L) - dot(Nd,Ng)*max(dot(Ng,L),0)) * detail) + spec",
+  "sun_irradiance_factor": [
+   1.01859,
+   0.99313,
+   0.95748
+  ],
+  "sun_dir_threejs": [
+   -0.07785,
+   0.7785,
+   0.6228
+  ],
+  "sun_dir_blender": [
+   -0.07785,
+   -0.6228,
+   0.7785
+  ]
+ },
+ "sets": {
+  "input": {
+   "kind": "static",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 195654,
+   "lm_p1_p50_p99": [
+    0.0037,
+    0.5553,
+    1.1921
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_input.webp",
+    "lightmaps/lm_input_aux.webp"
+   ]
+  },
+  "ground_input": {
+   "kind": "ground",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 109450,
+   "lm_p1_p50_p99": [
+    0.1007,
+    0.8815,
+    0.8964
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_ground_input.webp",
+    "lightmaps/lm_ground_input_aux.webp"
+   ]
+  },
+  "input_dyn": {
+   "kind": "dyn",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 149584,
+   "ao_p1_p50": [
+    0.021,
+    0.481
+   ],
+   "ambient_linear": [
+    0.4763999879360199,
+    0.42879998683929443,
+    0.37880000472068787
+   ],
+   "files": [
+    "lightmaps/lm_input_dyn_aux.webp"
+   ]
+  }
+ },
+ "materials": [
+  {
+   "material": "sand__ground_input",
+   "index": 0,
+   "surface": "sand",
+   "kind": "sand",
+   "baseColor": "sand_albedo",
+   "normal": "sand_normal",
+   "orm": "sand_orm",
+   "uv0": "tiling, metric / 3.2 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_ground_input.webp",
+   "lightmap_aux": "lightmaps/lm_ground_input_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "clayrod__input",
+   "index": 1,
+   "surface": "clayrod",
+   "kind": "clay",
+   "baseColor": "clay_rod_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_input.webp",
+   "lightmap_aux": "lightmaps/lm_input_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "darkclay__input_dyn",
+   "index": 2,
+   "surface": "darkclay",
+   "kind": "clay",
+   "baseColor": "clay_darkclay_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_input_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4763999879360199,
+    0.42879998683929443,
+    0.37880000472068787
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "terracotta__input",
+   "index": 3,
+   "surface": "terracotta",
+   "kind": "clay",
+   "baseColor": "clay_terracotta_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_input.webp",
+   "lightmap_aux": "lightmaps/lm_input_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "terracotta__input_dyn",
+   "index": 4,
+   "surface": "terracotta",
+   "kind": "clay",
+   "baseColor": "clay_terracotta_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_input_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4763999879360199,
+    0.42879998683929443,
+    0.37880000472068787
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "darkclay__input",
+   "index": 5,
+   "surface": "darkclay",
+   "kind": "clay",
+   "baseColor": "clay_darkclay_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_input.webp",
+   "lightmap_aux": "lightmaps/lm_input_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "BoneGlaze__input_dyn",
+   "index": 6,
+   "surface": "BoneGlaze",
+   "kind": "glaze",
+   "baseColor": "glaze_albedo",
+   "normal": "glaze_normal",
+   "orm": "glaze_orm",
+   "uv0": "tiling, metric / 0.25 m",
+   "glossy": true,
+   "lightmap": null,
+   "ao": "lightmaps/lm_input_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4763999879360199,
+    0.42879998683929443,
+    0.37880000472068787
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  }
+ ],
+ "objects": {
+  "ground_input": {
+   "materials": [
+    "sand__ground_input"
+   ],
+   "role": "ground",
+   "lightmap": "ground_input"
+  },
+  "INPUT_bbar": {
+   "materials": [
+    "clayrod__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_blade": {
+   "materials": [
+    "darkclay__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_bpost-1": {
+   "materials": [
+    "clayrod__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_bpost1": {
+   "materials": [
+    "clayrod__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_call3": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_call5": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_call8": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_dice00": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_dice01": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_dice10": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_dice11": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_dice20": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_dice21": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_feed0": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_feed1": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_feed2": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_feed3": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_fgcall2": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_fgcall5": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_fginvoice1": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_fginvoice4": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_fginvoice7": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_fgticket0": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_fgticket3": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_fgticket6": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_invoice1": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_invoice2": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_invoice7": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_ticket0": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_ticket4": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_ticket6": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_ticket9": {
+   "materials": [
+    "terracotta__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_track": {
+   "materials": [
+    "darkclay__input"
+   ],
+   "role": "static",
+   "lightmap": "input"
+  },
+  "INPUT_tok2": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok3": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok4": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok5": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok6": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok7": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok8": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok9": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok10": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok11": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok12": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok13": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok14": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok15": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok16": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok17": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok18": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok19": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok20": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok21": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok22": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok23": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok24": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok25": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok26": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok27": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok28": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok29": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok30": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok31": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok32": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok33": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok34": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok35": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok36": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok37": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok38": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok39": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok40": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok41": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok42": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok43": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok44": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok45": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok46": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok47": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok48": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok49": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok50": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok51": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok52": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok53": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok54": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok55": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok56": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok57": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok58": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok59": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok60": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok61": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok62": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok63": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok64": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok65": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok66": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok67": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok68": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok69": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok70": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok71": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok72": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok73": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok74": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok75": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok76": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok77": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok78": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok79": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok80": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok81": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok82": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok83": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok84": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok85": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok86": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok87": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok88": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok89": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok90": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok91": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok92": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok93": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok94": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok95": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok96": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok97": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok98": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok99": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok100": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok101": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok102": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok103": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok104": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok105": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok106": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok107": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok108": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok109": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok110": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok111": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok112": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok113": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok114": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok115": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok116": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok117": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok118": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok119": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok120": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok121": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok122": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok123": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok124": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok125": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok126": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok127": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok128": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok129": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok130": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok131": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok132": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok133": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok134": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok135": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok136": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok137": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok138": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok139": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok140": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok141": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok142": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok143": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok144": {
+   "materials": [
+    "BoneGlaze__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok145": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok146": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok147": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "INPUT_tok148": {
+   "materials": [
+    "terracotta__input_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  }
+ },
+ "hidden_in_lightmaps": [
+  "INPUT_feed0",
+  "INPUT_feed1",
+  "INPUT_feed2",
+  "INPUT_feed3",
+  "INPUT_tok2",
+  "INPUT_tok3",
+  "INPUT_tok4",
+  "INPUT_tok5",
+  "INPUT_tok6",
+  "INPUT_tok7",
+  "INPUT_tok8",
+  "INPUT_tok9",
+  "INPUT_tok10",
+  "INPUT_tok11",
+  "INPUT_tok12",
+  "INPUT_tok13",
+  "INPUT_tok14",
+  "INPUT_tok15",
+  "INPUT_tok16",
+  "INPUT_tok17",
+  "INPUT_tok18",
+  "INPUT_tok19",
+  "INPUT_tok20",
+  "INPUT_tok21",
+  "INPUT_tok22",
+  "INPUT_tok23",
+  "INPUT_tok24",
+  "INPUT_tok25",
+  "INPUT_tok26",
+  "INPUT_tok27",
+  "INPUT_tok28",
+  "INPUT_tok29",
+  "INPUT_tok30",
+  "INPUT_tok31",
+  "INPUT_tok32",
+  "INPUT_tok33",
+  "INPUT_tok34",
+  "INPUT_tok35",
+  "INPUT_tok36",
+  "INPUT_tok37",
+  "INPUT_tok38",
+  "INPUT_tok39",
+  "INPUT_tok40",
+  "INPUT_tok41",
+  "INPUT_tok42",
+  "INPUT_tok43",
+  "INPUT_tok44",
+  "INPUT_tok45",
+  "INPUT_tok46",
+  "INPUT_tok47",
+  "INPUT_tok48",
+  "INPUT_tok49",
+  "INPUT_tok50",
+  "INPUT_tok51",
+  "INPUT_tok52",
+  "INPUT_tok53",
+  "INPUT_tok54",
+  "INPUT_tok55",
+  "INPUT_tok56",
+  "INPUT_tok57",
+  "INPUT_tok58",
+  "INPUT_tok59",
+  "INPUT_tok60",
+  "INPUT_tok61",
+  "INPUT_tok62",
+  "INPUT_tok63",
+  "INPUT_tok64",
+  "INPUT_tok65",
+  "INPUT_tok66",
+  "INPUT_tok67",
+  "INPUT_tok68",
+  "INPUT_tok69",
+  "INPUT_tok70",
+  "INPUT_tok71",
+  "INPUT_tok72",
+  "INPUT_tok73",
+  "INPUT_tok74",
+  "INPUT_tok75",
+  "INPUT_tok76",
+  "INPUT_tok77",
+  "INPUT_tok78",
+  "INPUT_tok79",
+  "INPUT_tok80",
+  "INPUT_tok81",
+  "INPUT_tok82",
+  "INPUT_tok83",
+  "INPUT_tok84",
+  "INPUT_tok85",
+  "INPUT_tok86",
+  "INPUT_tok87",
+  "INPUT_tok88",
+  "INPUT_tok89",
+  "INPUT_tok90",
+  "INPUT_tok91",
+  "INPUT_tok92",
+  "INPUT_tok93",
+  "INPUT_tok94",
+  "INPUT_tok95",
+  "INPUT_tok96",
+  "INPUT_tok97",
+  "INPUT_tok98",
+  "INPUT_tok99",
+  "INPUT_tok100",
+  "INPUT_tok101",
+  "INPUT_tok102",
+  "INPUT_tok103",
+  "INPUT_tok104",
+  "INPUT_tok105",
+  "INPUT_tok106",
+  "INPUT_tok107",
+  "INPUT_tok108",
+  "INPUT_tok109",
+  "INPUT_tok110",
+  "INPUT_tok111",
+  "INPUT_tok112",
+  "INPUT_tok113",
+  "INPUT_tok114",
+  "INPUT_tok115",
+  "INPUT_tok116",
+  "INPUT_tok117",
+  "INPUT_tok118",
+  "INPUT_tok119",
+  "INPUT_tok120",
+  "INPUT_tok121",
+  "INPUT_tok122",
+  "INPUT_tok123",
+  "INPUT_tok124",
+  "INPUT_tok125",
+  "INPUT_tok126",
+  "INPUT_tok127",
+  "INPUT_tok128",
+  "INPUT_tok129",
+  "INPUT_tok130",
+  "INPUT_tok131",
+  "INPUT_tok132",
+  "INPUT_tok133",
+  "INPUT_tok134",
+  "INPUT_tok135",
+  "INPUT_tok136",
+  "INPUT_tok137",
+  "INPUT_tok138",
+  "INPUT_tok139",
+  "INPUT_tok140",
+  "INPUT_tok141",
+  "INPUT_tok142",
+  "INPUT_tok143",
+  "INPUT_tok144",
+  "INPUT_tok145",
+  "INPUT_tok146",
+  "INPUT_tok147",
+  "INPUT_tok148"
+ ],
+ "glb_bytes": 2046744,
+ "textures": [
+  {
+   "name": "sand_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 81360
+  },
+  {
+   "name": "sand_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 48824
+  },
+  {
+   "name": "sand_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 1926
+  },
+  {
+   "name": "clay_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 764858
+  },
+  {
+   "name": "clay_rod_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 69672
+  },
+  {
+   "name": "clay_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 41136
+  },
+  {
+   "name": "clay_darkclay_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 52750
+  },
+  {
+   "name": "clay_terracotta_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 46996
+  },
+  {
+   "name": "glaze_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 134718
+  },
+  {
+   "name": "glaze_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 35568
+  },
+  {
+   "name": "glaze_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 32594
+  },
+  {
+   "name": "lm_input.webp",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 101030
+  },
+  {
+   "name": "lm_input_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 94624
+  },
+  {
+   "name": "lm_ground_input.webp",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 84814
+  },
+  {
+   "name": "lm_ground_input_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 24636
+  },
+  {
+   "name": "lm_input_dyn_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 149584
+  }
+ ],
+ "gpu_texture_memory_MB": 117.3,
+ "notes": "",
+ "triangles": null,
+ "ground_tiles": {
+  "ground_input": {
+   "bbox": [
+    7.935912132263184,
+    25.935911178588867,
+    -5.968225955963135,
+    22.974971771240234
+   ],
+   "polys": 18180,
+   "verts": 18473,
+   "loss_faces": 0,
+   "z": [
+    0.0,
+    0.0
+   ]
+  }
+ }
+}

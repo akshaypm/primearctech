@@ -1,0 +1,473 @@
+.net {
+  --sand: #e4d8c4;
+  --surface: #efe6d6;
+  --ink: #222222;
+  --secondary: #6b5646;
+  --terracotta: #843829;
+  --clay: #5c2a21;
+  --bone: #f3ede1;
+  min-height: 100vh;
+  background: var(--sand);
+  color: var(--ink);
+  color-scheme: light;
+}
+
+html:has(.net) {
+  scroll-behavior: auto;
+  background: var(--sand);
+  color: var(--ink);
+}
+
+html:has(.net) body {
+  background: var(--sand);
+  color: var(--ink);
+}
+
+.net-spacer {
+  width: 1px;
+  pointer-events: none;
+}
+
+.net-canvas,
+.net-sand {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.net-canvas {
+  display: block;
+  z-index: 0;
+}
+
+.net-sand {
+  z-index: 2;
+  background: var(--sand);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.net-nav,
+.net-copy,
+.net-callouts,
+.net-products,
+.net-foot,
+.net-epoch,
+.net-boot,
+.net-skip {
+  position: fixed;
+  z-index: 3;
+}
+
+.net-nav {
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.1rem 1.4rem 0.8rem;
+  background: var(--bone);
+  border-bottom: 1px solid var(--ink);
+}
+
+.net-mark {
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 500;
+  font-size: 1.05rem;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.net-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.net-links button,
+.net-foot a,
+.net-legal a {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--secondary);
+  background: transparent;
+  border: 0;
+  padding: 0.2rem 0;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.net-links button[data-on="true"] {
+  color: var(--ink);
+}
+
+.net-nav-end {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.net-sound,
+.net-cta,
+.net-skip,
+.net-product,
+.net-fallback a {
+  font-family: var(--font-mono), monospace;
+  text-decoration: none;
+}
+
+.net-sound {
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.net-cta {
+  display: inline-block;
+  background: var(--terracotta);
+  color: var(--bone);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.net-copy {
+  left: 1.4rem;
+  bottom: 1.6rem;
+  width: min(36rem, calc(100% - 2.8rem));
+  pointer-events: none;
+}
+
+.net-copy[data-side="right"] {
+  left: auto;
+  right: 1.4rem;
+}
+
+.net-kicker,
+.net-tag,
+.net-callout,
+.net-product small,
+.net-epoch p,
+.net-boot p,
+.net-stat dt {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--secondary);
+}
+
+.net-copy h1,
+.net-copy h2,
+.net-fallback h1,
+.net-fallback h2 {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 500;
+  font-size: clamp(2.4rem, 5.4vw, 4.8rem);
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  color: var(--ink);
+}
+
+.net-copy h2 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+}
+
+.net-copy p,
+.net-product span,
+.net-fallback p {
+  margin: 0.8rem 0 0;
+  max-width: 34rem;
+  font-size: 1.15rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.net-tag {
+  display: inline-block;
+  margin-top: 0.7rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--terracotta);
+  color: var(--terracotta);
+  letter-spacing: 0.14em;
+}
+
+.net-chips,
+.net-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  margin-top: 1rem;
+  pointer-events: none;
+}
+
+.net-chips span,
+.net-stat {
+  border-top: 1px solid var(--clay);
+  padding-top: 0.35rem;
+  min-width: 6.5rem;
+}
+
+.net-stat dd {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 1.4rem;
+  letter-spacing: -0.04em;
+}
+
+.net-callouts,
+.net-products {
+  inset: 0;
+  pointer-events: none;
+}
+
+.net-callout[data-hidden="1"],
+.net-product[data-hidden="1"] {
+  display: none;
+}
+
+.net-callout,
+.net-product {
+  position: absolute;
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  color: var(--ink);
+  background: var(--bone);
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.2rem 0.15rem;
+  text-align: left;
+}
+
+.net-callout b,
+.net-product strong {
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+}
+
+.net-product {
+  pointer-events: auto;
+  flex-direction: column;
+  align-items: flex-start;
+  width: min(16rem, 70vw);
+  padding: 0.55rem 0.6rem 0.7rem;
+  background: var(--bone);
+}
+
+.net-product button,
+.net-product a {
+  margin-top: 0.45rem;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.net-product small {
+  color: var(--secondary);
+}
+
+.net-product span {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.net-foot {
+  left: 1.4rem;
+  right: 1.4rem;
+  bottom: 0.8rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  pointer-events: none;
+}
+
+.net-foot a,
+.net-legal a {
+  pointer-events: auto;
+}
+
+.net-legal {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.net-epoch {
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.net-epoch p {
+  margin: 0;
+}
+
+.net-epoch strong {
+  display: block;
+  margin-top: 0.4rem;
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 500;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  letter-spacing: -0.04em;
+}
+
+.net-boot {
+  left: 1.4rem;
+  bottom: 1.6rem;
+  width: min(28rem, calc(100% - 2.8rem));
+}
+
+.net-bar {
+  margin-top: 0.8rem;
+  height: 2px;
+  background: color-mix(in srgb, var(--ink) 25%, transparent);
+}
+
+.net-bar span {
+  display: block;
+  height: 100%;
+  background: var(--clay);
+}
+
+.net-skip {
+  right: 1.4rem;
+  bottom: 1.4rem;
+  border: 1px solid var(--ink);
+  background: var(--bone);
+  color: var(--ink);
+  padding: 0.45rem 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.net-cursor {
+  display: none;
+  position: fixed;
+  z-index: 5;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  margin-top: -7px;
+  border-radius: 50%;
+  background: var(--clay);
+  pointer-events: none;
+}
+
+.net-fallback {
+  position: relative;
+  z-index: 3;
+  padding: 6.5rem 1.4rem 4rem;
+  background: var(--sand);
+}
+
+.net-fallback figure {
+  margin: 2.5rem 0 0;
+}
+
+.net-fallback img {
+  display: block;
+  width: min(960px, 100%);
+  height: auto;
+  background: var(--surface);
+}
+
+.net-fallback figcaption {
+  margin-top: 0.8rem;
+  max-width: 38rem;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .net {
+    cursor: none;
+  }
+
+  .net-cursor {
+    display: block;
+  }
+
+  .net a,
+  .net button {
+    cursor: none;
+  }
+}
+
+.net a:focus-visible,
+.net button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.net[data-shot] .net-nav,
+.net[data-shot] .net-copy,
+.net[data-shot] .net-callouts,
+.net[data-shot] .net-products,
+.net[data-shot] .net-foot,
+.net[data-shot] .net-epoch,
+.net[data-shot] .net-boot,
+.net[data-shot] .net-skip,
+.net[data-shot] .net-cursor,
+.net[data-shot] .net-fallback {
+  display: none;
+}
+
+.net[data-fallback] .net-canvas,
+.net[data-fallback] .net-spacer {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .net-links {
+    display: none;
+  }
+
+  .net-copy h1,
+  .net-fallback h1 {
+    font-size: 2.35rem;
+  }
+
+  .net-nav {
+    padding: 0.8rem 0.9rem;
+  }
+
+  .net-copy,
+  .net-boot {
+    left: 0.9rem;
+    width: calc(100% - 1.8rem);
+  }
+
+  .net-copy[data-side="right"] {
+    right: 0.9rem;
+  }
+}
