@@ -132,12 +132,19 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.setClearColor(0xefe6d6, 1);
 
+  let loadProgress = 0;
   const source = params.get("src") === "original" ? "original" : "ktx";
+  const stream = params.get("stream") === "1";
   let world: NetworkWorld;
+  const boot = { loaderParsed: 0, first3d: 0, heroReady: 0 };
+  (window as Window & { __boot?: typeof boot }).__boot = boot;
   try {
     world = await loadWorld(renderer, mobileQuery || window.innerWidth < 760, source, (progress, label) => {
+      loadProgress = progress;
       publish({ progress, label, intro: !shot });
     });
+    boot.loaderParsed = performance.now();
+    if (shot) await Promise.all([world.loaded, world.animReady]);
   } catch (error) {
     console.error(error);
     publish({ fallback: true, intro: false, ready: true, label: "assets" });
@@ -156,7 +163,12 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   let clock = shot ? Number(params.get("t") || 6) : 0;
   let mix = loaderMixAt(clock);
   let cross = 0;
-  let assetsReady = true;
+  let assetsReady = false;
+  let tracksReady = false;
+  let painted = false;
+  void world.animReady.then(() => {
+    tracksReady = true;
+  });
   let epoch = false;
   let wrapping = false;
   let sand = 0;
@@ -200,16 +212,18 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     smoothCamera: !shot && !reduced,
     loaderMix: shot ? loaderMixAt(t) : mix,
     dive: dive && dive.u > 0 ? { node: productNode.get(dive.id) || dive.id, u: dive.u } : null,
-    fullResidency: shot || params.get("full") === "1",
+    fullResidency: (shot && !stream) || params.get("full") === "1",
   });
 
   const anchors = (t: number): AnchorPoint[] => {
     const beat = beatAt(t);
     const list: AnchorPoint[] = [];
     if (beat.id === "layers") {
+      const height = canvas.clientHeight || 1;
       for (const callout of LAYER_CALLOUTS) {
         const p = world.project(callout.node);
-        list.push({ id: callout.id, x: p?.x ?? 0, y: p?.y ?? 0, visible: Boolean(p && p.visible && p.x > 8 && p.y > 48 && p.x < (canvas.clientWidth || 1) - 8) });
+        const inCopy = Boolean(p && mobile && p.y > height * 0.72);
+        list.push({ id: callout.id, x: p?.x ?? 0, y: p?.y ?? 0, visible: Boolean(p && p.visible && !inCopy && p.x > 8 && p.y > 48 && p.x < (canvas.clientWidth || 1) - 8) });
       }
     }
     if (beat.id === "attention") {
@@ -249,6 +263,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       warnings: world.threadWarnings,
       dpr,
       source,
+      resident: world.resident(),
     };
     (window as Window & { __network?: unknown }).__network = report;
     publish({
@@ -269,7 +284,24 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     const host = window as Window & { __seek?: (t: number) => void; __network?: { t: number } };
     host.__seek = (t: number) => {
       shotT = t;
-      if (host.__network) host.__network.t = t;
+      world.pose(t, poseOpts(t));
+      world.render();
+      if (host.__network) {
+        host.__network.t = t;
+        const report = host.__network as { mem?: MemoryReport; resident?: string[] };
+        report.mem = world.memory();
+        report.resident = world.resident();
+      }
+      publish({
+        t,
+        beatId: beatAt(t).id,
+        ready: true,
+        progress: 1,
+        label: "shot",
+        intro: false,
+        sand: 0,
+        anchors: anchors(t),
+      });
     };
   }
 
@@ -294,7 +326,10 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     }
 
     if (intro) {
-      if (!assetsReady) {
+      if (!tracksReady) {
+        clock = 0;
+        mix = 1;
+      } else if (!assetsReady) {
         if (clock >= INTRO_END) clock = INTRO_LOOP_A;
         clock += dt;
         if (clock >= INTRO_END) clock = INTRO_LOOP_A;
@@ -359,6 +394,10 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     }
 
     world.pose(t, poseOpts(t));
+    if (!painted) {
+      painted = true;
+      boot.first3d = performance.now();
+    }
     if (!reduced && !dive && idleFor > 0.45 && idleFor < 8) {
       const wobble = Math.sin(now * 0.001 * Math.PI * 2 * 0.2);
       world.camera.position.x += wobble * 0.008;
@@ -386,7 +425,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       t: intro ? clock : t,
       beatId: intro ? "loader" : beat.id,
       ready: assetsReady,
-      progress: 1,
+      progress: assetsReady ? 1 : loadProgress,
       label: intro ? "network" : beat.id,
       intro,
       epoch,
@@ -397,13 +436,14 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     requestAnimationFrame(frame);
   };
 
-  assetsReady = true;
   if (!shot) {
+    void Promise.all([world.sceneReady("hero"), world.sceneReady("input")]).then(() => {
+      assetsReady = true;
+      boot.heroReady = performance.now();
+    });
     document.documentElement.style.overflow = "hidden";
-    requestAnimationFrame(frame);
-  } else {
-    requestAnimationFrame(frame);
   }
+  requestAnimationFrame(frame);
 
   const onResize = () => resize();
   window.addEventListener("resize", onResize);

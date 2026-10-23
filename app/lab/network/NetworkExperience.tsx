@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { BEATS, INPUT_CHIPS, LAYER_CALLOUTS, LOSS_STATS, NAV, PRODUCTS, beatAt, type Beat } from "./engine/copy";
+import { BEATS, INPUT_CHIPS, LAYER_CALLOUTS, LOSS_STATS, NAV, PRODUCTS, copyMotion, type Beat } from "./engine/copy";
 import { createNetwork, type FrameState, type NetworkHandle } from "./engine/createNetwork";
 import "./network.css";
 
@@ -58,6 +58,7 @@ export function NetworkExperience() {
   const cursorRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<NetworkHandle | null>(null);
   const beatId = useRef("loader");
+  const copyRef = useRef<HTMLElement>(null);
   const introRef = useRef(true);
   const epochRef = useRef(false);
   const diveRef = useRef<string | null>(null);
@@ -75,7 +76,7 @@ export function NetworkExperience() {
     if (!root || !canvas) return;
     const params = new URLSearchParams(window.location.search);
     const shot = params.get("shot") === "1";
-    if (shot) root.setAttribute("data-shot", "true");
+    if (shot && params.get("ui") !== "1") root.setAttribute("data-shot", "true");
     const pending = params.get("product");
     let opened = false;
     let alive = true;
@@ -134,9 +135,19 @@ export function NetworkExperience() {
           if (Math.abs(state.progress - progressRef.current) > 0.01) {
             progressRef.current = state.progress;
           }
-          if (state.beatId !== beatId.current) {
-            beatId.current = state.beatId;
-            setBeat(beatAt(state.t));
+          const motion = copyMotion(state.intro ? 0 : state.t);
+          const copy = copyRef.current;
+          if (copy) {
+            copy.dataset.place = motion.beat.id;
+            copy.style.opacity = state.intro ? "0" : String(motion.opacity);
+            copy.style.transform = `translate3d(0, ${state.intro ? 24 : motion.y}px, 0)`;
+          }
+          root.dataset.intro = state.intro ? "1" : "0";
+          root.dataset.beat = state.intro ? "loader" : motion.beat.id;
+          root.dataset.epoch = state.epoch ? "1" : "0";
+          if (motion.beat.id !== beatId.current && !state.intro) {
+            beatId.current = motion.beat.id;
+            setBeat(motion.beat);
           }
           if (!state.intro && pending && !opened && handleRef.current) {
             opened = true;
@@ -184,11 +195,8 @@ export function NetworkExperience() {
     if (next) audio?.cue("ambient");
   };
 
-  const showCopy = !intro && !fallback;
-  const showFoot = beat.id === "book" || epoch;
-
   return (
-    <div className="net" ref={rootRef} data-fallback={fallback ? "true" : undefined}>
+    <div className="net" ref={rootRef} data-intro="1" data-beat="loader" data-fallback={fallback ? "true" : undefined}>
       <div className="net-spacer" data-network-spacer="" />
       <canvas ref={canvasRef} className="net-canvas" aria-hidden={fallback} />
       <div ref={sandRef} className="net-sand" />
@@ -208,11 +216,6 @@ export function NetworkExperience() {
           ))}
         </ul>
         <div className="net-nav-end">
-          <nav className="net-legal" aria-label="Legal">
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
-            <Link href="/security">Security</Link>
-          </nav>
           <button type="button" className="net-sound" aria-pressed={sound} onClick={toggleSound}>
             Sound {sound ? "on" : "off"}
           </button>
@@ -222,49 +225,44 @@ export function NetworkExperience() {
         </div>
       </header>
 
-      {showCopy ? (
-        <section className="net-copy" data-side={beat.side} aria-live="polite">
-          <p className="net-kicker">{beat.kicker}</p>
-          {beat.h1 ? <h1>{beat.title}</h1> : <h2>{beat.title}</h2>}
-          {beat.body ? <p>{beat.body}</p> : null}
-          {beat.placeholder ? <span className="net-tag">placeholder</span> : null}
-          {beat.id === "input" ? (
-            <div className="net-chips">
-              {INPUT_CHIPS.map((chip) => (
-                <span key={chip}>{chip}</span>
-              ))}
-            </div>
-          ) : null}
-          {beat.id === "loss" ? (
-            <dl className="net-stats">
-              {LOSS_STATS.map((stat) => (
-                <div className="net-stat" key={stat.label}>
-                  <dt>{stat.label}</dt>
-                  <dd>
-                    {stat.value}
-                    {stat.placeholder ? " ·" : ""}
-                  </dd>
-                </div>
-              ))}
-              <span className="net-tag">placeholder</span>
-            </dl>
-          ) : null}
-        </section>
-      ) : null}
+      <section className="net-copy" ref={copyRef} data-place={beat.id} data-side={beat.side} aria-live="polite">
+        <p className="net-kicker">{beat.kicker}</p>
+        {beat.h1 ? <h1>{beat.title}</h1> : <h2>{beat.title}</h2>}
+        {beat.body ? <p>{beat.body}</p> : null}
+        {beat.placeholder ? <span className="net-tag">placeholder</span> : null}
+        {beat.id === "input" ? (
+          <div className="net-chips">
+            {INPUT_CHIPS.map((chip) => (
+              <span key={chip}>{chip}</span>
+            ))}
+          </div>
+        ) : null}
+        {beat.id === "loss" ? (
+          <dl className="net-stats">
+            {LOSS_STATS.map((stat) => (
+              <div className="net-stat" key={stat.label}>
+                <dt>{stat.label}</dt>
+                <dd>
+                  {stat.value}
+                  {stat.placeholder ? " ·" : ""}
+                </dd>
+              </div>
+            ))}
+            <span className="net-tag">placeholder</span>
+          </dl>
+        ) : null}
+      </section>
 
       <StageLabels onDive={onDive} />
 
-      {showFoot ? (
-        <footer className="net-foot">
-          <span className="net-kicker">PrimeArc</span>
-          <nav className="net-legal" aria-label="Footer">
-            <Link href="/fieldrelay">FieldRelay</Link>
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
-            <Link href="/security">Security</Link>
-          </nav>
-        </footer>
-      ) : null}
+      <footer className="net-foot">
+        <span className="net-kicker">PrimeArc</span>
+        <nav className="net-legal" aria-label="Legal">
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+          <Link href="/security">Security</Link>
+        </nav>
+      </footer>
 
       {epoch ? (
         <div className="net-epoch">

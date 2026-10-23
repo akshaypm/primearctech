@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
+import { copyMotion } from "../app/lab/network/engine/copy";
 import { buildTau, createSpring, plateau, pxPerSecond, RATE_A, springTo, tauAt, timeAtTau } from "../app/lab/network/engine/scroll";
 
 describe("network scroll map", () => {
@@ -29,6 +30,21 @@ describe("network scroll map", () => {
   it("uses half a viewport per second on desktop", () => {
     assert.equal(pxPerSecond(900, false), 450);
     assert.equal(pxPerSecond(844, true), 506.4);
+  });
+
+  it("hands the hero copy off before the input beat", () => {
+    const hero = copyMotion(9);
+    assert.equal(hero.beat.id, "hero");
+    assert.equal(hero.opacity, 1);
+    const leaving = copyMotion(10.35);
+    assert.equal(leaving.beat.id, "hero");
+    assert.ok(leaving.opacity < 0.6 && leaving.y < 0);
+    const gone = copyMotion(10.5);
+    assert.equal(gone.beat.id, "input");
+    assert.equal(gone.opacity, 0);
+    const input = copyMotion(12);
+    assert.equal(input.beat.id, "input");
+    assert.equal(input.opacity, 1);
   });
 
   it("critically damped follow settles without a long tail", () => {

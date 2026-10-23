@@ -20,14 +20,15 @@ const NSTR: Record<string, number> = { clay: 2, misc: 2, glaze: 1, stone: 1, san
 const ROUGHK: Record<string, number> = { clay: 4, misc: 4 };
 const SUN = new THREE.Vector3(-0.07785, 0.7785, 0.6228).normalize();
 const SCENES = ["loader", "hero", "input", "layers", "attn", "loss", "emb"] as const;
+/** Story order ±1. A scene stays resident while it is current or a neighbour. */
 const WINDOWS: Record<string, [number, number][]> = {
-  loader: [[0, 9]],
-  hero: [[0, 16], [54, 62.6]],
-  input: [[8, 22]],
-  layers: [[14, 38]],
-  attn: [[26, 46]],
-  loss: [[36, 56]],
-  emb: [[44, 62.6]],
+  loader: [[0, 12]],
+  hero: [[0, 22], [46, 62.6]],
+  input: [[3, 32]],
+  layers: [[10, 42]],
+  attn: [[18, 50]],
+  loss: [[30, 58]],
+  emb: [[40, 62.6]],
 };
 
 type TexRef = { index: number; LMAX?: number };
@@ -102,6 +103,10 @@ export type NetworkWorld = {
   readonly threadCount: number;
   readonly threadWarnings: string[];
   readonly camera: THREE.PerspectiveCamera;
+  readonly loaded: Promise<void>;
+  readonly animReady: Promise<void>;
+  sceneReady: (name: string) => Promise<void>;
+  resident: () => string[];
   dispose: () => void;
 };
 
@@ -155,8 +160,9 @@ function textureBytes(tex: THREE.Texture): number {
 
 function rgbaOf(tex: THREE.Texture): number {
   const image = tex.image as { width?: number; height?: number } | null;
-  const w = image?.width || 0;
-  const h = image?.height || 0;
+  if (!image) return 0;
+  const w = image.width || 0;
+  const h = image.height || 0;
   return w && h ? w * h * 4 : 0;
 }
 
@@ -238,14 +244,22 @@ export async function loadWorld(
   loader.setDRACOLoader(draco);
   loader.setKTX2Loader(ktx2);
 
-  const [world, samples, exj, params, anim] = await Promise.all([
+  const loaderBufP = fetch(`/network/${source}/loader-baked.glb`).then((r) => {
+    if (!r.ok) throw new Error(`missing loader glb (${r.status})`);
+    return r.arrayBuffer();
+  });
+  let anim: AnimApi | null = null;
+  const animReady = loadAnim("/network/anim/").then((value) => {
+    anim = value;
+  });
+  const [world, samples, exj, params, loaderBuf] = await Promise.all([
     fetch("/network/world.json").then((r) => r.json() as Promise<{ scenes: string[] }>),
     fetch("/network/camera-path-stack.json").then((r) => r.json() as Promise<{ samples: CamSample[] }>),
     fetch("/network/stack-explode.json").then((r) => r.json() as Promise<ExplodeFile>),
     fetch("/network/stack_v7_params.json").then((r) => r.json() as Promise<StackParams>),
-    loadAnim("/network/anim/"),
+    loaderBufP,
   ]);
-  onProgress(0.08, "tracks");
+  onProgress(0.08, "loader");
 
   const white = solid(255, true);
   const linearWhite = solid(255, false);
@@ -307,11 +321,22 @@ export async function loadWorld(
 
   let groundOverride: { lm: THREE.Texture; aux: THREE.Texture; object: string } | null = null;
   const layersGround: { lm: THREE.Texture; aux: THREE.Texture; object: string }[] = [];
-  const order = [...SCENES].filter((name) => world.scenes.includes(name));
-  let loaded = 0;
+  const order = ["loader", ...SCENES.filter((name) => name !== "loader" && world.scenes.includes(name))];
+  let loadedCount = 0;
+  const restWorld = new Map<THREE.Object3D, THREE.Matrix4>();
+  const lossScale = new Map<THREE.Object3D, number>();
+  const byName: Record<string, THREE.Object3D[]> = {};
+  const rotorRest = new Map<THREE.Object3D, THREE.Quaternion>();
+  let threadCount = 0;
+  let threadsStarted = false;
+  let lastLive: string[] = [];
+  const readyResolve = new Map<string, () => void>();
+  const readyPromise = new Map<string, Promise<void>>(
+    order.map((name) => [name, new Promise<void>((resolve) => readyResolve.set(name, resolve))]),
+  );
 
-  for (const name of order) {
-    const buf = await fetch(`/network/${source}/${name}-baked.glb`).then((r) => {
+  async function loadScene(name: string, preset?: ArrayBuffer) {
+    const buf = preset ?? await fetch(`/network/${source}/${name}-baked.glb`).then((r) => {
       if (!r.ok) throw new Error(`missing ${name} glb (${r.status})`);
       return r.arrayBuffer();
     });
@@ -462,40 +487,49 @@ export async function loadWorld(
       (nodeObj[nn] = nodeObj[nn] || []).push({ o, scene: name });
     });
     scene.add(gltf.scene);
-    loaded += 1;
-    onProgress(0.08 + (0.84 * loaded) / order.length, name);
-  }
-
-  for (const tex of dupes) {
-    if (![...canon.values()].includes(tex)) tex.dispose();
-  }
-
-  scene.updateMatrixWorld(true);
-  addSkirts(nodeObj, materials);
-  scene.updateMatrixWorld(true);
-  scene.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (mesh.isMesh) mesh.userData.baseMat = mesh.material;
-  });
-  const restWorld = new Map<THREE.Object3D, THREE.Matrix4>();
-  for (const nd of exj.nodes) {
-    const hit = (nodeObj[nd.node] || []).find((e) => e.scene === "layers");
-    if (hit) restWorld.set(hit.o, hit.o.matrixWorld.clone());
-  }
-  const lossScale = new Map<THREE.Object3D, number>();
-  for (const e of nodeObj.ground_loss || []) lossScale.set(e.o, e.o.scale.y);
-
-  const byName: Record<string, THREE.Object3D[]> = {};
-  for (const [name, list] of Object.entries(nodeObj)) byName[name] = list.map((e) => e.o);
-  const threadCount = await anim.initThreads(byName);
-  for (const list of Object.values(nodeObj)) {
-    for (const e of list) {
-      if (nodeName(e.o).startsWith("ATTN_th")) e.o.traverse((x) => {
-        const mesh = x as THREE.Mesh;
-        if (mesh.isMesh) mesh.frustumCulled = false;
-      });
+    scene.updateMatrixWorld(true);
+    addSkirts(nodeObj, materials);
+    gltf.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) mesh.userData.baseMat = mesh.material;
+    });
+    if (name === "layers") {
+      for (const nd of exj.nodes) {
+        const hit = (nodeObj[nd.node] || []).find((e) => e.scene === "layers");
+        if (hit) restWorld.set(hit.o, hit.o.matrixWorld.clone());
+      }
     }
+    for (const e of nodeObj.ground_loss || []) if (!lossScale.has(e.o)) lossScale.set(e.o, e.o.scale.y);
+    for (const key of Object.keys(byName)) delete byName[key];
+    for (const [node, list] of Object.entries(nodeObj)) byName[node] = list.map((e) => e.o);
+    if (name === "attn" && !threadsStarted) {
+      threadsStarted = true;
+      await animReady;
+      threadCount = await anim!.initThreads(byName);
+      for (const list of Object.values(nodeObj)) {
+        for (const e of list) {
+          if (!nodeName(e.o).startsWith("ATTN_th")) continue;
+          e.o.traverse((x) => {
+            const mesh = x as THREE.Mesh;
+            if (mesh.isMesh) mesh.frustumCulled = false;
+          });
+        }
+      }
+    }
+    for (const tex of dupes) {
+      if (![...canon.values()].includes(tex)) tex.dispose();
+    }
+    dupes.length = 0;
+    loadedCount += 1;
+    onProgress(0.08 + (0.84 * loadedCount) / order.length, name);
+    readyResolve.get(name)?.();
   }
+
+  await loadScene("loader", loaderBuf);
+  const loaded = (async () => {
+    for (const name of order.slice(1)) await loadScene(name);
+  })();
+  void loaded.catch((error) => console.error(error));
 
   const variant = new Map<string, THREE.ShaderMaterial>();
   function vary(material: THREE.ShaderMaterial, key: string) {
@@ -751,8 +785,26 @@ export async function loadWorld(
     for (const mesh of recv) bindShadow(mesh, pass, 1, 1, mobileShader ? 1 : 1, 0.03 / fit.range, 2 * texel, fit.range, 1 / fit.width);
   }
 
+  function spinRotors(t: number) {
+    const names = ["LAYERS_rotor_3La", "LAYERS_rotor_3Lb", "LAYERS_rotor_3Ra", "LAYERS_rotor_3Rb", "LAYERS_rotor_3Rc"];
+    names.forEach((name, index) => {
+      for (const e of nodeObj[name] || []) {
+        if (e.scene !== "layers") continue;
+        let rest = rotorRest.get(e.o);
+        if (!rest) {
+          rest = e.o.quaternion.clone();
+          rotorRest.set(e.o, rest);
+        }
+        const spin = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (index % 2 === 0 ? 1 : -1) * 0.6 * t);
+        e.o.quaternion.copy(rest).multiply(spin);
+        e.o.updateMatrixWorld(true);
+      }
+    });
+  }
+
   function pose(t: number, opts: PoseOptions) {
     const live = liveScenes(t, opts.fullResidency);
+    lastLive = [...live];
     if (opts.loaderMix > 0.02) live.add("loader");
     for (const list of Object.values(nodeObj)) {
       for (const e of list) {
@@ -760,8 +812,10 @@ export async function loadWorld(
         e.o.userData.evicted = false;
       }
     }
-    anim.apply(t, byName);
-    anim.applyThreads(t);
+    if (anim) {
+      anim.apply(t, byName);
+      anim.applyThreads(t);
+    }
     const mix = Math.min(1, Math.max(0, opts.loaderMix));
     const loaderRoot = roots.get("loader");
     if (loaderRoot) loaderRoot.visible = mix > 0.001;
@@ -795,6 +849,7 @@ export async function loadWorld(
       }
     }
     explodeStack(t);
+    spinRotors(t);
     applyRules(t, mix);
     applyCamera(camera, sampleCamera(samples.samples, t, opts.smoothCamera), t, cssW, cssH, opts.mobile, exj, params);
     if (opts.dive && opts.dive.u > 0) blendDive(opts.dive.node, opts.dive.u);
@@ -836,7 +891,7 @@ export async function loadWorld(
   }
 
   function mistAt(t: number): [number, number] {
-    let mist: [number, number] = [anim.scalar("mist:start", t) ?? 8, anim.scalar("mist:depth", t) ?? 55];
+    let mist: [number, number] = [anim?.scalar("mist:start", t) ?? 8, anim?.scalar("mist:depth", t) ?? 55];
     const lfNear = exj.fog_threejs.layers.near;
     const lfDepth = exj.fog_threejs.layers.far - lfNear;
     if (t >= 19.5 && t < 36) {
@@ -1029,9 +1084,21 @@ export async function loadWorld(
     resize,
     project,
     memory,
-    threadCount,
-    threadWarnings: anim.warnings,
+    get threadCount() {
+      return threadCount;
+    },
+    get threadWarnings() {
+      return anim?.warnings ?? [];
+    },
     camera,
+    loaded,
+    animReady,
+    sceneReady(name: string) {
+      return readyPromise.get(name) ?? Promise.resolve();
+    },
+    resident() {
+      return lastLive;
+    },
     dispose() {
       shadow?.target.dispose();
       draco.dispose();

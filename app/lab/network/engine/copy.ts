@@ -92,6 +92,16 @@ export function beatAt(t: number): Beat {
   return BEATS.find((b) => t >= b.t0 && t < b.t1) ?? BEATS[BEATS.length - 1];
 }
 
+/** Outgoing copy slides up and fades over 300ms, and is gone at the boundary. The next beat fades in after that. */
+export function copyMotion(t: number): { beat: Beat; opacity: number; y: number } {
+  const beat = beatAt(t);
+  const into = Math.min(1, Math.max(0, (t - beat.t0) / 0.3));
+  const out = Math.min(1, Math.max(0, (beat.t1 - t) / 0.3));
+  const opacity = Math.min(into, out);
+  const y = t - beat.t0 < 0.3 ? (1 - into) * 24 : -(1 - out) * 24;
+  return { beat, opacity, y };
+}
+
 export const LAYER_CALLOUTS = [
   { id: "audit", node: "LAYERS_blk0_box", index: "01", label: "Audit" },
   { id: "design", node: "LAYERS_blk1_box", index: "02", label: "Design" },
@@ -139,11 +149,8 @@ export const LOSS_STATS = [
 
 export const NAV = [
   { id: "hero" as const, label: "Network", t: 8 },
-  { id: "input" as const, label: "Input", t: 15 },
   { id: "layers" as const, label: "Layers", t: 24 },
   { id: "attention" as const, label: "Products", t: 34 },
-  { id: "loss" as const, label: "Proof", t: 44 },
-  { id: "embedding" as const, label: "Partners", t: 52 },
   { id: "book" as const, label: "Book", t: 60 },
 ];
 
