@@ -3,6 +3,7 @@ import { createNetworkAudio, type NetworkAudio } from "./audio";
 import { LAYER_CALLOUTS, PRODUCTS, beatAt, beatScenes, nextScene, productFocus, type BeatId } from "./copy";
 import { createHands } from "./hands";
 import { SCROLL_OMEGA, STORY_END, buildTau, createSpring, pxPerSecond, springTo, tauAt, timeAtTau } from "./scroll";
+import { createShaderGuard } from "./samplers";
 import { loadWorld, type MemoryReport, type NetworkWorld, type Obstacle } from "./world";
 
 export type AnchorPoint = {
@@ -28,6 +29,7 @@ export type FrameState = {
   sand: number;
   reduced: boolean;
   fallback: boolean;
+  unavailable: boolean;
   dive: string | null;
   diveU: number;
   anchors: AnchorPoint[];
@@ -100,6 +102,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   const audio = createNetworkAudio();
   const table = buildTau();
   const spring = createSpring(0);
+  let unavailable = false;
 
   const publish = (partial: Partial<FrameState>) => {
     onFrame({
@@ -113,6 +116,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       sand: 0,
       reduced,
       fallback: forceFallback,
+      unavailable,
       dive: null,
       diveU: 0,
       anchors: [],
@@ -161,6 +165,26 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.setClearColor(0xefe6d6, 1);
+  const shaders = createShaderGuard(renderer);
+  const markUnavailable = () => {
+    if (!shaders.fault) return false;
+    unavailable = true;
+    return true;
+  };
+  const stalled = () => ({
+    audio,
+    scrollToTime() {},
+    dive() {},
+    cancelDive() {},
+    skipDive() {},
+    nudge() {},
+    press() {
+      return false;
+    },
+    dispose() {
+      audio.dispose();
+    },
+  });
   renderer.setSize(Math.max(2, window.innerWidth), Math.max(2, window.innerHeight), false);
   renderer.clear(true, true, true);
   const probe = new Uint8Array(4);
@@ -237,6 +261,19 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     renderer.dispose();
     return null;
   }
+  shaders.inspect();
+  if (markUnavailable()) {
+    publish({ unavailable: true, poster: 1, ready: true, intro: false, live: false, fallback: false });
+    return stalled();
+  }
+  const renderWorld = () => {
+    if (unavailable) return false;
+    world.render();
+    shaders.inspect();
+    if (!markUnavailable()) return true;
+    publish({ unavailable: true, poster: 1, ready: true, intro: false, live: false, fallback: false });
+    return false;
+  };
 
   let mobile = mobileQuery || window.matchMedia("(max-width: 760px)").matches;
   let dprCap = mobile ? 1.5 : 1.75;
@@ -388,17 +425,17 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   const finishShot = async (t: number) => {
     const opts = poseOpts(t);
     world.pose(t, opts);
-    world.render();
+    renderWorld();
     const pixel = new Uint8Array(4);
     for (let i = 0; i < 2; i += 1) {
       world.pose(t, opts);
-      world.render();
+      renderWorld();
     }
     const n = 6;
     const t0 = performance.now();
     for (let i = 0; i < n; i += 1) {
       world.pose(t, opts);
-      world.render();
+      renderWorld();
       gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
     }
     const frameMs = (performance.now() - t0) / n;
@@ -416,7 +453,8 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       resident: world.resident(),
     };
     (window as Window & { __network?: unknown }).__network = report;
-    if (frameLit()) {
+    if (unavailable) poster = 1;
+    else if (frameLit()) {
       revealed = true;
       poster = 0;
     } else {
@@ -445,8 +483,9 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     host.__seek = (t: number) => {
       shotT = t;
       world.pose(t, poseOpts(t));
-      world.render();
-      if (frameLit()) {
+      renderWorld();
+      if (unavailable) poster = 1;
+      else if (frameLit()) {
         revealed = true;
         poster = 0;
       } else if (!revealed) {
@@ -577,7 +616,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       audio.setReduced(false);
       audio.sync(shotT, "story");
       rollAnim(shotT);
-      world.render();
+      if (!renderWorld()) return;
       if (frameLit()) {
         revealed = true;
         poster = 0;
@@ -696,7 +735,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       world.camera.position.x += wobble * 0.008;
       world.camera.position.y += Math.cos(now * 0.001) * 0.003;
     }
-    world.render();
+    if (!renderWorld()) return;
     if (!revealed) {
       if (frameLit()) {
         revealed = true;

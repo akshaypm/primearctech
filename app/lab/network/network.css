@@ -190,6 +190,31 @@ html:has(.net) body {
   opacity: 0;
 }
 
+.net-unavailable {
+  position: fixed;
+  z-index: 4;
+  left: 1.5rem;
+  bottom: 1.6rem;
+  margin: 0;
+  padding: 0.55rem 0.8rem;
+  background: var(--clay);
+  color: var(--bone);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.net[data-unavailable] .net-poster {
+  opacity: 1 !important;
+}
+
+.net[data-unavailable] .net-copy,
+.net[data-unavailable] .net-callouts,
+.net[data-unavailable] .net-products {
+  display: none;
+}
+
 .net-copy {
   pointer-events: none;
   width: min(35rem, 42vw);

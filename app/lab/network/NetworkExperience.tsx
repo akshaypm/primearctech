@@ -148,6 +148,7 @@ export function NetworkExperience() {
   const [beat, setBeat] = useState<Beat>(HERO_BEAT);
   const [epoch, setEpoch] = useState(false);
   const [fallback, setFallback] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const [sound, setSound] = useState(false);
   const [dive, setDive] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
@@ -235,8 +236,12 @@ export function NetworkExperience() {
             if (leader) leader.style.width = `${LABEL_GAP}px`;
             labelBoxes.push({ x0: edge, y0: mid - labelH / 2, x1: left + labelW, y1: mid + labelH / 2 });
           });
-          if (posterRef.current) posterRef.current.style.opacity = String(state.poster);
-          root.dataset.poster = state.poster > 0.02 ? "1" : "0";
+          if (state.unavailable) {
+            root.dataset.unavailable = "1";
+            if (posterRef.current) posterRef.current.style.opacity = "1";
+            setUnavailable(true);
+          } else if (posterRef.current) posterRef.current.style.opacity = String(state.poster);
+          root.dataset.poster = state.unavailable || state.poster > 0.02 ? "1" : "0";
           if (state.fallback) {
             root.setAttribute("data-fallback", "true");
             setFallback(true);
@@ -500,7 +505,7 @@ export function NetworkExperience() {
   };
 
   return (
-    <div className="net" ref={rootRef} data-intro="0" data-beat="hero" data-poster="1" data-fallback={fallback ? "true" : undefined}>
+    <div className="net" ref={rootRef} data-intro="0" data-beat="hero" data-poster="1" data-unavailable={unavailable ? "1" : undefined} data-fallback={fallback ? "true" : undefined}>
       <div className="net-spacer" data-network-spacer="" />
       <div className="net-poster" ref={posterRef}>
         <picture>
@@ -510,6 +515,11 @@ export function NetworkExperience() {
           <img src="/network/poster/hero-1920.webp" alt="" width={1920} height={1200} fetchPriority="high" />
         </picture>
       </div>
+      {unavailable ? (
+        <p className="net-unavailable" role="status">
+          3D unavailable
+        </p>
+      ) : null}
       <canvas ref={canvasRef} className="net-canvas" aria-hidden={fallback} />
       <div ref={veilRef} className="net-veil" />
       <div ref={sandRef} className="net-sand" />

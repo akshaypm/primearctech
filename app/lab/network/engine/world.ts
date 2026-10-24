@@ -6,7 +6,7 @@ import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { createAnim, type AnimApi, type AnimPack } from "./anim";
 import { smootherstep } from "./animatic";
 import { applyCamera, sampleCamera, type CamSample, type ExplodeFile, type RideFit, type StackParams } from "./camera";
-import { fragmentShader, fragmentShaderMobile, skyFragmentShader, skyVertexShader, vertexShader } from "./shader";
+import { featuresFromMaterial, fragmentShader, fragmentShaderMobile, materialDefines, skyFragmentShader, skyVertexShader, vertexShader } from "./shader";
 
 const SPEC: Record<string, [number, number]> = {
   clay: [0.0176, 0.1],
@@ -453,12 +453,12 @@ export async function loadWorld(
   }
 
   const fs = fragment;
-  function makeMaterial(uniforms: Record<string, { value: unknown }>, hasColor: boolean) {
+  function makeMaterial(uniforms: Record<string, { value: unknown }>, defines: Record<string, number>) {
     const material = new THREE.ShaderMaterial({
       uniforms,
       vertexShader,
       fragmentShader: fs,
-      defines: hasColor ? { HAS_COLOR: 1 } : {},
+      defines,
     });
     material.toneMapped = false;
     materials.push(material);
@@ -657,7 +657,7 @@ export async function loadWorld(
           rideLmax: { value: ex.rideLightMap?.LMAX ?? 2 },
           glowMax: { value: ex.rideGlow?.GMAX ?? 2 },
         };
-        material = makeMaterial(uniforms, hasColor);
+        material = makeMaterial(uniforms, materialDefines(featuresFromMaterial(name, def, hasColor)));
         material.userData.baseGroove = loss ? loss.grooveBump : 0;
         material.userData.kind = kind;
         built.set(key, material);
@@ -762,6 +762,10 @@ export async function loadWorld(
     if (!next) {
       next = material.clone();
       next.userData.baseGroove = material.userData.baseGroove;
+      if ((key.startsWith("lm2:") || key === "loader-ground") && !next.defines?.HAS_DYN && !next.defines?.HAS_LM2) {
+        next.defines.HAS_LM2 = 1;
+        next.needsUpdate = true;
+      }
       materials.push(next);
       variant.set(id, next);
     }
