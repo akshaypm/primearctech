@@ -337,7 +337,26 @@ export async function loadWorld(
   ktx2.load = (url, onLoad, _onProgress, onError) => {
     fetchTexture(url).then(
       (buffer) => {
-        ktx2.parse(buffer, onLoad, onError);
+        const key = textureKey(url);
+        const boot = key.includes("/boot/");
+        // A second load of the same URL reuses this buffer after parse() has transferred
+        // it. Reading a detached buffer throws and never reaches the task cache, so the
+        // GLTF dependency never resolves. Skip the header once the bytes are gone.
+        let width = 0;
+        if (buffer.byteLength >= 24) width = new DataView(buffer).getUint32(20, true);
+        ktx2.parse(
+          buffer,
+          (tex: THREE.Texture) => {
+            if (width > 0) {
+              tex.userData.ktxWidth = tex.userData.ktxWidth || width;
+              tex.userData.ktxUrl = tex.userData.ktxUrl || key;
+              if (boot) tex.userData.boot = true;
+              else tex.userData.fullWidth = tex.userData.fullWidth || width;
+            }
+            onLoad(tex as THREE.CompressedTexture);
+          },
+          onError,
+        );
       },
       (error: unknown) => {
         onError?.(error instanceof Error ? error : new Error(String(error)));
@@ -415,10 +434,21 @@ export async function loadWorld(
   const roots = new Map<string, THREE.Object3D>();
   const materials: THREE.ShaderMaterial[] = [];
   const canon = new Map<string, THREE.Texture>();
+  const replaced = new Map<THREE.Texture, THREE.Texture>();
   const records = new Map<THREE.Texture, TexRec>();
   const dupes: THREE.Texture[] = [];
   let rgbaBefore = 0;
   let rgbaUnique = 0;
+
+  function liveTexture(tex: THREE.Texture): THREE.Texture {
+    let current = tex;
+    const seen = new Set<THREE.Texture>();
+    while (replaced.has(current) && !seen.has(current)) {
+      seen.add(current);
+      current = replaced.get(current) as THREE.Texture;
+    }
+    return current;
+  }
 
   function adopt(tex: THREE.Texture, key: string, srgb: boolean, light: boolean) {
     rgbaBefore += rgbaOf(tex);
@@ -440,8 +470,9 @@ export async function loadWorld(
       records.set(tex, { tex, scenes: new Set(), ground: false, evicted: false, image: tex.image, bytes: textureBytes(tex) });
       return tex;
     }
-    if (hit !== tex) dupes.push(tex);
-    return hit;
+    const live = liveTexture(hit);
+    if (live !== tex) dupes.push(tex);
+    return live;
   }
 
   function tag(tex: THREE.Texture | null, sceneName: string, ground: boolean) {
@@ -657,6 +688,9 @@ export async function loadWorld(
           rideLmax: { value: ex.rideLightMap?.LMAX ?? 2 },
           glowMax: { value: ex.rideGlow?.GMAX ?? 2 },
         };
+        for (const slot of Object.values(uniforms)) {
+          if (slot.value instanceof THREE.Texture) slot.value = liveTexture(slot.value);
+        }
         material = makeMaterial(uniforms, materialDefines(featuresFromMaterial(name, def, hasColor)));
         material.userData.baseGroove = loss ? loss.grooveBump : 0;
         material.userData.kind = kind;
@@ -1006,31 +1040,182 @@ export async function loadWorld(
     return out;
   }
   let upgraded = false;
-  function upgrade() {
-    if (upgraded || !upgrades.length) return;
-    upgraded = true;
-    const seen = new Set<string>();
-    const batch = upgrades.splice(0).filter((item) => {
-      if (seen.has(item.url)) return false;
-      seen.add(item.url);
-      return true;
-    });
-    void (async () => {
-      for (const item of batch) {
-        try {
-          const full = await ktx2.loadAsync(item.url);
-          item.tex.dispose();
-          item.tex.mipmaps = full.mipmaps;
-          item.tex.image = full.image;
-          item.tex.format = full.format;
-          item.tex.generateMipmaps = false;
-          item.tex.needsUpdate = true;
-          const rec = records.get(item.tex);
-          if (rec) rec.bytes = textureBytes(item.tex);
-        } catch (error) {
-          console.error(error);
-        }
+  let upgradeSettled = false;
+
+  function copySampling(from: THREE.Texture, to: THREE.Texture) {
+    to.colorSpace = from.colorSpace;
+    to.flipY = false;
+    to.wrapS = from.wrapS;
+    to.wrapT = from.wrapT;
+    to.magFilter = from.magFilter;
+    to.minFilter = from.minFilter;
+    to.anisotropy = from.anisotropy;
+    to.generateMipmaps = false;
+    to.needsUpdate = true;
+  }
+
+  function textureReferenced(tex: THREE.Texture) {
+    if (records.has(tex)) return true;
+    for (const material of materials) {
+      for (const uniform of Object.values(material.uniforms)) {
+        if (uniform.value === tex) return true;
       }
+    }
+    if (groundOverride && (groundOverride.lm === tex || groundOverride.aux === tex)) return true;
+    return layersGround.some((ground) => ground.lm === tex || ground.aux === tex);
+  }
+
+  function retargetTexture(from: THREE.Texture, to: THREE.Texture) {
+    copySampling(from, to);
+    replaced.set(from, to);
+    for (const material of materials) {
+      for (const uniform of Object.values(material.uniforms)) {
+        if (uniform.value === from) uniform.value = to;
+      }
+    }
+    if (groundOverride) {
+      if (groundOverride.lm === from) groundOverride.lm = to;
+      if (groundOverride.aux === from) groundOverride.aux = to;
+    }
+    for (const ground of layersGround) {
+      if (ground.lm === from) ground.lm = to;
+      if (ground.aux === from) ground.aux = to;
+    }
+    const rec = records.get(from);
+    if (rec) {
+      records.delete(from);
+      rec.tex = to;
+      rec.image = to.image;
+      rec.bytes = textureBytes(to);
+      rec.evicted = false;
+      records.set(to, rec);
+    }
+    for (const [key, tex] of canon) if (tex === from) canon.set(key, to);
+    from.dispose();
+  }
+
+  function freshCompressed(full: THREE.Texture) {
+    const image = full.image as { width?: number; height?: number } | null;
+    const width = image?.width || Number(full.userData.fullWidth) || Number(full.userData.ktxWidth) || 1;
+    const height = image?.height || width;
+    const source = full as THREE.CompressedTexture;
+    const next = new THREE.CompressedTexture(source.mipmaps.slice(), width, height, source.format, source.type);
+    next.userData.fullWidth = Number(full.userData.fullWidth) || width;
+    next.userData.ktxUrl = full.userData.ktxUrl;
+    next.userData.ktxWidth = next.userData.fullWidth;
+    return next;
+  }
+
+  function textureAudit() {
+    const mismatches: { url: string; width: number; expected: number; boot: boolean }[] = [];
+    const seen = new Set<THREE.Texture>();
+    const consider = (value: unknown) => {
+      const tex = value as THREE.Texture & { isCompressedTexture?: boolean };
+      if (!tex?.isTexture || !tex.isCompressedTexture || seen.has(tex)) return;
+      seen.add(tex);
+      const width = (tex.image as { width?: number } | null)?.width || 0;
+      const expected = Number(tex.userData.fullWidth) || 0;
+      const boot = Boolean(tex.userData.boot);
+      if (boot || (expected > 0 && width !== expected)) mismatches.push({ url: String(tex.userData.ktxUrl || ""), width, expected, boot });
+    };
+    for (const material of materials) {
+      for (const uniform of Object.values(material.uniforms)) consider(uniform.value);
+    }
+    return { done: upgradeSettled, count: seen.size, mismatches };
+  }
+
+  function publishTextureAudit() {
+    const audit = textureAudit();
+    (window as Window & { __textureAudit?: ReturnType<typeof textureAudit> }).__textureAudit = audit;
+    if (audit.done && audit.mismatches.length) console.error(`texture upgrade: ${audit.mismatches.length} map(s) are not the full KTX tier`);
+  }
+
+  function bootFile(tex: THREE.Texture) {
+    const url = String(tex.userData.ktxUrl || "");
+    return url.includes("/boot/") ? url.split("/").pop() || "" : "";
+  }
+
+  function bootTexturesInUse() {
+    const found: THREE.Texture[] = [];
+    const seen = new Set<THREE.Texture>();
+    const consider = (value: unknown) => {
+      const tex = value as THREE.Texture & { isCompressedTexture?: boolean };
+      if (!tex?.isTexture || !tex.isCompressedTexture || seen.has(tex) || !tex.userData.boot) return;
+      seen.add(tex);
+      found.push(tex);
+    };
+    for (const material of materials) {
+      for (const uniform of Object.values(material.uniforms)) consider(uniform.value);
+    }
+    if (groundOverride) {
+      consider(groundOverride.lm);
+      consider(groundOverride.aux);
+    }
+    for (const ground of layersGround) {
+      consider(ground.lm);
+      consider(ground.aux);
+    }
+    return found;
+  }
+
+  async function upgradeBootTextures(list: THREE.Texture[]) {
+    const groups = new Map<string, THREE.Texture[]>();
+    for (const tex of list) {
+      const file = bootFile(tex);
+      if (!file) continue;
+      const url = `/network/tex/${file}`;
+      const bucket = groups.get(url) || [];
+      if (!bucket.includes(tex)) bucket.push(tex);
+      groups.set(url, bucket);
+    }
+    for (const [url, textures] of groups) {
+      try {
+        const full = await ktx2.loadAsync(url);
+        for (const old of textures) {
+          if (!old.userData.boot) continue;
+          if (old === full) {
+            full.userData.boot = false;
+            full.userData.fullWidth = Number(full.userData.ktxWidth) || (full.image as { width?: number } | null)?.width || 0;
+            continue;
+          }
+          retargetTexture(old, freshCompressed(full));
+        }
+        if (!textureReferenced(full)) full.dispose();
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }
+
+  function rebindReplacedTextures() {
+    const swap = (tex: THREE.Texture) => liveTexture(tex);
+    for (const material of materials) {
+      for (const uniform of Object.values(material.uniforms)) {
+        if (uniform.value instanceof THREE.Texture) uniform.value = swap(uniform.value);
+      }
+    }
+    if (groundOverride) {
+      groundOverride.lm = swap(groundOverride.lm);
+      groundOverride.aux = swap(groundOverride.aux);
+    }
+    for (const ground of layersGround) {
+      ground.lm = swap(ground.lm);
+      ground.aux = swap(ground.aux);
+    }
+  }
+
+  function upgrade() {
+    if (upgraded) return;
+    upgraded = true;
+    const initial = upgrades.splice(0).map((item) => item.tex);
+    void (async () => {
+      await upgradeBootTextures(initial);
+      await loaded;
+      // A scene that finishes loading during the swap can still be holding the boot texture.
+      await upgradeBootTextures(bootTexturesInUse());
+      rebindReplacedTextures();
+      upgradeSettled = true;
+      publishTextureAudit();
     })();
   }
 
@@ -1531,6 +1716,9 @@ export async function loadWorld(
     }
   }
 
+  // 28px is the floor. Right after load the nearest hero node sits about 45px
+  // outside (820, 330), so the pad has to clear that gap or the drag never grabs.
+  const PICK_PX = 64;
   const raycaster = new THREE.Raycaster();
   const pointerNdc = new THREE.Vector2();
   const rayHit = new THREE.Vector3();
@@ -1564,6 +1752,16 @@ export async function loadWorld(
     return out;
   }
 
+  function paddedDistance(px: number, py: number, rect: ScreenRect, pad: number) {
+    const x0 = rect.x0 - pad;
+    const y0 = rect.y0 - pad;
+    const x1 = rect.x1 + pad;
+    const y1 = rect.y1 + pad;
+    const dx = px < x0 ? x0 - px : px > x1 ? px - x1 : 0;
+    const dy = py < y0 ? y0 - py : py > y1 ? py - y1 : 0;
+    return Math.hypot(dx, dy);
+  }
+
   function pick(x: number, y: number, test?: (name: string) => boolean) {
     if (!test) return null;
     pointerRay(x, y);
@@ -1578,7 +1776,30 @@ export async function loadWorld(
         object = object.parent;
       }
     }
-    return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const px = x - rect.left;
+    const py = y - rect.top;
+    let best: { name: string; object: THREE.Object3D; point: THREE.Vector3; score: number } | null = null;
+    const seen = new Set<string>();
+    for (const object of targets) {
+      const name = nodeName(object);
+      if (!name || seen.has(name) || !test(name)) continue;
+      seen.add(name);
+      const list = nodeObj[name];
+      const entry = list?.find((item) => item.o.visible);
+      if (!entry) continue;
+      const box = projectBox(name);
+      const center = project(name);
+      const boxDist = box ? paddedDistance(px, py, box, PICK_PX) : Infinity;
+      const centerDist = center?.visible ? Math.hypot(px - center.x, py - center.y) : Infinity;
+      if (boxDist > 0 && centerDist > PICK_PX) continue;
+      const score = Number.isFinite(centerDist) ? centerDist : 0;
+      if (best && score >= best.score) continue;
+      const point = new THREE.Vector3();
+      entry.o.getWorldPosition(point);
+      best = { name, object: entry.o, point, score };
+    }
+    return best ? { name: best.name, object: best.object, point: best.point } : null;
   }
 
   function rayPoint(x: number, y: number, plane: THREE.Plane) {

@@ -69,6 +69,12 @@ function loaderMixAt(t: number) {
   return 1 - (t - INTRO_END) / CROSSFADE;
 }
 
+function gestureBeat(t: number, mixValue: number): BeatId {
+  const beat = beatAt(t).id;
+  if (mixValue < 0.5 && t < 10.5) return "hero";
+  return beat;
+}
+
 function webgl2(canvas: HTMLCanvasElement) {
   try {
     return canvas.getContext("webgl2", {
@@ -611,7 +617,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       }
       world.pose(shotT, poseOpts(shotT));
       shownT = shotT;
-      const handFrame = hands.step(dt, beatAt(shotT).id, false);
+      const handFrame = hands.step(dt, gestureBeat(shotT, loaderMixAt(shotT)), false);
       world.syncBall(false);
       audio.setReduced(false);
       audio.sync(shotT, "story");
@@ -715,8 +721,8 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     }
 
     world.pose(t, poseOpts(t));
-    const handBeat = beatAt(phase === "loader" ? t : intro ? 6 : t).id;
-    const handFrame = hands.step(dt, phase === "loader" ? "loader" : handBeat, reduced);
+    const handBeat = gestureBeat(phase === "loader" ? t : intro ? 6 : t, mix);
+    const handFrame = hands.step(dt, phase === "loader" && mix >= 0.5 ? "loader" : handBeat, reduced);
     world.syncBall(reduced);
     audio.setReduced(reduced);
     audio.sync(phase === "loader" ? clock : t, phase);
@@ -804,8 +810,10 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
   };
   window.addEventListener("wheel", blockScroll, { passive: false });
   window.addEventListener("touchmove", blockScroll, { passive: false });
-  const beatNow = () => beatAt(shot ? shotT : shownT).id;
+  const beatNow = () => gestureBeat(shot ? shotT : shownT, shot ? loaderMixAt(shotT) : mix);
   const onPointerDown = (event: PointerEvent) => {
+    const target = event.target;
+    if (target instanceof Element && target.closest("a, button, input, textarea, select")) return;
     audio.unlock();
     const grabbed = hands.down(event.clientX, event.clientY, beatNow());
     if (grabbed && event.pointerType === "touch") event.preventDefault();
@@ -818,7 +826,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
     hands.up(beatNow());
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   };
-  canvas.addEventListener("pointerdown", onPointerDown);
+  window.addEventListener("pointerdown", onPointerDown, true);
   window.addEventListener("pointermove", onPointerMove);
   window.addEventListener("pointerup", onPointerUp);
   const host = window as Window & {
@@ -863,7 +871,7 @@ export async function createNetwork({ canvas, onFrame }: Options): Promise<Netwo
       window.removeEventListener("resize", onResize);
       window.removeEventListener("wheel", blockScroll);
       window.removeEventListener("touchmove", blockScroll);
-      canvas.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointerdown", onPointerDown, true);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       world.dispose();
