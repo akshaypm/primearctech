@@ -1,0 +1,1035 @@
+{
+ "scene": "hero",
+ "about": "PrimeArc 'hero' baked-lighting asset. Blender Z-up metres; GLB is glTF Y-up (x, z, -y). See /workspace/primearc/rebuild/README.md.",
+ "glb": "hero-baked.glb",
+ "bake_pose_t": 8.0,
+ "verify_times": [
+  6,
+  8,
+  10
+ ],
+ "lightmap_encoding": {
+  "rgb": "sRGB-encoded (LM / LMAX); texture.colorSpace = SRGBColorSpace, sampled with uv1 (TEXCOORD_1); irradiance = texel_linear * LMAX",
+  "LMAX": 2.0,
+  "three_lightMapIntensity_if_using_MeshStandardMaterial": 6.28319,
+  "aux": "linear (NoColorSpace), uv1, half resolution: R = sun visibility (soft shadow mask 0..1), G = baked AO (static/dyn) or 1 (ground), B unused",
+  "shading": "out = albedo * cavity(ORM.r) * (LM*LMAX + sunIrr * vis * (dot(Nd,L) - dot(Nd,Ng)*max(dot(Ng,L),0)) * detail) + spec",
+  "sun_irradiance_factor": [
+   1.01859,
+   0.99313,
+   0.95748
+  ],
+  "sun_dir_threejs": [
+   -0.07785,
+   0.7785,
+   0.6228
+  ],
+  "sun_dir_blender": [
+   -0.07785,
+   -0.6228,
+   0.7785
+  ]
+ },
+ "sets": {
+  "hero": {
+   "kind": "static",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 1234252,
+   "lm_p1_p50_p99": [
+    0.1374,
+    0.6585,
+    1.2344
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_hero.webp",
+    "lightmaps/lm_hero_aux.webp"
+   ]
+  },
+  "ground_hero": {
+   "kind": "ground",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 61036,
+   "lm_p1_p50_p99": [
+    0.3569,
+    0.8907,
+    0.897
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_ground_hero.webp",
+    "lightmaps/lm_ground_hero_aux.webp"
+   ]
+  },
+  "ground_far": {
+   "kind": "ground",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 60210,
+   "lm_p1_p50_p99": [
+    0.8627,
+    0.883,
+    0.9058
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_ground_far.webp",
+    "lightmaps/lm_ground_far_aux.webp"
+   ]
+  },
+  "hero_dyn": {
+   "kind": "dyn",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 73492,
+   "ao_p1_p50": [
+    0.106,
+    0.543
+   ],
+   "ambient_linear": [
+    0.4406000077724457,
+    0.4016999900341034,
+    0.3569999933242798
+   ],
+   "files": [
+    "lightmaps/lm_hero_dyn_aux.webp"
+   ]
+  }
+ },
+ "materials": [
+  {
+   "material": "clayrod__hero",
+   "index": 0,
+   "surface": "clayrod",
+   "kind": "clay",
+   "baseColor": "clay_rod_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_hero.webp",
+   "lightmap_aux": "lightmaps/lm_hero_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "BoneGlaze__hero",
+   "index": 1,
+   "surface": "BoneGlaze",
+   "kind": "glaze",
+   "baseColor": "glaze_albedo",
+   "normal": "glaze_normal",
+   "orm": "glaze_orm",
+   "uv0": "tiling, metric / 0.25 m",
+   "glossy": true,
+   "lightmap": "lightmaps/lm_hero.webp",
+   "lightmap_aux": "lightmaps/lm_hero_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "terracotta__hero",
+   "index": 2,
+   "surface": "terracotta",
+   "kind": "clay",
+   "baseColor": "clay_terracotta_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_hero.webp",
+   "lightmap_aux": "lightmaps/lm_hero_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "darkclay__hero",
+   "index": 3,
+   "surface": "darkclay",
+   "kind": "clay",
+   "baseColor": "clay_darkclay_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_hero.webp",
+   "lightmap_aux": "lightmaps/lm_hero_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "BoneGlaze__hero_dyn",
+   "index": 4,
+   "surface": "BoneGlaze",
+   "kind": "glaze",
+   "baseColor": "glaze_albedo",
+   "normal": "glaze_normal",
+   "orm": "glaze_orm",
+   "uv0": "tiling, metric / 0.25 m",
+   "glossy": true,
+   "lightmap": null,
+   "ao": "lightmaps/lm_hero_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.4406000077724457,
+    0.4016999900341034,
+    0.3569999933242798
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "sand__ground_hero",
+   "index": 5,
+   "surface": "sand",
+   "kind": "sand",
+   "baseColor": "sand_albedo",
+   "normal": "sand_normal",
+   "orm": "sand_orm",
+   "uv0": "tiling, metric / 3.2 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_ground_hero.webp",
+   "lightmap_aux": "lightmaps/lm_ground_hero_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "sand__ground_far",
+   "index": 6,
+   "surface": "sand",
+   "kind": "sand",
+   "baseColor": "sand_albedo",
+   "normal": "sand_normal",
+   "orm": "sand_orm",
+   "uv0": "tiling, metric / 3.2 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_ground_far.webp",
+   "lightmap_aux": "lightmaps/lm_ground_far_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  }
+ ],
+ "objects": {
+  "HERO_e0_0_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_0_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_1_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_1_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_2_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_2_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_2_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_3_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_3_2": {
+   "materials": [
+    "BoneGlaze__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_4_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_4_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_4_3": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_5_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_5_3": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_5_4": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_6_3": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_6_4": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_7_3": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_7_4": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_7_5": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_8_4": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_8_5": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_9_4": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e0_9_5": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_0_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_0_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_0_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_0_3": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_1_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_1_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_1_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_1_3": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_2_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_2_1": {
+   "materials": [
+    "BoneGlaze__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_2_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_2_3": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_3_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_3_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_3_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_3_3": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_4_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_4_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_4_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_4_3": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_5_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_5_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_5_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e1_5_3": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_0_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_0_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_0_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_1_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_1_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_1_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_2_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_2_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_2_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_3_0": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_3_1": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_e2_3_2": {
+   "materials": [
+    "clayrod__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n0_0": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n0_1": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n0_2": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n0_3": {
+   "materials": [
+    "BoneGlaze__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n0_4": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n0_5": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n0_6": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n0_7": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n0_8": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n0_9": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n1_0": {
+   "materials": [
+    "darkclay__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n1_1": {
+   "materials": [
+    "darkclay__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n1_2": {
+   "materials": [
+    "BoneGlaze__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n1_3": {
+   "materials": [
+    "darkclay__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n1_4": {
+   "materials": [
+    "darkclay__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n1_5": {
+   "materials": [
+    "darkclay__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n2_0": {
+   "materials": [
+    "darkclay__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n2_1": {
+   "materials": [
+    "BoneGlaze__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n2_2": {
+   "materials": [
+    "darkclay__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n2_3": {
+   "materials": [
+    "darkclay__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n3_0": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n3_1": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_n3_2": {
+   "materials": [
+    "terracotta__hero"
+   ],
+   "role": "static",
+   "lightmap": "hero"
+  },
+  "HERO_pulse0": {
+   "materials": [
+    "BoneGlaze__hero_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_pulse1": {
+   "materials": [
+    "BoneGlaze__hero_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_pulse2": {
+   "materials": [
+    "BoneGlaze__hero_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_pulse3": {
+   "materials": [
+    "BoneGlaze__hero_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "HERO_pulse4": {
+   "materials": [
+    "BoneGlaze__hero_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "ground_hero": {
+   "materials": [
+    "sand__ground_hero"
+   ],
+   "role": "ground",
+   "lightmap": "ground_hero"
+  },
+  "ground_far": {
+   "materials": [
+    "sand__ground_far"
+   ],
+   "role": "ground",
+   "lightmap": "ground_far"
+  }
+ },
+ "hidden_in_lightmaps": [
+  "HERO_pulse0",
+  "HERO_pulse1",
+  "HERO_pulse2",
+  "HERO_pulse3",
+  "HERO_pulse4"
+ ],
+ "glb_bytes": 3903232,
+ "textures": [
+  {
+   "name": "clay_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 764858
+  },
+  {
+   "name": "clay_rod_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 69672
+  },
+  {
+   "name": "clay_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 41136
+  },
+  {
+   "name": "glaze_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 134718
+  },
+  {
+   "name": "glaze_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 35568
+  },
+  {
+   "name": "glaze_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 32594
+  },
+  {
+   "name": "clay_terracotta_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 46996
+  },
+  {
+   "name": "clay_darkclay_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 52750
+  },
+  {
+   "name": "sand_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 81360
+  },
+  {
+   "name": "sand_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 48824
+  },
+  {
+   "name": "sand_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 1926
+  },
+  {
+   "name": "lm_hero.webp",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 549572
+  },
+  {
+   "name": "lm_hero_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 684680
+  },
+  {
+   "name": "lm_ground_hero.webp",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 45150
+  },
+  {
+   "name": "lm_ground_hero_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 15886
+  },
+  {
+   "name": "lm_ground_far.webp",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 59112
+  },
+  {
+   "name": "lm_ground_far_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 1098
+  },
+  {
+   "name": "lm_hero_dyn_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 73492
+  }
+ ],
+ "gpu_texture_memory_MB": 144.0,
+ "notes": "",
+ "triangles": null,
+ "ground_tiles": {
+  "ground_hero": {
+   "bbox": [
+    -10.064087867736816,
+    7.935912132263184,
+    -11.968226432800293,
+    13.974970817565918
+   ],
+   "polys": 12780,
+   "verts": 13013,
+   "loss_faces": 0,
+   "z": [
+    -0.0004609585739672184,
+    0.009143788367509842
+   ]
+  },
+  "ground_far": {
+   "bbox": [
+    -420.0,
+    420.0,
+    -420.0,
+    420.0
+   ],
+   "polys": 37071,
+   "verts": 37658,
+   "loss_faces": 0,
+   "z": [
+    -0.3714869022369385,
+    0.8614277243614197
+   ]
+  }
+ }
+}

@@ -1,0 +1,230 @@
+{
+ "version": 1,
+ "generated": "2026-10-23 IST",
+ "sample_rate": 48000,
+ "formats": {
+  "webm": "Opus 96k VBR in WebM (primary)",
+  "ogg": "same Opus in Ogg — drop-in for existing engine extensionFor() which requests .ogg",
+  "mp3": "LAME V2 44.1k fallback (not gapless: loop via Web Audio with loopStart=576/sr)"
+ },
+ "loudness_method": "EBU R128 integrated via ffmpeg ebur128; clips <1 s measured padded with 0.5 s silence each side; true peak ceiling -4 dBTP (4x oversampled limiter) so encodes stay ≤ -3.6 dBFS",
+ "cues": {
+  "ambient-loop": {
+   "files": {
+    "webm": "ambient-loop.webm",
+    "ogg": "ambient-loop.ogg",
+    "mp3": "ambient-loop.mp3"
+   },
+   "duration_s": 51.0,
+   "lufs": -30.0,
+   "target_lufs": -30,
+   "true_peak_db": -11.92,
+   "loop": true,
+   "gain": 0.5,
+   "hook": "existing hook ambient-loop (engine.startAmbient)",
+   "trigger": "first user gesture after sound toggle ON; 2.5 s fade-in; runs whole scroll; duck -4 dB under one-shots",
+   "source": "ambient_a 4-58s, despiked x2 (+3dB over 3s median), HP60, 3s xfade"
+  },
+  "boot-stinger": {
+   "files": {
+    "webm": "boot-stinger.webm",
+    "ogg": "boot-stinger.ogg",
+    "mp3": "boot-stinger.mp3"
+   },
+   "duration_s": 4.557,
+   "lufs": -20.2,
+   "target_lufs": -20,
+   "true_peak_db": -4.0,
+   "loop": false,
+   "gain": 1.0,
+   "hook": "existing hook boot-stinger (engine.onLock; impact = loudest sample)",
+   "trigger": "loader 0-3.5 s; impact sample at 3.513 s = loader resolve at 3.5 s",
+   "source": "loader_b; hum 0.15-2.72s atempo 0.751 + ramp -14→-9 dB; hit from 2.72s",
+   "impact_s": 3.513
+  },
+  "hover": {
+   "files": {
+    "webm": "hover.webm",
+    "ogg": "hover.ogg",
+    "mp3": "hover.mp3"
+   },
+   "duration_s": 0.275,
+   "lufs": -24.0,
+   "target_lufs": -24,
+   "true_peak_db": -4.41,
+   "loop": false,
+   "gain": 0.7,
+   "hook": "existing hook hover (engine.hover, HOVER_GAP_MS 700, ±60 cents)",
+   "trigger": "pointerenter on any interactive clay object/nav item; debounce ≥120 ms",
+   "source": "tap_a 0.345-0.62s"
+  },
+  "shatter": {
+   "files": {
+    "webm": "shatter.webm",
+    "ogg": "shatter.ogg",
+    "mp3": "shatter.mp3"
+   },
+   "duration_s": 4.3,
+   "lufs": -20.0,
+   "target_lufs": -20,
+   "true_peak_db": -4.0,
+   "loop": false,
+   "gain": 0.9,
+   "hook": "existing hook shatter (engine.onBurst start) — reused for stack sliding apart",
+   "trigger": "layers stack explode, scroll ~24-30 s (stack-explode.json start)",
+   "source": "slide_a 0.1-4.4s (stack slides apart)"
+  },
+  "reassemble": {
+   "files": {
+    "webm": "reassemble.webm",
+    "ogg": "reassemble.ogg",
+    "mp3": "reassemble.mp3"
+   },
+   "duration_s": 3.685,
+   "lufs": -20.0,
+   "target_lufs": -20,
+   "true_peak_db": -4.0,
+   "loop": false,
+   "gain": 0.9,
+   "hook": "existing hook reassemble (engine.onBurst end-aligned) — stack slides back + settle tock",
+   "trigger": "stack re-closes / scroll-back; buffer end aligned to return end",
+   "source": "slide_a reversed (minus last 1.2s) + tock_a settle"
+  },
+  "click": {
+   "files": {
+    "webm": "click.webm",
+    "ogg": "click.ogg",
+    "mp3": "click.mp3"
+   },
+   "duration_s": 0.39,
+   "lufs": -24.2,
+   "target_lufs": -24,
+   "true_peak_db": -4.0,
+   "loop": false,
+   "gain": 0.8,
+   "hook": "NEW hook click",
+   "trigger": "pointerdown/click anywhere interactive (ripple)",
+   "source": "click_b 0.09-0.48s"
+  },
+  "tock": {
+   "files": {
+    "webm": "tock.webm",
+    "ogg": "tock.ogg",
+    "mp3": "tock.mp3"
+   },
+   "duration_s": 0.565,
+   "lufs": -24.0,
+   "target_lufs": -24,
+   "true_peak_db": -7.77,
+   "loop": false,
+   "gain": 0.8,
+   "hook": "NEW hook tock",
+   "trigger": "glaze ball contact / collision (velocity-scaled gain), also loss-landscape ball landing ~39-48 s",
+   "source": "tock_a 0.285-0.85s"
+  },
+  "drag-loop": {
+   "files": {
+    "webm": "drag-loop.webm",
+    "ogg": "drag-loop.ogg",
+    "mp3": "drag-loop.mp3"
+   },
+   "duration_s": 2.85,
+   "lufs": -24.0,
+   "target_lufs": -24,
+   "true_peak_db": -4.0,
+   "loop": true,
+   "gain": 0.7,
+   "hook": "NEW hook drag (loop while dragging)",
+   "trigger": "start on drag start, gain ∝ pointer speed (0-1), 120 ms fade out on release",
+   "source": "drag_a 0.2-3.45s, 0.4s equal-power xfade"
+  },
+  "roll-loop": {
+   "files": {
+    "webm": "roll-loop.webm",
+    "ogg": "roll-loop.ogg",
+    "mp3": "roll-loop.mp3"
+   },
+   "duration_s": 6.55,
+   "lufs": -24.0,
+   "target_lufs": -24,
+   "true_peak_db": -4.0,
+   "loop": true,
+   "gain": 0.7,
+   "hook": "NEW hook roll (loop)",
+   "trigger": "glaze ball rolling, loss landscape 39-48 s; gain & playbackRate 0.9-1.1 ∝ ball speed",
+   "source": "roll_b 0.2-7.35s, de-bumped, 0.6s xfade"
+  },
+  "pulse": {
+   "files": {
+    "webm": "pulse.webm",
+    "ogg": "pulse.ogg",
+    "mp3": "pulse.mp3"
+   },
+   "duration_s": 1.54,
+   "lufs": -20.0,
+   "target_lufs": -20,
+   "true_peak_db": -4.0,
+   "loop": false,
+   "gain": 0.8,
+   "hook": "NEW hook pulse",
+   "trigger": "pulse runs up the bone spine, layers section 19.5-30 s (each pulse)",
+   "source": "pulse_a full"
+  },
+  "dive": {
+   "files": {
+    "webm": "dive.webm",
+    "ogg": "dive.ogg",
+    "mp3": "dive.mp3"
+   },
+   "duration_s": 0.9,
+   "lufs": -20.0,
+   "target_lufs": -20,
+   "true_peak_db": -4.54,
+   "loop": false,
+   "gain": 0.9,
+   "hook": "NEW hook dive",
+   "trigger": "product dive into FieldRelay/Counter/Roster room (attention section 30-39 s click); <1.2 s, also on Esc-back at 0.7 gain",
+   "source": "dive_b 0.02-0.92s, swell env (peak 45%), HP140 LP6k"
+  },
+  "pebbles": {
+   "files": {
+    "webm": "pebbles.webm",
+    "ogg": "pebbles.ogg",
+    "mp3": "pebbles.mp3"
+   },
+   "duration_s": 2.45,
+   "lufs": -20.3,
+   "target_lufs": -20,
+   "true_peak_db": -4.0,
+   "loop": false,
+   "gain": 0.9,
+   "hook": "NEW hook pebbles",
+   "trigger": "embedding pebbles scatter, ~48 s",
+   "source": "pebbles_a 0.15-2.6s"
+  },
+  "book-close": {
+   "files": {
+    "webm": "book-close.webm",
+    "ogg": "book-close.ogg",
+    "mp3": "book-close.mp3"
+   },
+   "duration_s": 1.75,
+   "lufs": -21.4,
+   "target_lufs": -20,
+   "true_peak_db": -4.0,
+   "loop": false,
+   "gain": 0.9,
+   "hook": "NEW hook book-close",
+   "trigger": "book closes ~61 s (before epoch 02 loop)",
+   "source": "book_a 1.55-3.3s"
+  }
+ },
+ "mix": {
+  "default": "sound OFF; visible toggle (top-right, speaker icon + label); persist choice in localStorage but still require a gesture to start",
+  "ambient": "starts only on first user gesture after toggle ON; fade-in 2.5 s; gain 0.5 on top of -30 LUFS file",
+  "ceiling": "master DynamicsCompressor (threshold -6, ratio 4) + never exceed gain 1.0; no cue louder than -20 LUFS file level",
+  "hover_debounce_ms": 120,
+  "reduced_motion": "hover/drag/roll muted; ambient optional",
+  "loops": "decode Opus into AudioBuffer, AudioBufferSourceNode.loop=true (never <audio loop>)"
+ }
+}

@@ -1,0 +1,1109 @@
+{
+ "scene": "emb",
+ "about": "PrimeArc 'emb' baked-lighting asset. Blender Z-up metres; GLB is glTF Y-up (x, z, -y). See /workspace/primearc/rebuild/README.md.",
+ "glb": "emb-baked.glb",
+ "bake_pose_t": 55.5,
+ "verify_times": [
+  50,
+  52,
+  55
+ ],
+ "lightmap_encoding": {
+  "rgb": "sRGB-encoded (LM / LMAX); texture.colorSpace = SRGBColorSpace, sampled with uv1 (TEXCOORD_1); irradiance = texel_linear * LMAX",
+  "LMAX": 2.0,
+  "three_lightMapIntensity_if_using_MeshStandardMaterial": 6.28319,
+  "aux": "linear (NoColorSpace), uv1, half resolution: R = sun visibility (soft shadow mask 0..1), G = baked AO (static/dyn) or 1 (ground), B unused",
+  "shading": "out = albedo * cavity(ORM.r) * (LM*LMAX + sunIrr * vis * (dot(Nd,L) - dot(Nd,Ng)*max(dot(Ng,L),0)) * detail) + spec",
+  "sun_irradiance_factor": [
+   1.01859,
+   0.99313,
+   0.95748
+  ],
+  "sun_dir_threejs": [
+   -0.07785,
+   0.7785,
+   0.6228
+  ],
+  "sun_dir_blender": [
+   -0.07785,
+   -0.6228,
+   0.7785
+  ]
+ },
+ "sets": {
+  "emb": {
+   "kind": "static",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 38738,
+   "lm_p1_p50_p99": [
+    0.0161,
+    0.6261,
+    1.2737
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_emb.webp",
+    "lightmaps/lm_emb_aux.webp"
+   ]
+  },
+  "ground_emb": {
+   "kind": "ground",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 166032,
+   "lm_p1_p50_p99": [
+    0.8779,
+    0.8837,
+    0.8891
+   ],
+   "clipped_frac": 0.0,
+   "files": [
+    "lightmaps/lm_ground_emb.webp",
+    "lightmaps/lm_ground_emb_aux.webp"
+   ]
+  },
+  "emb_dyn": {
+   "kind": "dyn",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 388178,
+   "ao_p1_p50": [
+    0.032,
+    0.552
+   ],
+   "ambient_linear": [
+    0.5153999924659729,
+    0.4375999867916107,
+    0.34220001101493835
+   ],
+   "ambient_hemi": {
+    "up": [
+     0.493,
+     0.4582,
+     0.4152
+    ],
+    "down": [
+     0.5591,
+     0.4615,
+     0.3465
+    ],
+    "ao": 0,
+    "dir": {
+     "a": [
+      0.5258,
+      0.4597,
+      0.3807
+     ],
+     "bx": [
+      0.0789,
+      0.0752,
+      0.07
+     ],
+     "by": [
+      0.2403,
+      0.2342,
+      0.2255
+     ],
+     "bz": [
+      -0.0323,
+      -0.0009,
+      0.035
+     ]
+    }
+   },
+   "files": [
+    "lightmaps/lm_emb_dyn_aux.webp"
+   ]
+  }
+ },
+ "materials": [
+  {
+   "material": "sand__ground_emb",
+   "index": 0,
+   "surface": "sand",
+   "kind": "sand",
+   "baseColor": "sand_albedo",
+   "normal": "sand_normal",
+   "orm": "sand_orm",
+   "uv0": "tiling, metric / 3.2 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_ground_emb.webp",
+   "lightmap_aux": "lightmaps/lm_ground_emb_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "clayrod__emb",
+   "index": 1,
+   "surface": "clayrod",
+   "kind": "clay",
+   "baseColor": "clay_rod_albedo",
+   "normal": "clay_normal",
+   "orm": "clay_orm",
+   "uv0": "tiling, metric / 0.3 m",
+   "glossy": false,
+   "lightmap": "lightmaps/lm_emb.webp",
+   "lightmap_aux": "lightmaps/lm_emb_aux.webp",
+   "uv1": "lightmap atlas (TEXCOORD_1)"
+  },
+  {
+   "material": "BoneStone__emb_dyn",
+   "index": 2,
+   "surface": "BoneStone",
+   "kind": "stone",
+   "baseColor": "stone_bone_albedo",
+   "normal": "stone_normal",
+   "orm": "stone_orm",
+   "uv0": "tiling, metric / 0.25 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_emb_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.5153999924659729,
+    0.4375999867916107,
+    0.34220001101493835
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "stone_terracotta__emb_dyn",
+   "index": 3,
+   "surface": "stone_terracotta",
+   "kind": "stone",
+   "baseColor": "stone_terracotta_albedo",
+   "normal": "stone_normal",
+   "orm": "stone_orm",
+   "uv0": "tiling, metric / 0.25 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_emb_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.5153999924659729,
+    0.4375999867916107,
+    0.34220001101493835
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  },
+  {
+   "material": "stone_darkclay__emb_dyn",
+   "index": 4,
+   "surface": "stone_darkclay",
+   "kind": "stone",
+   "baseColor": "stone_darkclay_albedo",
+   "normal": "stone_normal",
+   "orm": "stone_orm",
+   "uv0": "tiling, metric / 0.25 m",
+   "glossy": false,
+   "lightmap": null,
+   "ao": "lightmaps/lm_emb_dyn_aux.webp (G)",
+   "ambient_linear": [
+    0.5153999924659729,
+    0.4375999867916107,
+    0.34220001101493835
+   ],
+   "note": "LIVE: light = ao * ambient + sunIrr * max(dot(Nd, L), 0) (+ realtime shadow if the site adds one)"
+  }
+ ],
+ "objects": {
+  "ground_emb": {
+   "materials": [
+    "sand__ground_emb"
+   ],
+   "role": "ground",
+   "lightmap": "ground_emb"
+  },
+  "EMB_axx": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_axy": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_axz": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_bone0": {
+   "materials": [
+    "BoneStone__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_bone1": {
+   "materials": [
+    "BoneStone__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_bone2": {
+   "materials": [
+    "BoneStone__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb0": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb1": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb10": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb11": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb12": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb13": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb14": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb15": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb16": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb17": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb18": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb19": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb2": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb20": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb21": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb22": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb23": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb24": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb25": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb26": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb27": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb28": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb29": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb3": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb30": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb31": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb32": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb33": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb34": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb35": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb36": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb37": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb38": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb39": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb4": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb40": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb41": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb42": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb43": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb44": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb45": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb46": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb47": {
+   "materials": [
+    "stone_darkclay__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb48": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb49": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb5": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb50": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb51": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb52": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb53": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb54": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb55": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb56": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb57": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb58": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb59": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb6": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb60": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb61": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb62": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb63": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb64": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb65": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb66": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb67": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb68": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb69": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb7": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb8": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_peb9": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_tickx1": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_tickx2": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_tickx3": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_tickx4": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_tickx5": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_ticky1": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_ticky2": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_ticky3": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_ticky4": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_ticky5": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_tickz1": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_tickz2": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_tickz3": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_tickz4": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_tickz5": {
+   "materials": [
+    "clayrod__emb"
+   ],
+   "role": "static",
+   "lightmap": "emb"
+  },
+  "EMB_under0": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_under1": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  },
+  "EMB_under2": {
+   "materials": [
+    "stone_terracotta__emb_dyn"
+   ],
+   "role": "dynamic",
+   "lightmap": "none (dynamic: live light + baked AO)"
+  }
+ },
+ "hidden_in_lightmaps": [
+  "EMB_bone0",
+  "EMB_bone1",
+  "EMB_bone2",
+  "EMB_peb0",
+  "EMB_peb1",
+  "EMB_peb10",
+  "EMB_peb11",
+  "EMB_peb12",
+  "EMB_peb13",
+  "EMB_peb14",
+  "EMB_peb15",
+  "EMB_peb16",
+  "EMB_peb17",
+  "EMB_peb18",
+  "EMB_peb19",
+  "EMB_peb2",
+  "EMB_peb20",
+  "EMB_peb21",
+  "EMB_peb22",
+  "EMB_peb23",
+  "EMB_peb24",
+  "EMB_peb25",
+  "EMB_peb26",
+  "EMB_peb27",
+  "EMB_peb28",
+  "EMB_peb29",
+  "EMB_peb3",
+  "EMB_peb30",
+  "EMB_peb31",
+  "EMB_peb32",
+  "EMB_peb33",
+  "EMB_peb34",
+  "EMB_peb35",
+  "EMB_peb36",
+  "EMB_peb37",
+  "EMB_peb38",
+  "EMB_peb39",
+  "EMB_peb4",
+  "EMB_peb40",
+  "EMB_peb41",
+  "EMB_peb42",
+  "EMB_peb43",
+  "EMB_peb44",
+  "EMB_peb45",
+  "EMB_peb46",
+  "EMB_peb47",
+  "EMB_peb48",
+  "EMB_peb49",
+  "EMB_peb5",
+  "EMB_peb50",
+  "EMB_peb51",
+  "EMB_peb52",
+  "EMB_peb53",
+  "EMB_peb54",
+  "EMB_peb55",
+  "EMB_peb56",
+  "EMB_peb57",
+  "EMB_peb58",
+  "EMB_peb59",
+  "EMB_peb6",
+  "EMB_peb60",
+  "EMB_peb61",
+  "EMB_peb62",
+  "EMB_peb63",
+  "EMB_peb64",
+  "EMB_peb65",
+  "EMB_peb66",
+  "EMB_peb67",
+  "EMB_peb68",
+  "EMB_peb69",
+  "EMB_peb7",
+  "EMB_peb8",
+  "EMB_peb9",
+  "EMB_under0",
+  "EMB_under1",
+  "EMB_under2"
+ ],
+ "glb_bytes": 3366188,
+ "textures": [
+  {
+   "name": "sand_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 81360
+  },
+  {
+   "name": "sand_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 48824
+  },
+  {
+   "name": "sand_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 1926
+  },
+  {
+   "name": "clay_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 764858
+  },
+  {
+   "name": "clay_rod_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 69672
+  },
+  {
+   "name": "clay_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 41136
+  },
+  {
+   "name": "stone_normal",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 497686
+  },
+  {
+   "name": "stone_bone_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 166110
+  },
+  {
+   "name": "stone_orm",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 28674
+  },
+  {
+   "name": "stone_terracotta_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 31430
+  },
+  {
+   "name": "stone_darkclay_albedo",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 34810
+  },
+  {
+   "name": "lm_emb.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 18306
+  },
+  {
+   "name": "lm_emb_aux.webp",
+   "size": [
+    512,
+    512
+   ],
+   "bytes": 20432
+  },
+  {
+   "name": "lm_ground_emb.webp",
+   "size": [
+    2048,
+    2048
+   ],
+   "bytes": 28846
+  },
+  {
+   "name": "lm_ground_emb_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 137186
+  },
+  {
+   "name": "lm_emb_dyn_aux.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 388178
+  }
+ ],
+ "gpu_texture_memory_MB": 97.3,
+ "notes": "",
+ "triangles": null,
+ "ground_tiles": {
+  "ground_emb": {
+   "bbox": [
+    36.02728271484375,
+    58.02728271484375,
+    -7.968225955963135,
+    13.974970817565918
+   ],
+   "polys": 26840,
+   "verts": 27183,
+   "loss_faces": 0,
+   "z": [
+    -7.974661002663197e-07,
+    0.006148715037852526
+   ]
+  }
+ }
+}
